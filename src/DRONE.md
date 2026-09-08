@@ -22,7 +22,7 @@ The drone uses the following update loop:
 └──    Act
 ```
 
-### Sense 
+### Spatial perception 
 - IMU: acceleration + rotation
 - Cameras: visual information
 - Range/depth sensor: obstacles/distances
