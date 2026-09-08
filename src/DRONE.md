@@ -4,7 +4,7 @@
 ## Update loop
 The drone uses the following update loop:
 ```
-┌─> perception
+┌─> Perception
 |       |
 |       v
 |    Estimate
