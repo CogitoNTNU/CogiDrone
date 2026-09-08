@@ -43,7 +43,7 @@ This is where an EKF, VIO, etc. come in. If GPS is unavailable, VIO becomes espe
 
 ### Spatial representation
 Answer:
-    **"What’s around me?"**
+    **"What's around me?"**
 
 For example:
 - obstacle locations
@@ -55,7 +55,7 @@ SLAM may be used here if the drone needs to build a map while simultaneously loc
 
 ### Navigation
 Answer:
-    **"Given where I am and what’s around me, where should I go next?"**
+    **"Given where I am and what's around me, where should I go next?"**
 
 This includes:
 - mission logic
@@ -81,7 +81,7 @@ Then sensors measure the new situation, and the whole thing happens again.
 
 
 ## The important part for your project
-These don’t necessarily all run at the same frequency.
+These don't necessarily all run at the same frequency.
 | Part | Rough frequency |
 | --- | --- |
 | IMU sampling | 200–1000+ Hz |
@@ -92,11 +92,11 @@ These don’t necessarily all run at the same frequency.
 | Obstacle avoidance/planning | ~5–30 Hz |
 | High-level mission logic | ~1–10 Hz |
 
-So architecturally, I wouldn’t make one giant update loop. Your flight controller should handle the extremely fast, safety-critical estimation/control loops, while your onboard computer handles heavier autonomy tasks like VIO, perception, mapping and planning.
+So architecturally, I wouldn't make one giant update loop. Your flight controller should handle the extremely fast, safety-critical estimation/control loops, while your onboard computer handles heavier autonomy tasks like VIO, perception, mapping and planning.
 
 For Cogidrone, a sensible split is basically:
 ```
 Sensors → onboard computer (perception/VIO/planning) → desired trajectory → flight controller (estimation/control) → motors.
 ```
 
-That distinction will matter a lot when you’re deciding how powerful your onboard computer actually needs to be.
+That distinction will matter a lot when you're deciding how powerful your onboard computer actually needs to be.
