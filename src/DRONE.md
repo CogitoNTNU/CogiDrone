@@ -13,7 +13,7 @@ The drone uses the following update loop:
 |  Representaion
 |       |
 |       v
-|    Planning
+|   Navigation
 |       |
 |       v
 |    Control
@@ -53,7 +53,7 @@ For example:
   
 SLAM may be used here if the drone needs to build a map while simultaneously localizing itself.
 
-### Planning
+### Navigation
 Answer:
     **"Given where I am and what’s around me, where should I go next?"**
 
