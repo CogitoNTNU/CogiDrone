@@ -5,17 +5,17 @@ echo === CogiDrone ARM64 Build ===
 echo.
 
 REM Find configuration file relative to this script
-set "CONFIG_FILE=%~dp0toolchain.config"
+set "CONFIG_FILE=%~dp0toolchain.windows.config"
 
 if not exist "%CONFIG_FILE%" (
-    echo ERROR: toolchain.config not found.
+    echo ERROR: toolchain.windows.config not found.
     echo.
-    echo Copy toolchain.config.example to toolchain.config
+    echo Copy toolchain.windows.config.example to toolchain.windows.config
     echo and set ARM_GCC_ROOT to your Arm GNU Toolchain installation.
     exit /b 1
 )
 
-REM Read ARM_GCC_ROOT from toolchain.config
+REM Read ARM_GCC_ROOT from toolchain.windows.config
 for /f "usebackq tokens=1,* delims==" %%A in ("%CONFIG_FILE%") do (
     if "%%A"=="ARM_GCC_ROOT" set "ARM_GCC_ROOT=%%B"
 )
@@ -26,7 +26,7 @@ if defined ARM_GCC_ROOT (
 )
 
 if not defined ARM_GCC_ROOT (
-    echo ERROR: ARM_GCC_ROOT is not set in toolchain.config.
+    echo ERROR: ARM_GCC_ROOT is not set in toolchain.windows.config.
     exit /b 1
 )
 
@@ -34,7 +34,7 @@ if not exist "%ARM_GCC_ROOT%\bin\aarch64-none-linux-gnu-g++.exe" (
     echo ERROR: ARM GCC compiler not found:
     echo   "%ARM_GCC_ROOT%\bin\aarch64-none-linux-gnu-g++.exe"
     echo.
-    echo Check ARM_GCC_ROOT in toolchain.config.
+    echo Check ARM_GCC_ROOT in toolchain.windows.config.
     exit /b 1
 )
 
