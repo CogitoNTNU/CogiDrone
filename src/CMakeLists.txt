@@ -1,16 +1,25 @@
 add_executable(cogidrone
+    # Main
     drone.cpp
 
-    
-    
+    # Perception
+    perception/camera/camera.cpp
+    perception/vision/yolo.cpp
 
-    perception/camera/camera_node.cpp
-    perception/vision/yolo_detector.cpp
+    # Estimation
+
+    # Representation
+
+    # Navigation
+
+    # Control
+
+    # Act
 )
 
 target_include_directories(cogidrone
     PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 target_compile_features(cogidrone PRIVATE cxx_std_23)

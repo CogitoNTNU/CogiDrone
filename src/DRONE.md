@@ -7,7 +7,7 @@ The drone uses the following update loop:
 ┌──>  Perception
 |         |
 |         v
-|      Estimate
+|     Estimation
 |         |
 |         v
 |   Representaion
