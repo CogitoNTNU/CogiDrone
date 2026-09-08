@@ -1,4 +1,4 @@
-You should treat this as **three separate systems**:
+We should treat this as **three separate systems**:
 
 ```text
 Ground station / RC controller
