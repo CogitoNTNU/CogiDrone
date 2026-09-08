@@ -4,22 +4,22 @@
 ## Update loop
 The drone uses the following update loop:
 ```
-+--> Sense
-|      |
-|      v
-|   Estimate
-|      |
-|      v
-| Representaion
-|      |
-|      v
-|   Planning
-|      |
-|      v
-|   Control
-|      |
-|      v
-+---  Act
+┌─> perception
+|       |
+|       v
+|    Estimate
+|       |
+|       v
+|  Representaion
+|       |
+|       v
+|    Planning
+|       |
+|       v
+|    Control
+|       |
+|       v
+└──    Act
 ```
 
 ### Sense 
