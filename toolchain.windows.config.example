@@ -2,4 +2,4 @@
 # and set ARM_GCC_ROOT to the ROOT of your Arm GNU Toolchain.
 # This directory must contain bin/aarch64-none-linux-gnu-g++.
 
-ARM_GCC_ROOT="full/path/to/arm-gnu-toolchain-15.3.rel1"
+ARM_GCC_ROOT="C:/path/to/arm-gnu-toolchain-15.3.rel1"
