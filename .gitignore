@@ -212,7 +212,10 @@ bower_components
 .sass-cache
 connect.lock
 typings
+
+# Development
 .backup
+.dev
 
 # Logs
 logs
