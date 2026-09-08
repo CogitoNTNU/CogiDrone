@@ -1,1 +1,4 @@
-ARM_GCC_ROOT="full/path/to/toolchain/directory/here/arm-gnu-toolchain-15.3.rel1"
+# Copy this file to toolchain.config
+# and set ARM_GCC_ROOT to the location of your Arm GNU Toolchain.
+
+ARM_GCC_ROOT="full/path/to/arm-gnu-toolchain-15.3.rel1"
