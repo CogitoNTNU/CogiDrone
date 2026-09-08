@@ -4,30 +4,31 @@
 ## Update loop
 The drone uses the following update loop:
 ```
-┌─> Perception
-|       |
-|       v
-|    Estimate
-|       |
-|       v
-|  Representaion
-|       |
-|       v
-|   Navigation
-|       |
-|       v
-|    Control
-|       |
-|       v
-└──    Act
+┌──>  Perception
+|         |
+|         v
+|      Estimate
+|         |
+|         v
+|   Representaion
+|         |
+|         v
+|     Navigation
+|         |
+|         v
+|      Control
+|         |
+|         v
+└───     Act
 ```
 
-### Spatial perception 
+### Perception 
 - IMU: acceleration + rotation
 - Cameras: visual information
 - Range/depth sensor: obstacles/distances
 - GPS/GNSS (when available)
 - Barometer: altitude
+- Controller input: received manual input from physical controller 
   
 ### State estimation
 Combine those measurements to answer: 
@@ -54,6 +55,9 @@ For example:
 SLAM may be used here if the drone needs to build a map while simultaneously localizing itself.
 
 ### Navigation
+> [!IMPORTANT]
+> this segment should be skipped if we have received manual flight instructions fromm the physical controller
+
 Answer:
     **"Given where I am and what's around me, where should I go next?"**
 
