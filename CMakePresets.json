@@ -1,0 +1,12 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "linux-arm64",
+      "displayName": "Linux ARM64",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/linux-arm64",
+      "toolchainFile": "${sourceDir}/cmake/aarch64-linux-gnu.cmake"
+    }
+  ]
+}

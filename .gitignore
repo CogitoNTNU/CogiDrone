@@ -216,6 +216,10 @@ bower_components
 connect.lock
 typings
 
+# Development
+.backup
+.dev
+
 # Logs
 logs
 *.log
@@ -255,3 +259,7 @@ lerna-debug.log
 # System Files
 .DS_Store
 Thumbs.db
+
+# Toolchain config file
+# ! NOTE: THIS FILE IS REQUIRED TO BE GIT-IGNORED, ELSE IT WILL CAUSE OVERWRITES OF THE TOOLCHAIN CONFIGURATION FOR EVERYONE ELSE USING WINDOWS !!!!
+toolchain.windows.config
