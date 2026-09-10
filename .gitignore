@@ -6,6 +6,9 @@ __pycache__/
 # C extensions
 *.so
 
+# Downloaded YOLO model weights (auto-fetched by ultralytics on first run)
+*.pt
+
 # Distribution / packaging
 .Python
 build/
