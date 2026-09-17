@@ -1,12 +1,15 @@
 #pragma once
 
+#include "perception/perception.h"
 
-class Drone {
+
+class Drone {    
+private:
+    Perception perception;
+
 public:
     Drone();
     ~Drone();
-
-private:
     
 };
 
