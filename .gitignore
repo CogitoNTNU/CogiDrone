@@ -262,4 +262,4 @@ Thumbs.db
 toolchain.windows.config
 
 # 3rd party libraries
-third-party/
+# third-party/
