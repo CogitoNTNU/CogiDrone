@@ -7575,7 +7575,7 @@ SHA1: e5912613f9e7d046423d7a85bff75997fe05806e
 SHA256: ee087bd14eac6eae2ce63c54964a8452e01cf29d8b5874b234ebee5396706d4c
 SHA512: 2c7d55f24e7dc418a6815696db333a33ad07bbd12721d2519ec8a0c47a7c5d804da7630585d8c87044630397de8c5740ec7f995ca5108f23712de7af7a85ede8
 Homepage: https://reproducible-builds.org/
-Description: file non-deterministic information stripper — Debhelper add-on
+Description: file non-deterministic information stripper - Debhelper add-on
 Description-md5: 8d263bf649295a9e610e1397553155b8
 
 Package: dhcpcd-base
@@ -20927,7 +20927,7 @@ MD5sum: 432104724009e30a702e23efee9c04f8
 SHA1: 878b7c862c9c2acbf7a47473d0727cca7d44f68f
 SHA256: e9c76539315746cb65289f3d9571dfd5dfdd0b13be3ce4c441fac3ff45bd6a79
 SHA512: be9ba16c438c85ac2c16f6d7fd425201996a3141b9b58795dabe5fef57016b1aaf2aaef86945bb0f8836909b1b53a526ed55077cd1b56263c163f232c07f6efb
-Description: Adwaita GTK 2 theme — engine
+Description: Adwaita GTK 2 theme - engine
 Task: ubuntu-desktop-minimal, ubuntu-desktop, xubuntu-minimal, xubuntu-desktop, lubuntu-desktop, ubuntustudio-desktop, ubuntu-mate-core, ubuntu-mate-desktop, ubuntu-budgie-desktop-minimal, ubuntu-budgie-desktop, ubuntu-budgie-desktop-raspi, ubuntu-unity-desktop, edubuntu-desktop-gnome-minimal, edubuntu-desktop-gnome, edubuntu-desktop-gnome-raspi, ubuntucinnamon-desktop-minimal, ubuntucinnamon-desktop-raspi
 Description-md5: f3db194ed48f162a1b53a54e177a1e06
 
@@ -20949,7 +20949,7 @@ MD5sum: 47b00d2b0957c6913b82ba1ec399cb52
 SHA1: b1cb92bac970417c7958f8895cbf3db2746ba0b7
 SHA256: b6032590bdc4e404137f0d7aeef7ad8aa889cc27c5adb96618276d2bf5cdd4b5
 SHA512: ed80a4e798093d64723aa9a9f651dbc457c469a7da8f7b106f191b8433581382ab13b8f1ec2b84492f3aac037c5ac6482834af539bc0342e072017b312665185
-Description: Adwaita GTK 2 theme and Adwaita-dark GTK 3 theme — common files
+Description: Adwaita GTK 2 theme and Adwaita-dark GTK 3 theme - common files
 Task: ubuntu-desktop-minimal, ubuntu-desktop, xubuntu-minimal, xubuntu-desktop, lubuntu-desktop, ubuntustudio-desktop, ubuntu-mate-core, ubuntu-mate-desktop, ubuntu-budgie-desktop-minimal, ubuntu-budgie-desktop, ubuntu-budgie-desktop-raspi, ubuntu-unity-desktop, edubuntu-desktop-gnome-minimal, edubuntu-desktop-gnome, edubuntu-desktop-gnome-raspi, ubuntucinnamon-desktop-minimal, ubuntucinnamon-desktop-raspi
 Description-md5: 880cffd5023d496d6bfa2b0b4fc779fe
 
@@ -51819,7 +51819,7 @@ SHA1: 650614a9fed68f384bb100585a6a8b3fde1f03d5
 SHA256: a014a7f42921fde6c4468d7c7adc28f895f0ecd638b78c967297cc5bc2e06252
 SHA512: b69ff33e4f8855b43d2321f6ec4b8fb79ab8ce58ceee764c4fd24a0465f106a13085c43919ebbc6d4ab2d46487f0002ebcbebab325438975f8e93c20c4290623
 Homepage: https://reproducible-builds.org/
-Description: file non-deterministic information stripper — Perl module
+Description: file non-deterministic information stripper - Perl module
 Description-md5: 7a8f47713a14d4cffef04ea1071c8eaa
 
 Package: libfile-touch-perl
@@ -72561,7 +72561,7 @@ SHA1: 7a33eb72bbbabd483a6260593cdb92b0d43fe878
 SHA256: bd707c1d8738148381cc790ecd66626f50f92b3a3889f990c1cabfa2415fcd7d
 SHA512: 3d5ba3394734e77a507486444c71876c9284b8a29262dfce1c8fcb2c7168c18ea1985be8303599768027ae157e1e527b82146410fcf44280083b6d867205195d
 Homepage: https://github.com/kkos/oniguruma
-Description: regular expressions library — development files
+Description: regular expressions library - development files
 Description-md5: 25507f219fbf50e51f393e5fb2482030
 
 Package: libonig5
@@ -76053,7 +76053,7 @@ SHA1: b5e289ed8606fbb9fac3890bd945c0f116ad9591
 SHA256: d5658a2e493156af5e0c5f2dd557f2aaea1c59c605c1d976df5af229bdc9fab7
 SHA512: 42dfbe384d545475f3d7f968faa6aa6ed00c911bc6f84bddad24567c6d8870dfaf9f1dddc804cef525e3330fe94523231960ee583e2ded4ea5fda7261e76c647
 Homepage: https://pmem.io/pmdk/
-Description: Persistent Memory low level support library — debug build
+Description: Persistent Memory low level support library - debug build
 Description-md5: 697a0e77150bc6487a3729b3486cd5ae
 
 Package: libpmem2-dev
@@ -91909,7 +91909,7 @@ SHA1: ef1afab504527f8c966583e406badd93058b3c3e
 SHA256: bce62d6d0e9215f2d3efced60e2afbfd70834d606be1fa3b490a641b42b8d2a6
 SHA512: 6d1351a3e7bc2edc62e3569ea11f1f4b8dbfa0b85b664c61366424942c78a073a6b17457af88d7228b1c1dda258c3b1ecfb4138f48d9b650ecb5669b25ca58c3
 Homepage: https://developers.yubico.com/libu2f-host/
-Description: Universal 2nd Factor (U2F) — transitional package
+Description: Universal 2nd Factor (U2F) - transitional package
 Task: ubuntu-desktop-minimal, ubuntu-desktop, ubuntu-desktop-raspi, kubuntu-desktop, xubuntu-minimal, xubuntu-desktop, lubuntu-desktop, ubuntustudio-desktop-core, ubuntustudio-desktop, ubuntukylin-desktop, ubuntukylin-desktop-minimal, ubuntu-mate-core, ubuntu-mate-desktop, ubuntu-budgie-desktop-minimal, ubuntu-budgie-desktop, ubuntu-budgie-desktop-raspi, ubuntu-unity-desktop, edubuntu-desktop-gnome-minimal, edubuntu-desktop-gnome-raspi, ubuntucinnamon-desktop-minimal, ubuntucinnamon-desktop-raspi
 Description-md5: 3eddce28b1501e92cbac3e3ac635606b
 
@@ -118308,7 +118308,7 @@ SHA1: d3350e2dd4a5ceefdef0d53ed69d7e9847ad2311
 SHA256: 215f47225fb813acede59a0a84b5b7bedc7ef6339f7a5d3b32716c17ec776165
 SHA512: 8845916b68f8ceb00e946d2987fcf653fdbc19a0d0f076c03ec38d0ac10db3cce5a65ace76db8138811ef2731b62241b5d38dc61913ad3500431f6e233b45b15
 Homepage: https://github.com/mbr/tinyrpc/
-Description: small, modular RPC library — documentation
+Description: small, modular RPC library - documentation
 Description-md5: be1479cfae51e1f62aed89140cc64068
 
 Package: python-tornado-doc
@@ -126774,7 +126774,7 @@ SHA1: 99a0ee0919ab328e4555bbc0997f40e62c279b55
 SHA256: c349df96c34795078251949a400f667e70bea97e061c4a1a07d2ae0cb55bcf6d
 SHA512: d409f9d16e87c46b6a1d2846ff8aecb9875bb2e22ed56512d23b6216db0e32605e7ac5c811fbc268d6863c1fc129aeece43dcef7df2d955ec179f7ac02e49a68
 Homepage: https://github.com/mbr/tinyrpc/
-Description: small, modular RPC library — Python 3
+Description: small, modular RPC library - Python 3
 Description-md5: ec537061133b0456a11925d83d370e50
 
 Package: python3-tk

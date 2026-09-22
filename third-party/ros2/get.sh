@@ -41,7 +41,7 @@ fetch() {                                                                       
     "$CURL" $K -fLO "$1/$f"
     got=$(sha256sum "$deb" | awk '{print $1}')
     if [ "$want" != "$got" ]; then
-      echo "!! sha256 MISMATCH: $3 — bad copy, skipping"
+      echo "!! sha256 MISMATCH: $3 - bad copy, skipping"
       rm -f "$deb"
       return 0
     fi
@@ -56,7 +56,7 @@ fetch() {                                                                       
 
   # MSYS2 cannot create POSIX symlinks: tar falls back to copying the
   # target, but the target may appear later in the archive. Extract
-  # twice — pass 1 lays down real files (symlink errors tolerated),
+  # twice - pass 1 lays down real files (symlink errors tolerated),
   # pass 2 resolves the symlinks now that their targets exist.
   case "$member" in
     *.zst) tar --zstd -xf "$member" -C "$DEST" 2>/dev/null || true

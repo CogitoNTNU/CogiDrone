@@ -1105,7 +1105,7 @@ Description: Tools for working with curated collections of Cargo packages
  Motivation
  ----------
  .
- Cargo is designed to be highly reliable by ensuring that dependencies are either pulled from a central registry (like crates.io) or explicitly defined by their location (e.g., ``path = "../my-crate"``). While this approach provides great predictability, there are specialized use cases where developers may need more flexibility—specifically, when resolving dependencies from dynamically provided local directories without modifying the original source code.
+ Cargo is designed to be highly reliable by ensuring that dependencies are either pulled from a central registry (like crates.io) or explicitly defined by their location (e.g., ``path = "../my-crate"``). While this approach provides great predictability, there are specialized use cases where developers may need more flexibility-specifically, when resolving dependencies from dynamically provided local directories without modifying the original source code.
  .
  Other build systems and environments often provide mechanisms to search for dependencies across multiple locations:
  .
@@ -57650,7 +57650,7 @@ Size: 290228
 SHA256: a73e1dd379065446c07e7e481deffb295158872b1e8830b98d14d4cfe7ae3708
 SHA1: 25d053ce52fc2a28c27853a70f0eacf477f0571b
 MD5sum: af378c8bf597246a36131d05083b8a43
-Description: Real-time web-based system webview for ROS 2 — CPU, memory, swap, load average, and /rosout log viewer
+Description: Real-time web-based system webview for ROS 2 - CPU, memory, swap, load average, and /rosout log viewer
 
 Package: ros-jazzy-system-webview-dbgsym
 Package-Type: ddeb
@@ -143600,7 +143600,7 @@ Size: 291738
 SHA256: 560c9c5012f5d4ffbd7724224c05825554c4a4be144bd46d71b18423abee0abc
 SHA1: 6563e843ac37d2cf53c4fb475746660f48a1b021
 MD5sum: 6621c5898ece9987533fffe8448252c9
-Description: Real-time web-based system webview for ROS 2 — CPU, memory, swap, load average, and /rosout log viewer
+Description: Real-time web-based system webview for ROS 2 - CPU, memory, swap, load average, and /rosout log viewer
 
 Package: ros-rolling-system-webview-dbgsym
 Package-Type: ddeb
