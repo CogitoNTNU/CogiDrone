@@ -14,7 +14,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-# lib/
+lib/
 lib64/
 parts/
 sdist/
@@ -263,3 +263,4 @@ toolchain.windows.config
 
 # 3rd party libraries
 # third-party/
+!third-party
