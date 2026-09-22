@@ -1,4 +1,5 @@
 #include "perception.h"
+#include "perception/vision/yolo.h"
 
 
 Perception::Perception() {
