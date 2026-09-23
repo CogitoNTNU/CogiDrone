@@ -24,9 +24,13 @@ Drone::initiate(int argc, const char* argv[]) {
     // if (!perception) return std::unexpected(InitError::CameraNotFound);
 
     // 3. Assemble
+    // ? We wrap the raw pointer and let a unique_ptr take ownership to prevent leaks 
+    // ? caused by not deleting the Drone object. Note that the wrapping is simply  
+    // ? here because make_unique<Drone> is unavailable as the constructor is private
     return std::unique_ptr<Drone>(
-        new Drone(M{
-            .perception = std::move(*perception),
-        })
+        new Drone(M{                                                                    // ? We must return a Drone pointer, as the Drone 
+            .perception = std::move(*perception),                                       // ? object shouldn't be copyable nor movable, so 
+                                                                                        // ? we can't return a Drone object by value                            
+        })                                                                                  
     );
 }
