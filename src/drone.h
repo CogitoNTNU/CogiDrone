@@ -19,7 +19,7 @@ private:
 
 public:
     // Initialization error codes for the Drone class
-    enum class InitError {
+    enum class InitError {                                                              // ! NOTE: This becomes redundant if we're using std::optional
         ConfigInvalid,
         CameraNotFound,
         ModelLoadFailed,
@@ -39,7 +39,7 @@ public:
     // ? not fully constructed, eliminating the risk of a caller, or 
     // ? us - the author, using a partially constructed Drone object, 
     // ? which could lead to undefined behavior or crashes. 
-    [[nodiscard]] static std::expected<std::unique_ptr<Drone>, InitError> 
+    [[nodiscard]] static std::expected<std::unique_ptr<Drone>, InitError>               // ! NOTE: We need to use std::optional if we can't compile with C++23
     initiate(int argc, const char* argv[]);                                             // Factory method
 
     ~Drone();                                                                           // 1. Dtor: declared, requires cleanup via rclcpp::shutdown()  
