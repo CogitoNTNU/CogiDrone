@@ -12,6 +12,6 @@ public:
             rclcpp::SensorDataQoS(),
             [this](const sensor_msgs::msg::Image& msg) { (void)msg; });
         (void)sub;
-        RCLCPP_INFO(get_logger(), "{}", std::format("ok"));
+        RCLCPP_INFO(get_logger(), "ok");
     }
 };

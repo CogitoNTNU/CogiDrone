@@ -97,14 +97,25 @@ ROS_PKGS=(
   ros-jazzy-ament-index-cpp ros-jazzy-class-loader
   ros-jazzy-console-bridge-vendor
   ros-jazzy-fastcdr ros-jazzy-fastrtps
+  ros-jazzy-rcl-logging-interface ros-jazzy-rcl-logging-spdlog
+  ros-jazzy-rosidl-dynamic-typesupport-fastrtps
 )
+
 
 # ! NOT NEEDED: the cross-toolchain supplies its own 
 # !             libstdc++/libc headers (see CMake toolchain file)
 # --- Ubuntu noble arm64: minimal sysroot so std:: resolves ---
 # // UB_PKGS=(libgcc-13-dev libstdc++-13-dev libc6-dev linux-libc-dev libconsole-bridge-dev)
 
+SYS_PKGS=(
+  libssl3t64 libyaml-0-2 libtinyxml2-10 libconsole-bridge1.0 liblttng-ust1t64
+  libnuma1 liblttng-ust-common1t64
+  libspdlog1.12 libfmt9
+)
+
+
 for p in "${ROS_PKGS[@]}"; do fetch "$ROS_BASE" ros-Packages "$p"; done
-for p in "${UB_PKGS[@]}";  do fetch "$UB_BASE"  ub-Packages  "$p"; done
+# for p in "${UB_PKGS[@]}";  do fetch "$UB_BASE"  ub-Packages  "$p"; done
+for p in "${SYS_PKGS[@]}"; do fetch "$UB_BASE" ub-Packages "$p"; done
 
 echo "Done. Headers at $DEST/opt/ros/jazzy/include"
