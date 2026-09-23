@@ -58,9 +58,11 @@ target_link_libraries(cogidrone PRIVATE
 target_link_options(cogidrone PRIVATE
     "-Wl,-rpath-link,${CMAKE_SOURCE_DIR}/third-party/ros2/opt/ros/jazzy/lib"
     "-Wl,-rpath-link,${CMAKE_SOURCE_DIR}/third-party/ros2/usr/lib/aarch64-linux-gnu"
-    # "-Wl,--allow-shlib-undefined"                                                       # ? UNCOMMENT THIS IF WE EVER WANNA BLINDLY LINK TO A LIB   
-)                                                                                         # ? WHICH WE KNOW EXISTS ON THE TARGET, BUT WHICH IS NOT  
-                                                                                          # ? PRESENT IN THE CROSS-TOOLCHAIN SYSROOT!
+
+    # ? UNCOMMENT THIS IF WE EVER WANNA BLINDLY LINK TO A LIB WHICH WE KNOW EXISTS ON THE TARGET, BUT WHICH IS NOT PRESENT IN THE CROSS-TOOLCHAIN SYSROOT!
+    # "-Wl,--allow-shlib-undefined"            
+)    
+
 # * Compile
 target_compile_features(cogidrone PRIVATE cxx_std_23)
 
