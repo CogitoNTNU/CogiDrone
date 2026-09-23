@@ -7,11 +7,13 @@ int main(int argc, char* argv[]) {
 
     // Ensure correct initialization
     if (!drone) {
-        // handle: log InitError, exit — right here, not 10 minutes into a flight
+        // TODO: 
+        //     : - handle: log InitError
+        //     : - exit, right here, not 10 minutes into a flight
         return 1;
     }
 
-    // Start the drone on the main thread, and let it run until the user presses Ctrl+C or the drone is stopped.
+    // Start the drone on the main thread, and let it run until the drone is stopped.
     (*drone)->start();
  
     return 0;
