@@ -18,6 +18,7 @@ private:
     explicit Drone(M&& m);                                                              // No default ctor exposed
 
 public:
+    // Initialization error codes for the Drone class
     enum class InitError {
         ConfigInvalid,
         CameraNotFound,
