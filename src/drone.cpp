@@ -35,3 +35,14 @@ Drone::initiate(int argc, const char* argv[]) {
         })                                                                                  
     );
 }
+
+
+
+// * Public interface
+inline void Drone::start() {
+    // TODO: Ensure that this is the correct place and design choice for starting the Drone object
+    // Start the ROS event loop, which will run until rclcpp::shutdown() is called
+    rclcpp::spin(std::make_shared<rclcpp::Node>("drone_node"));
+}
+
+inline void Drone::stop() {}
