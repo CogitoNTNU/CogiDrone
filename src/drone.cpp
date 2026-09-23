@@ -12,7 +12,6 @@ Drone::~Drone() {
     }
 }
 
-
 std::expected<std::unique_ptr<Drone>, Drone::InitError>
 Drone::initiate(int argc, const char* argv[]) {
     // 1. Initialize ROS global state, so subsystems can create nodes
