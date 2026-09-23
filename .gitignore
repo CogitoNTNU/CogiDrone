@@ -203,10 +203,11 @@ bower_components
 
 # IDE - VSCode
 .vscode/*
-!.vscode/settings.json
+# !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
+!.vscode/c_cpp_properties.json
 
 # misc
 .sass-cache
@@ -257,7 +258,7 @@ lerna-debug.log
 .DS_Store
 Thumbs.db
 
-# Toolchain config file
+# Toolchain
 # ! NOTE: THIS FILE IS REQUIRED TO BE GIT-IGNORED, ELSE IT WILL CAUSE OVERWRITES OF THE TOOLCHAIN CONFIGURATION FOR EVERYONE ELSE USING WINDOWS !!!!
 toolchain.windows.config
 

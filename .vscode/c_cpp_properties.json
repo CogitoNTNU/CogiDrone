@@ -1,0 +1,9 @@
+{
+  "configurations": [
+    {
+      "name": "Jazzy arm64",
+      "configurationProvider": "ms-vscode.cmake-tools"
+    }
+  ],
+  "version": 4
+}

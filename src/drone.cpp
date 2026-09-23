@@ -2,8 +2,7 @@
 
 
 
-
-Drone::Drone() : perception(Perception()) {
+Drone::Drone() : perception() {
     // Constructor implementation
 }
 

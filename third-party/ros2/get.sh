@@ -11,9 +11,9 @@ K="-k"                                                                          
 
 mkdir -p "$DEST/debs" && cd "$DEST/debs"
 
-get_index() {                                                                           # $1=base $2=name
-  "$CURL" $K -fL "$1/dists/noble/main/binary-arm64/Packages.gz" -o "$2.gz" \
-    || "$CURL" $K -fL "$1/dists/noble/main/binary-arm64/Packages.xz" -o "$2.xz"
+get_index() {                                                                           # $1=base $2=name $3=component
+  "$CURL" $K -fL "$1/dists/noble/$3/binary-arm64/Packages.gz" -o "$2.gz" \
+    || "$CURL" $K -fL "$1/dists/noble/$3/binary-arm64/Packages.xz" -o "$2.xz"
   [ -f "$2.gz" ] && gzip -dkf "$2.gz" || xz -dkf "$2.xz"
 }
 
@@ -69,18 +69,26 @@ fetch() {                                                                       
   rm -f "$member"
 }
 
-get_index "$ROS_BASE" ros-Packages
-get_index "$UB_BASE"  ub-Packages
+get_index "$ROS_BASE" ros-Packages main
+get_index "$UB_BASE"  ub-Packages main
+get_index "$UB_BASE"  ub-Packages-universe universe
+cat ub-Packages-universe >> ub-Packages        # merge; awk takes the first match per package
 
 # --- ROS 2 Jazzy: core + message packages (headers for IntelliSense) ---
 ROS_PKGS=(
   ros-jazzy-rclcpp ros-jazzy-rcl ros-jazzy-rcl-interfaces
+  ros-jazzy-service-msgs ros-jazzy-type-description-interfaces
+  ros-jazzy-rcl-yaml-param-parser
   ros-jazzy-rcutils ros-jazzy-rcpputils
   ros-jazzy-rmw ros-jazzy-rmw-implementation ros-jazzy-rmw-fastrtps-cpp
+  ros-jazzy-rmw-fastrtps-shared-cpp ros-jazzy-rmw-dds-common
   ros-jazzy-rosidl-runtime-c ros-jazzy-rosidl-runtime-cpp
   ros-jazzy-rosidl-typesupport-interface
   ros-jazzy-rosidl-typesupport-c ros-jazzy-rosidl-typesupport-cpp
   ros-jazzy-rosidl-typesupport-fastrtps-c ros-jazzy-rosidl-typesupport-fastrtps-cpp
+  ros-jazzy-rosidl-typesupport-introspection-c
+  ros-jazzy-rosidl-typesupport-introspection-cpp
+  ros-jazzy-rosidl-dynamic-typesupport
   ros-jazzy-builtin-interfaces ros-jazzy-std-msgs ros-jazzy-sensor-msgs
   ros-jazzy-geometry-msgs ros-jazzy-nav-msgs
   ros-jazzy-rosgraph-msgs ros-jazzy-statistics-msgs
@@ -92,7 +100,9 @@ ROS_PKGS=(
 )
 
 # --- Ubuntu noble arm64: minimal sysroot so std:: resolves ---
-UB_PKGS=(gcc-13 libstdc++-13-dev libc6-dev linux-libc-dev)
+# ! NOT NEEDED: the cross-toolchain supplies its own 
+# !             libstdc++/libc headers (see CMake toolchain file)
+# UB_PKGS=(libgcc-13-dev libstdc++-13-dev libc6-dev linux-libc-dev libconsole-bridge-dev)
 
 for p in "${ROS_PKGS[@]}"; do fetch "$ROS_BASE" ros-Packages "$p"; done
 for p in "${UB_PKGS[@]}";  do fetch "$UB_BASE"  ub-Packages  "$p"; done
