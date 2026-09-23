@@ -99,10 +99,10 @@ ROS_PKGS=(
   ros-jazzy-fastcdr ros-jazzy-fastrtps
 )
 
-# --- Ubuntu noble arm64: minimal sysroot so std:: resolves ---
 # ! NOT NEEDED: the cross-toolchain supplies its own 
 # !             libstdc++/libc headers (see CMake toolchain file)
-# UB_PKGS=(libgcc-13-dev libstdc++-13-dev libc6-dev linux-libc-dev libconsole-bridge-dev)
+# --- Ubuntu noble arm64: minimal sysroot so std:: resolves ---
+# // UB_PKGS=(libgcc-13-dev libstdc++-13-dev libc6-dev linux-libc-dev libconsole-bridge-dev)
 
 for p in "${ROS_PKGS[@]}"; do fetch "$ROS_BASE" ros-Packages "$p"; done
 for p in "${UB_PKGS[@]}";  do fetch "$UB_BASE"  ub-Packages  "$p"; done
