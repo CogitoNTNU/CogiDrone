@@ -9,12 +9,12 @@ from ultralytics import YOLO
 
 from camera import open_webcam, close_webcam, COCO_CLASS_NAMES
 
-MODEL_WEIGHTS = "yolov8n.pt"
+MODEL_WEIGHTS = "yolo26n.pt"
 AVERAGE_HUMAN_HEIGHT_M = 1.70
 
 
 def main() -> None:
-    cap = open_webcam()
+    cap = open_webcam(width=1280, height=720,camera_index=1)
     model = YOLO(MODEL_WEIGHTS)
 
     print("Laster inn Depth Anything V2...")
