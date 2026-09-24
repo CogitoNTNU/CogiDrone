@@ -1,0 +1,8 @@
+setup.py
+service_msgs/__init__.py
+service_msgs.egg-info/PKG-INFO
+service_msgs.egg-info/SOURCES.txt
+service_msgs.egg-info/dependency_links.txt
+service_msgs.egg-info/top_level.txt
+service_msgs/msg/__init__.py
+service_msgs/msg/_service_event_info.py
