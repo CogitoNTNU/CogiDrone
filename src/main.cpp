@@ -1,7 +1,7 @@
 #include "drone.h"
 
 
-int main(int argc, char* argv[]) {
+int main(int argc, const char* argv[]) {
     // Instantiate the Drone class
     auto drone = Drone::initiate(argc, argv);
 
@@ -14,7 +14,7 @@ int main(int argc, char* argv[]) {
     }
 
     // Start the drone on the main thread, and let it run until the drone is stopped.
-    (*drone)->start();
+    // drone->start();
  
     return 0;
 }
