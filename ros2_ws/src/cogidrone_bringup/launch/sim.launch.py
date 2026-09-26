@@ -17,6 +17,18 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 PX4_DIR = os.environ.get("PX4_DIR", "/opt/PX4-Autopilot")
+PX4_PARAM = os.path.join(PX4_DIR, "build/px4_sitl_default/bin/px4-param")
+SET_NO_GCS_REQUIRED = f"""
+ok=0
+for i in $(seq 1 60); do
+  sleep 2
+  if {PX4_PARAM} show NAV_DLL_ACT 2>/dev/null | grep -q ": 0$"; then
+    ok=$((ok+1)); [ $ok -ge 5 ] && exit 0
+  else
+    ok=0; {PX4_PARAM} set NAV_DLL_ACT 0 >/dev/null 2>&1
+  fi
+done
+"""
 
 
 def _px4(context):
@@ -25,8 +37,6 @@ def _px4(context):
         "PX4_SYS_AUTOSTART": "4001",
         "PX4_SIM_MODEL": "gz_" + LaunchConfiguration("model").perform(context),
         "PX4_GZ_WORLD": LaunchConfiguration("world").perform(context),
-        # Sim only: allow arming without QGroundControl connected (keep this on the real drone).
-        "PX4_PARAM_NAV_DLL_ACT": "0",
         # ROS ships its own `gz` without the simulator; point it at Gazebo Harmonic's config.
         "GZ_CONFIG_PATH": os.environ.get("GZ_CONFIG_PATH", "") + ":/usr/share/gz",
     }
@@ -38,7 +48,14 @@ def _px4(context):
             cwd=PX4_DIR,
             additional_env=env,
             output="screen",
-        )
+        ),
+        # Sim only: allow arming without QGroundControl connected (keep this on the
+        # real drone). PX4 raises this default late in startup, which overrides a
+        # PX4_PARAM_ env var, so keep setting it until it has stayed 0 for a while.
+        ExecuteProcess(
+            cmd=["bash", "-c", SET_NO_GCS_REQUIRED],
+            output="log",
+        ),
     ]
 
 

@@ -14,26 +14,10 @@ import math
 from enum import Enum, auto
 
 import rclpy
-from px4_msgs.msg import (
-    OffboardControlMode,
-    TrajectorySetpoint,
-    VehicleCommand,
-    VehicleLocalPosition,
-    VehicleStatus,
-)
-from rclpy.node import Node
-from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
+from px4_msgs.msg import VehicleStatus
 from vision_msgs.msg import Detection2DArray
 
-RATE_HZ = 10.0
-
-# PX4 publishes best-effort; our subscriptions must match or nothing arrives.
-PX4_QOS = QoSProfile(
-    reliability=ReliabilityPolicy.BEST_EFFORT,
-    durability=DurabilityPolicy.TRANSIENT_LOCAL,
-    history=HistoryPolicy.KEEP_LAST,
-    depth=1,
-)
+from cogidrone_control.px4_node import RATE_HZ, Px4Node, wrap_pi
 
 
 class State(Enum):
@@ -44,11 +28,7 @@ class State(Enum):
     LAND = auto()
 
 
-def wrap_pi(angle: float) -> float:
-    return math.atan2(math.sin(angle), math.cos(angle))
-
-
-class Offboard(Node):
+class Offboard(Px4Node):
     def __init__(self):
         super().__init__("offboard")
         self.declare_parameter("altitude", 3.0)  # m above takeoff point
@@ -61,11 +41,6 @@ class Offboard(Node):
         self.declare_parameter("search_rate_deg", 20.0)
         self.declare_parameter("lost_timeout_s", 1.0)
         self.declare_parameter("land_after_s", 0.0)  # 0 = hover/track until Ctrl+C
-        # PX4 >= 1.16 appends _vN to versioned message topics.
-        self.declare_parameter("status_topic", "/fmu/out/vehicle_status_v1")
-        self.declare_parameter(
-            "local_position_topic", "/fmu/out/vehicle_local_position_v1"
-        )
 
         p = lambda name: self.get_parameter(name).value
         self.altitude = p("altitude")
@@ -79,27 +54,10 @@ class Offboard(Node):
         self.lost_timeout = p("lost_timeout_s")
         self.land_after = p("land_after_s")
 
-        self.mode_pub = self.create_publisher(
-            OffboardControlMode, "/fmu/in/offboard_control_mode", PX4_QOS
-        )
-        self.setpoint_pub = self.create_publisher(
-            TrajectorySetpoint, "/fmu/in/trajectory_setpoint", PX4_QOS
-        )
-        self.command_pub = self.create_publisher(
-            VehicleCommand, "/fmu/in/vehicle_command", PX4_QOS
-        )
-        self.create_subscription(
-            VehicleStatus, p("status_topic"), self.on_status, PX4_QOS
-        )
-        self.create_subscription(
-            VehicleLocalPosition, p("local_position_topic"), self.on_position, PX4_QOS
-        )
         self.create_subscription(
             Detection2DArray, "/cogidrone/detections", self.on_detections, 10
         )
 
-        self.status: VehicleStatus | None = None
-        self.position: VehicleLocalPosition | None = None
         self.state = State.WAIT_FOR_PX4
         self.state_ticks = 0
         self.hold_xy = (0.0, 0.0)
@@ -112,12 +70,6 @@ class Offboard(Node):
         self.get_logger().info("Waiting for PX4 (is the XRCE agent running?)...")
 
     # --- inputs -------------------------------------------------------------
-
-    def on_status(self, msg: VehicleStatus):
-        self.status = msg
-
-    def on_position(self, msg: VehicleLocalPosition):
-        self.position = msg
 
     def on_detections(self, msg: Detection2DArray):
         best = None
@@ -166,12 +118,7 @@ class Offboard(Node):
                 self.state_ticks >= RATE_HZ
                 and self.state_ticks % int(2 * RATE_HZ) == RATE_HZ
             ):
-                self.command(
-                    VehicleCommand.VEHICLE_CMD_DO_SET_MODE, param1=1.0, param2=6.0
-                )  # 6 = offboard
-                self.command(
-                    VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM, param1=1.0
-                )
+                self.arm_offboard()
                 self.get_logger().info("Requesting offboard mode + arm")
             if self.is_armed_offboard():
                 self.get_logger().info(
@@ -188,7 +135,7 @@ class Offboard(Node):
             self.update_yaw()
             if self.land_after > 0 and self.state_ticks > self.land_after * RATE_HZ:
                 self.get_logger().info("Time is up, landing")
-                self.command(VehicleCommand.VEHICLE_CMD_NAV_LAND)
+                self.land()
                 self.set_state(State.LAND)
 
     def update_yaw(self):
@@ -218,42 +165,13 @@ class Offboard(Node):
 
     def is_armed_offboard(self) -> bool:
         return (
-            self.status.arming_state == VehicleStatus.ARMING_STATE_ARMED
+            self.is_armed()
             and self.status.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD
         )
 
     def set_state(self, state: State):
         self.state = state
         self.state_ticks = 0
-
-    def timestamp_us(self) -> int:
-        return self.get_clock().now().nanoseconds // 1000
-
-    def publish_offboard_mode(self):
-        msg = OffboardControlMode()
-        msg.position = True
-        msg.timestamp = self.timestamp_us()
-        self.mode_pub.publish(msg)
-
-    def publish_setpoint(self, x: float, y: float, z: float, yaw: float):
-        msg = TrajectorySetpoint()
-        msg.position = [float(x), float(y), float(z)]
-        msg.yaw = float(yaw)
-        msg.timestamp = self.timestamp_us()
-        self.setpoint_pub.publish(msg)
-
-    def command(self, command: int, **params: float):
-        msg = VehicleCommand()
-        msg.command = command
-        for i in range(1, 8):
-            setattr(msg, f"param{i}", params.get(f"param{i}", 0.0))
-        msg.target_system = 1
-        msg.target_component = 1
-        msg.source_system = 1
-        msg.source_component = 1
-        msg.from_external = True
-        msg.timestamp = self.timestamp_us()
-        self.command_pub.publish(msg)
 
 
 def main():

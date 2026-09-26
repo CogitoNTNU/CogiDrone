@@ -19,6 +19,7 @@ setup(
     entry_points={
         "console_scripts": [
             "offboard = cogidrone_control.offboard:main",
+            "teleop = cogidrone_control.teleop:main",
         ],
     },
 )
