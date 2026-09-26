@@ -34,15 +34,24 @@ class Teleop(Px4Node):
     def __init__(self):
         super().__init__("teleop")
         self.flying = False
+        self.stream_ticks = 0
         self.sp = [0.0, 0.0, 0.0]
         self.yaw_sp = 0.0
         self.create_timer(1.0 / RATE_HZ, self.tick)
 
     def tick(self):
         # PX4 needs a steady setpoint stream to enter and stay in offboard mode.
-        if self.flying:
-            self.publish_offboard_mode()
-            self.publish_setpoint(*self.sp, self.yaw_sp)
+        if not self.flying:
+            return
+        self.publish_offboard_mode()
+        self.publish_setpoint(*self.sp, self.yaw_sp)
+        self.stream_ticks += 1
+        # Only after ~1 s of setpoints will PX4 accept offboard; retry every 2 s.
+        if (
+            not self.is_armed_offboard()
+            and self.stream_ticks % int(2 * RATE_HZ) == RATE_HZ
+        ):
+            self.arm_offboard()
 
     def hold_here(self):
         p = self.position
@@ -57,7 +66,7 @@ class Teleop(Px4Node):
             self.hold_here()
             self.sp[2] = p.z - TAKEOFF_M
             self.flying = True
-            self.arm_offboard()
+            self.stream_ticks = 0
         elif k == "l":
             self.flying = False
             self.land()

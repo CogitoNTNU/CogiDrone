@@ -14,7 +14,6 @@ import math
 from enum import Enum, auto
 
 import rclpy
-from px4_msgs.msg import VehicleStatus
 from vision_msgs.msg import Detection2DArray
 
 from cogidrone_control.px4_node import RATE_HZ, Px4Node, wrap_pi
@@ -155,18 +154,14 @@ class Offboard(Px4Node):
     # --- helpers --------------------------------------------------------------
 
     def px4_ready(self) -> bool:
+        # Not status.pre_flight_checks_pass: that is for the *current* mode, and the
+        # default mode needs an RC stick, so it stays false until we are in offboard.
+        # PX4 still runs every arming check when we request arm.
         return (
             self.status is not None
             and self.position is not None
-            and self.status.pre_flight_checks_pass
             and self.position.xy_valid
             and self.position.z_valid
-        )
-
-    def is_armed_offboard(self) -> bool:
-        return (
-            self.is_armed()
-            and self.status.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD
         )
 
     def set_state(self, state: State):

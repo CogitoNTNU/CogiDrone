@@ -77,6 +77,12 @@ class Px4Node(Node):
             and self.status.arming_state == VehicleStatus.ARMING_STATE_ARMED
         )
 
+    def is_armed_offboard(self) -> bool:
+        return (
+            self.is_armed()
+            and self.status.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD
+        )
+
     def timestamp_us(self) -> int:
         return self.get_clock().now().nanoseconds // 1000
 
