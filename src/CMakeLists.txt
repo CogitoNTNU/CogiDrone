@@ -18,8 +18,7 @@ add_executable(cogidrone
 
     # Perception
     perception/perception.cpp
-    perception/camera/camera.cpp
-    perception/vision/yolo.cpp
+    perception/models/yolo.cpp
 
     # Estimation
 
