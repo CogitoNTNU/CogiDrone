@@ -19,7 +19,7 @@ std::expected<Person, Person::InitError> Person::create() {
 // ??:
 // // Person::~Person() = default;                                                                // members clean up (engine handle)
 
-std::vector<Person::Detection> Person::detect(const Frame& frame) {
-    // preprocess -> infer -> decode
-    return {};
-}
+// std::vector<Person::Detection> Person::detect(const Frame& frame) {
+//     // preprocess -> infer -> decode
+//     return {};
+// }
