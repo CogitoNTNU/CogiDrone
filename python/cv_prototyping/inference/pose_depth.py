@@ -77,7 +77,7 @@ def draw_pose(img, obj_kps: np.ndarray) -> None:
 
 
 def main() -> None:
-    cap = open_webcam()
+    cap = open_webcam(camera_index=1)
     model = YOLO(MODEL_WEIGHTS)
     pose_model = YOLO(POSE_MODEL_WEIGHTS)
 
