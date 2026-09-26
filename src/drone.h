@@ -15,7 +15,8 @@ private:
 
     // * Ctors & dtor
     // Ctor
-    explicit Drone(M&& m);                                                              // No default ctor exposed
+    // TODO: Fix ctor
+    explicit Drone(M&& m) : m(std::move(m)) {}                                          // No default ctor exposed
 
 public:
     // Initialization error codes for the Drone class

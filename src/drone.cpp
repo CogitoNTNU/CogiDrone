@@ -4,7 +4,6 @@
 
 
 // * Ctor & dtor
-Drone::Drone(M&& m) : m(std::move(m)) {} 
 Drone::~Drone() {
     // Shutdown ROS context if it was initialized
     if (rclcpp::ok()) {
@@ -41,8 +40,10 @@ Drone::initiate(int argc, const char* argv[]) {
 // * Public interface
 void Drone::start() {
     // TODO: Ensure that this is the correct place and design choice for starting the Drone object
-    // Start the ROS event loop, which will run until rclcpp::shutdown() is called
-    // rclcpp::spin(std::make_shared<rclcpp::Node>("drone_node"));
+    rclcpp::executors::MultiThreadedExecutor executor;                                  // Local
+    executor.add_node(m.perception.node());
+    executor.spin();                                                                    // ! Blocks until shutdown
+    // executor destroyed here — releases its node references
 }
 
 void Drone::stop() {
