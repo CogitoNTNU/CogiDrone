@@ -1,0 +1,4 @@
+# Only docker/sim is needed to build the sim image (see compose.yaml).
+# The repo itself is bind-mounted at runtime.
+*
+!docker/sim

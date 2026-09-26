@@ -1,3 +1,13 @@
-int main() {
-    return 0;
+#include "drone.h"
+
+
+
+
+Drone::Drone() : perception(Perception()) {
+    // Constructor implementation
+}
+
+
+Drone::~Drone() {
+    // Destructor implementation
 }
