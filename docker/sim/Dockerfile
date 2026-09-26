@@ -59,7 +59,7 @@ RUN mkdir -p /opt/px4_ws/src \
     && git clone --depth 1 -b ${PX4_MSGS_BRANCH} https://github.com/PX4/px4_msgs.git /opt/px4_ws/src/px4_msgs \
     && source /opt/ros/${ROS_DISTRO}/setup.bash \
     && cd /opt/px4_ws \
-    && colcon build --event-handlers console_cohesion- \
+    && MAKEFLAGS=-j4 colcon build --executor sequential --event-handlers console_cohesion- \
     && rm -rf build log
 
 COPY docker/sim/env.sh /opt/cogidrone/env.sh
@@ -77,6 +77,8 @@ FROM dev AS sim
 ARG ROS_DISTRO
 ARG PX4_VERSION=v1.17.0
 ARG XRCE_AGENT_VERSION=v2.4.3
+# Parallel compile jobs. Each needs ~1 GB RAM; raise it if Docker has more memory.
+ARG BUILD_JOBS=4
 
 # Gazebo Harmonic (the version PX4 and ROS 2 Jazzy both target).
 RUN apt-get update && apt-get install -y --no-install-recommends lsb-release gnupg \
@@ -103,12 +105,12 @@ RUN git clone --depth 1 --recursive --shallow-submodules -b ${PX4_VERSION} \
         https://github.com/PX4/PX4-Autopilot.git /opt/PX4-Autopilot \
     && /opt/venv/bin/pip install --no-cache-dir "numpy<2" -r /opt/PX4-Autopilot/Tools/setup/requirements.txt \
     && cd /opt/PX4-Autopilot \
-    && make px4_sitl
+    && make px4_sitl j=${BUILD_JOBS}
 
 # Micro XRCE-DDS Agent: bridges PX4 (uORB) <-> ROS 2 (DDS) over UDP 8888.
 RUN git clone --depth 1 -b ${XRCE_AGENT_VERSION} https://github.com/eProsima/Micro-XRCE-DDS-Agent.git /tmp/xrce \
     && cmake -S /tmp/xrce -B /tmp/xrce/build -DCMAKE_BUILD_TYPE=Release \
-    && cmake --build /tmp/xrce/build -j"$(nproc)" \
+    && cmake --build /tmp/xrce/build -j"${BUILD_JOBS}" \
     && cmake --install /tmp/xrce/build \
     && ldconfig \
     && rm -rf /tmp/xrce
