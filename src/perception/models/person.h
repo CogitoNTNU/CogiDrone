@@ -1,11 +1,10 @@
-// yolo.h — plain C++ class, NO rclcpp
 #pragma once
 
 #include <expected>
 #include <memory>
 
 
-class Yolo {
+class Person {
 private:
     struct M { 
         /* 
@@ -14,23 +13,23 @@ private:
         */
     } m;
 
-    explicit Yolo(M&& m) : m(std::move(m)) {}
+    explicit Person(M&& m) : m(std::move(m)) {}
 
 public:
     enum class InitError { 
         ModelLoadFailed 
     };
 
-    // Simplified factory: returns by value so Yolo is movable, because it's a value type
+    // Simplified factory: returns by value so person is movable, because it's a value type
     // and the engine handle is moved, not copied. This makes it unobservable.
-    [[nodiscard]] static std::expected<Yolo, InitError> create();
+    [[nodiscard]] static std::expected<Person, InitError> create();
 
-    ~Yolo() = default;                                                                  // members clean up (engine handle)
+    ~Person() = default;                                                                // members clean up (engine handle)
 
-    Yolo(Yolo&&) noexcept = default;                                                    // movable - engine handle transfers
-    Yolo& operator=(Yolo&&) noexcept = default;                                 
-    Yolo(const Yolo&) = delete;                                                         // still non-copyable (one engine)
-    Yolo& operator=(const Yolo&) = delete;
+    Person(Person&&) noexcept = default;                                                // movable - engine handle transfers
+    Person& operator=(Person&&) noexcept = default;                                 
+    Person(const Person&) = delete;                                                     // still non-copyable (one engine)
+    Person& operator=(const Person&) = delete;
 
     // TODO: 
     // pure computation: frame in, detections out

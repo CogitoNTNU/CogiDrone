@@ -2,13 +2,13 @@
 
 
 
-std::expected<Yolo, Yolo::InitError> Yolo::create() {
+std::expected<Person, Person::InitError> Person::create() {
     // ! Fallible work FIRST: load engine, build context
 
     // TODO:
     // if (!engine_ok) return std::unexpected(InitError::ModelLoadFailed);
 
-    return Yolo(M{ 
+    return Person(M{ 
         /* 
         engine, 
         weights 
@@ -17,9 +17,9 @@ std::expected<Yolo, Yolo::InitError> Yolo::create() {
 }
 
 // ??:
-// // Yolo::~Yolo() = default;                                                                // members clean up (engine handle)
+// // Person::~Person() = default;                                                                // members clean up (engine handle)
 
-std::vector<Yolo::Detection> Yolo::detect(const Frame& frame) {
+std::vector<Person::Detection> Person::detect(const Frame& frame) {
     // preprocess -> infer -> decode
     return {};
 }
