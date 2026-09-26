@@ -1,0 +1,554 @@
+{
+	"artifacts" : 
+	[
+		{
+			"path" : "src/cogidrone"
+		}
+	],
+	"backtrace" : 1,
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"add_executable",
+			"target_link_options",
+			"target_link_directories",
+			"target_link_libraries",
+			"target_compile_options",
+			"target_include_directories",
+			"target_compile_features"
+		],
+		"files" : 
+		[
+			"src/CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 11,
+				"parent" : 0
+			},
+			{
+				"command" : 1,
+				"file" : 0,
+				"line" : 66,
+				"parent" : 0
+			},
+			{
+				"command" : 2,
+				"file" : 0,
+				"line" : 42,
+				"parent" : 0
+			},
+			{
+				"command" : 3,
+				"file" : 0,
+				"line" : 43,
+				"parent" : 0
+			},
+			{
+				"command" : 4,
+				"file" : 0,
+				"line" : 80,
+				"parent" : 0
+			},
+			{
+				"command" : 5,
+				"file" : 0,
+				"line" : 36,
+				"parent" : 0
+			},
+			{
+				"command" : 6,
+				"file" : 0,
+				"line" : 75,
+				"parent" : 0
+			}
+		]
+	},
+	"compileGroups" : 
+	[
+		{
+			"compileCommandFragments" : 
+			[
+				{
+					"fragment" : "-g -std=gnu++2b -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX27.0.sdk -mmacosx-version-min=26.6 -fcolor-diagnostics"
+				},
+				{
+					"backtrace" : 5,
+					"fragment" : "-Wall"
+				},
+				{
+					"backtrace" : 5,
+					"fragment" : "-Wextra"
+				},
+				{
+					"backtrace" : 5,
+					"fragment" : "-Wpedantic"
+				}
+			],
+			"includes" : 
+			[
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/src"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/action_msgs"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/ament_index_cpp"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/builtin_interfaces"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/class_loader"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/fastcdr"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/fastrtps"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/geometry_msgs"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/libstatistics_collector"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/nav_msgs"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/px4_msgs"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/rcl"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/rcl_interfaces"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/rcl_logging_interface"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/rcl_yaml_param_parser"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/rclcpp"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/rcpputils"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/rcutils"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/rmw"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/rmw_dds_common"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/rmw_fastrtps_cpp"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/rmw_fastrtps_shared_cpp"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/rosgraph_msgs"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/rosidl_dynamic_typesupport"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/rosidl_dynamic_typesupport_fastrtps"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/rosidl_runtime_c"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/rosidl_runtime_cpp"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/rosidl_typesupport_c"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/rosidl_typesupport_cpp"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/rosidl_typesupport_fastrtps_c"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/rosidl_typesupport_fastrtps_cpp"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/rosidl_typesupport_interface"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/rosidl_typesupport_introspection_c"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/rosidl_typesupport_introspection_cpp"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/sensor_msgs"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/service_msgs"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/statistics_msgs"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/std_msgs"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/tracetools"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/type_description_interfaces"
+				},
+				{
+					"backtrace" : 6,
+					"path" : "/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/include/unique_identifier_msgs"
+				}
+			],
+			"language" : "CXX",
+			"languageStandard" : 
+			{
+				"backtraces" : 
+				[
+					7
+				],
+				"standard" : "23"
+			},
+			"sourceIndexes" : 
+			[
+				0,
+				1,
+				2,
+				3,
+				4,
+				5
+			]
+		}
+	],
+	"id" : "cogidrone::@145eef247bfb46b6828c",
+	"link" : 
+	{
+		"commandFragments" : 
+		[
+			{
+				"fragment" : "-g",
+				"role" : "flags"
+			},
+			{
+				"fragment" : "",
+				"role" : "flags"
+			},
+			{
+				"backtrace" : 2,
+				"fragment" : "-Wl,-rpath-link,/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/lib",
+				"role" : "flags"
+			},
+			{
+				"backtrace" : 2,
+				"fragment" : "-Wl,-rpath-link,/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/usr/lib/aarch64-linux-gnu",
+				"role" : "flags"
+			},
+			{
+				"backtrace" : 3,
+				"fragment" : "-L/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/lib",
+				"role" : "libraryPath"
+			},
+			{
+				"fragment" : "-Wl,-rpath,/Users/andersnikolaiholsen/Documents/Autumn2026/CogiDrone/third-party/ros2/opt/ros/jazzy/lib",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "-lrclcpp",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "-lrcl",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "-lrmw",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "-lrmw_fastrtps_cpp",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "-lrmw_implementation",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "-lrmw_dds_common",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "-lrmw_fastrtps_shared_cpp",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "-lrcutils",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "-lrcpputils",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "-lrosidl_runtime_c",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "-lrosidl_typesupport_c",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "-lrosidl_typesupport_cpp",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "-lrosidl_typesupport_fastrtps_c",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "-lrosidl_typesupport_fastrtps_cpp",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "-lrosidl_typesupport_introspection_c",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "-lrosidl_typesupport_introspection_cpp",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "-lrosidl_dynamic_typesupport",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "-lsensor_msgs__rosidl_typesupport_cpp",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "-lsensor_msgs__rosidl_typesupport_c",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "-lstd_msgs__rosidl_typesupport_cpp",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "-lbuiltin_interfaces__rosidl_typesupport_cpp",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "-lgeometry_msgs__rosidl_typesupport_cpp",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "-lnav_msgs__rosidl_typesupport_cpp",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "-lpx4_msgs__rosidl_typesupport_cpp",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "-lpx4_msgs__rosidl_typesupport_c",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "-llibstatistics_collector",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "-lrosgraph_msgs__rosidl_typesupport_cpp",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "-lstatistics_msgs__rosidl_typesupport_cpp",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "-ltracetools",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "-lrcl_yaml_param_parser",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "-lrcl_interfaces__rosidl_typesupport_cpp",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "-lament_index_cpp",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "-lclass_loader",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "-lfastcdr",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "-lfastrtps",
+				"role" : "libraries"
+			}
+		],
+		"language" : "CXX"
+	},
+	"name" : "cogidrone",
+	"nameOnDisk" : "cogidrone",
+	"paths" : 
+	{
+		"build" : "src",
+		"source" : "src"
+	},
+	"sourceGroups" : 
+	[
+		{
+			"name" : "Source Files",
+			"sourceIndexes" : 
+			[
+				0,
+				1,
+				2,
+				3,
+				4,
+				5
+			]
+		}
+	],
+	"sources" : 
+	[
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/main.cpp",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/test.cpp",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/drone.cpp",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/perception/perception.cpp",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/perception/camera/camera.cpp",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/perception/vision/yolo.cpp",
+			"sourceGroupIndex" : 0
+		}
+	],
+	"type" : "EXECUTABLE"
+}
