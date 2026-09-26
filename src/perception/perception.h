@@ -32,12 +32,16 @@ private:
         rclcpp::Publisher<cogidrone::msg::FusedDetections>::SharedPtr targetPublisher;  // Publisher for fused target detections
                 
         // Models
-        std::unique_ptr<Person> personModel;
-        // std::unique_ptr<Head> headModel;
-        // std::unique_ptr<DepthAnything> depthAnythingModel;
+        Person          personModel;
+        Head            headModel;
+        DepthAnything   depthAnythingModel;
     } m;
 
-    explicit Perception(M&& m);    
+    // * Default ctor
+    explicit Perception(M&& m) : m(std::move(m)) {}                                     // No default ctor exposed;    
+
+    // * Callbacks
+    void onFrame(const sensor_msgs::msg::Image& msg);
 
 public:
     enum class InitError {
@@ -47,13 +51,15 @@ public:
     
     
     // * Ctors & dtor
-    [[nodiscard]] static std::expected<std::unique_ptr<Perception>, InitError> create();
+    [[nodiscard]] static std::expected<Perception, InitError> create();
 
     ~Perception();
-    Perception(const Perception&) = delete;
+
+    Perception(Perception&&) noexcept = default;                                        // movable
+    Perception& operator=(Perception&&) noexcept = default;
+
+    Perception(const Perception&) = delete;                                             // non-copyable (one node, one camera)
     Perception& operator=(const Perception&) = delete;
-    Perception(Perception&&) = delete;
-    Perception& operator=(Perception&&) = delete;
 
     // * Accessors
     [[nodiscard]] inline rclcpp::Node::SharedPtr node() const noexcept { return m.node; }

@@ -13,17 +13,20 @@ Drone::~Drone() {
 
 std::expected<std::unique_ptr<Drone>, Drone::InitError>
 Drone::initiate(int argc, const char* argv[]) {
-    // 1. Initialize ROS global state, so subsystems can create nodes
+    // * 1. Initialize ROS global state, so subsystems can create nodes
     if (!rclcpp::ok()) {
         rclcpp::init(argc, argv);
     }
 
-    // 2. Subsystems (each may create rclcpp::Node objects)
-    // auto perception = Perception::create();
-    // if (!perception) return std::unexpected(InitError::CameraNotFound);
-    Perception perception;                                                              // | Debug as Perception is missing implementation
+    // * 2. Subsystems (each may create rclcpp::Node objects)
+    auto perception = Perception::create();
+    if (!perception) {
+        // If perception failes, return the unexpected value received from the subsystem
+        // to the caller, so they can handle it appropriately
+        return std::unexpected(InitError::CameraNotFound);
+    };
 
-    // 3. Assemble
+    // * 3. Assemble
     // ? We wrap the raw pointer and let a unique_ptr take ownership to prevent leaks 
     // ? caused by not deleting the Drone object. Note that the wrapping is simply  
     // ? here because make_unique<Drone> is unavailable as the constructor is private
