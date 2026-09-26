@@ -32,3 +32,7 @@ version_scheme = "pep440"
 version_provider = "uv"
 update_changelog_on_bump = true
 major_version_zero = true
+
+[tool.pytest.ini_options]
+# ros2_ws needs ROS 2 (rclpy), which only exists inside the sim container.
+norecursedirs = [".*", "*.egg", "build", "dist", "venv", "node_modules", "third-party", "ros2_ws", "sim"]

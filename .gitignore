@@ -264,3 +264,11 @@ toolchain.windows.config
 # 3rd party libraries
 # third-party/
 !third-party
+
+# ROS 2 / simulation
+ros2_ws/install/
+ros2_ws/log/
+rosbags/
+*.mcap
+*.db3
+*.pt

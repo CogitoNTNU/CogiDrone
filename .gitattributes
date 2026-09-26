@@ -1,0 +1,12 @@
+# Files that run inside the Linux container must keep LF endings,
+# even when cloned on Windows with core.autocrlf=true.
+*.sh        text eol=lf
+*.py        text eol=lf
+*.yaml      text eol=lf
+*.yml       text eol=lf
+*.sdf       text eol=lf
+*.config    text eol=lf
+*.xml       text eol=lf
+Dockerfile  text eol=lf
+setup.cfg   text eol=lf
+ros2_ws/src/*/resource/* text eol=lf
