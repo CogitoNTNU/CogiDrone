@@ -84,8 +84,11 @@ ros2 run rqt_image_view rqt_image_view /camera/camera/color/image_raw   # drone 
 **Low-spec PC (8 GB RAM).** Add `headless:=true`. The Gazebo 3D view is the heaviest
 part; the drone camera window above still works.
 
-**QGroundControl (optional).** Install it on your own machine. Under *Application
-Settings → Comm Links*, add a UDP link to server `127.0.0.1:18570`, then connect.
+**QGroundControl (optional).** Install it on your own machine and open it while the
+sim runs. It connects by itself (PX4 sends to the host on UDP 14550). To fly with an RC
+transmitter such as the RadioMaster Pocket, plug it in over USB and pick *USB Joystick (HID)*,
+then in QGC go to *Vehicle Setup → Joystick*, enable and calibrate it, and fly in
+*Position* mode.
 
 ## 4. Mac users: record and replay
 

@@ -29,6 +29,17 @@ for i in $(seq 1 60); do
   fi
 done
 """
+# QGroundControl on the host listens on UDP 14550, but PX4's own GCS link only talks
+# to localhost inside the container. Add a link aimed at the host (Docker Desktop).
+QGC_LINK = f"""
+host=$(getent ahostsv4 host.docker.internal | head -1 | cut -d' ' -f1)
+[ -z "$host" ] && exit 0
+for i in $(seq 1 60); do
+  sleep 2
+  {PX4_DIR}/build/px4_sitl_default/bin/px4-mavlink start -x -u 14590 -r 4000000 -f \\
+    -t "$host" -o 14550 >/dev/null 2>&1 && exit 0
+done
+"""
 
 
 def _px4(context):
@@ -56,6 +67,7 @@ def _px4(context):
             cmd=["bash", "-c", SET_NO_GCS_REQUIRED],
             output="log",
         ),
+        ExecuteProcess(cmd=["bash", "-c", QGC_LINK], output="log"),
     ]
 
 
