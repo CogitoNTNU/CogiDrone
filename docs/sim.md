@@ -13,6 +13,8 @@ Docker image, so all 8 of us get the same setup no matter which computer we use.
 v2.4.3, px4_msgs `release/1.17` and YOLO (ultralytics, CPU). All versions are pinned in
 [`docker/sim/Dockerfile`](../docker/sim/Dockerfile) and nowhere else.
 
+**Recommended PC:** 16 GB RAM and 30 GB free disk. 8 GB works in headless mode.
+
 ## 1. Install (once)
 
 **Windows**
@@ -68,6 +70,19 @@ ros2 topic list                          # /fmu/... (PX4), /camera/... (sim came
 ros2 run rqt_image_view rqt_image_view   # pick /cogidrone/detections/image to see YOLO boxes
 ros2 topic echo /fmu/out/vehicle_status_v1 --once
 ```
+
+**Fly it yourself.** Start the sim without the autonomous controller, then in a
+second shell run the keyboard controller (`t` take off, `w/a/s/d` move, `r/f` up/down,
+`q/e` turn, `l` land):
+
+```bash
+ros2 launch cogidrone_bringup sim.launch.py autonomy:=false
+ros2 run cogidrone_control teleop                                   # second shell
+ros2 run rqt_image_view rqt_image_view /camera/camera/color/image_raw   # drone camera
+```
+
+**Low-spec PC (8 GB RAM).** Add `headless:=true`. The Gazebo 3D view is the heaviest
+part; the drone camera window above still works.
 
 **QGroundControl (optional).** Install it on your own machine. Under *Application
 Settings → Comm Links*, add a UDP link to server `127.0.0.1:18570`, then connect.
