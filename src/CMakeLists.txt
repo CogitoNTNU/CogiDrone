@@ -18,7 +18,9 @@ add_executable(cogidrone
 
     # Perception
     perception/perception.cpp
-    perception/models/yolo.cpp
+    perception/models/person.cpp
+    perception/models/head.cpp
+    perception/models/depth_anything.cpp
 
     # Estimation
 

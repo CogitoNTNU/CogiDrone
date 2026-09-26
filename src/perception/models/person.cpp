@@ -1,4 +1,4 @@
-#include "perception/models/yolo.h"
+#include "perception/models/person.h"
 
 
 

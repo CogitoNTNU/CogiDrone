@@ -7,8 +7,10 @@
 #include "sensor_msgs/msg/image.hpp"
 #include "std_msgs/msg/string.hpp"
 
-#include "perception/sensors/camera.h"
-#include "perception/models/yolo.h"
+#include "perception/models/person.h"
+#include "perception/models/head.h"
+#include "perception/models/depth_anything.h"
+
 
 
 namespace perception {
