@@ -23,17 +23,27 @@ else
 fi
 SERVICE="${COGIDRONE_SERVICE:-$SERVICE}"
 
+start_x11_relay() {
+    if ! pgrep -f x11-relay.py >/dev/null; then
+        nohup python3 scripts/x11-relay.py >"$HOME/.cogidrone-x11-relay.log" 2>&1 &
+        sleep 1
+    fi
+}
+
 # Tell compose where the host's display lives, via .env (also used by the devcontainer).
 write_display_env() {
     local x11 wslg display wayland runtime
     if grep -qi microsoft /proc/version 2>/dev/null; then
-        # WSL2 + WSLg. Docker Desktop exposes WSLg under a different path than Docker in WSL.
+        # WSL2 + WSLg. Docker Desktop can't mount /mnt/wslg, so relay the X socket
+        # through a normal WSL folder (scripts/x11-relay.py). Docker Engine in WSL can.
         if docker info 2>/dev/null | grep -q "Operating System: Docker Desktop"; then
-            wslg=/run/desktop/mnt/host/wslg
+            start_x11_relay
+            x11="$HOME/.cogidrone/X11-unix" wslg=/tmp/cogidrone-no-wslg
+            display=:0 wayland="" runtime=/tmp/runtime-root
         else
-            wslg=/mnt/wslg
+            x11=/mnt/wslg/.X11-unix wslg=/mnt/wslg
+            display=:0 wayland=wayland-0 runtime=/mnt/wslg/runtime-dir
         fi
-        x11="$wslg/.X11-unix" display=:0 wayland=wayland-0 runtime=/mnt/wslg/runtime-dir
     elif [ "$(uname -s)" = "Linux" ]; then
         x11=/tmp/.X11-unix wslg=/tmp/cogidrone-no-wslg display="${DISPLAY:-:0}" wayland="" runtime=/tmp/runtime-root
         command -v xhost >/dev/null 2>&1 && xhost +local: >/dev/null 2>&1 || true
@@ -65,6 +75,7 @@ case "${1:-help}" in
         ;;
     down)
         docker compose down
+        pkill -f x11-relay.py 2>/dev/null || true
         ;;
     *)
         sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'
