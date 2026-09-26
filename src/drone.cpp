@@ -45,4 +45,6 @@ void Drone::start() {
     // rclcpp::spin(std::make_shared<rclcpp::Node>("drone_node"));
 }
 
-void Drone::stop() {}
+void Drone::stop() {
+    
+}
