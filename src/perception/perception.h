@@ -32,9 +32,9 @@ private:
         rclcpp::Publisher<cogidrone::msg::FusedDetections>::SharedPtr targetPublisher;  // Publisher for fused target detections
                 
         // Models
-        std::unique_ptr<Person> person;
-        // std::unique_ptr<Head> head;
-        // std::unique_ptr<DepthAnything> depthAnything;
+        std::unique_ptr<Person> personModel;
+        // std::unique_ptr<Head> headModel;
+        // std::unique_ptr<DepthAnything> depthAnythingModel;
     } m;
 
     explicit Perception(M&& m);    
