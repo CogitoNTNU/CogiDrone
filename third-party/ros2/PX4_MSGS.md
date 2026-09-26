@@ -48,10 +48,28 @@ PX4_MSGS_REF=release/1.16 ./third-party/ros2/get-px4-msgs.sh
 
 ## Deployment to the Jetson
 
-`src/CMakeLists.txt` links with `-Wl,-rpath-link,...`, which is **link-time
-only** — no runtime rpath is baked into the binary. The Jetson therefore resolves
-ROS libraries from its own `/opt/ros/jazzy`, and `px4_msgs` must be installed
-there too (or on `LD_LIBRARY_PATH` as a sourced overlay).
+`src/CMakeLists.txt` passes `-Wl,-rpath-link,...`, which is link-time only. But
+CMake *also* bakes a build-tree `RUNPATH` of its own from `target_link_directories`,
+and it points at the build container's path:
+
+```
+RUNPATH   /workspace/third-party/ros2/opt/ros/jazzy/lib
+```
+
+That directory does not exist on the Jetson, so in practice it resolves to nothing
+and the loader falls through — but do not rely on it, and do not read it as the
+libraries being found. `DT_RUNPATH` is searched *after* `LD_LIBRARY_PATH` (unlike the
+legacy `DT_RPATH`), so an explicit `LD_LIBRARY_PATH` still wins.
+
+The Jetson therefore resolves ROS libraries from its own `/opt/ros/jazzy`, and
+`px4_msgs` must be installed there too (or on `LD_LIBRARY_PATH` as a sourced
+overlay).
+
+> [!NOTE]
+> Leaking an absolute build-container path into a flight binary is untidy and
+> worth fixing with `CMAKE_SKIP_BUILD_RPATH` (or an explicit install RPATH). Left
+> alone for now because it changes link behaviour for every target, not just
+> `px4_msgs`.
 
 That install must include the `fastrtps` and `introspection` typesupport `.so`s,
 even though `src/CMakeLists.txt` does not link them: `rmw_fastrtps_cpp`

@@ -1,6 +1,9 @@
 #pragma once
 
 #include "perception/perception.h"
+#include "link/vehicle_link.h"
+
+#include <rclcpp/rclcpp.hpp>
 
 #include <expected>
 #include <memory>
@@ -11,6 +14,12 @@ private:
     // Members
     struct M {                                                                          // Assembly struct
         Perception perception;
+        std::unique_ptr<IVehicleLink> link;                                              // the vehicle: real over DDS, or a fake
+
+        // ? The node to spin, kept separately from `link` so that IVehicleLink can
+        // ? stay free of rclcpp (the whole point of link/vehicle_link.h). Null when
+        // ? a fake link was injected - there is then nothing to spin.
+        rclcpp::Node::SharedPtr node;
     } m;
 
     // * Ctors & dtor
@@ -24,6 +33,7 @@ public:
         CameraNotFound,
         ModelLoadFailed,
         ROSContextFailed,
+        LinkFailed,                                                                     // could not reach/create the PX4 link
     };
     
     // * Ctors & dtor
@@ -41,6 +51,15 @@ public:
     // ? which could lead to undefined behavior or crashes. 
     [[nodiscard]] static std::expected<std::unique_ptr<Drone>, InitError>               // ! NOTE: We need to use std::optional if we can't compile with C++23
     initiate(int argc, const char* argv[]);                                             // Factory method
+
+    // ? The injection seam. `struct M` is private, so an overload is the only way
+    // ? to hand the Drone a pre-built link - which is what makes FakeLink usable.
+    // ! Deliberately does NOT call rclcpp::init(): a fake-injected Drone must be
+    // ! constructible in a process where ROS was never initialised at all, or the
+    // ! fake buys nothing (third-party/ros2 is arm64-only, so a test host may have
+    // ! no working ROS runtime whatsoever).
+    [[nodiscard]] static std::expected<std::unique_ptr<Drone>, InitError>
+    initiate(std::unique_ptr<IVehicleLink> link);                                       // Factory method, for tests
 
     ~Drone();                                                                           // 1. Dtor: declared, requires cleanup via rclcpp::shutdown()  
 

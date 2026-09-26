@@ -1,0 +1,29 @@
+# PX4 parameters for the uXRCE-DDS link to the Jetson.
+#
+# These are set ON THE PIXHAWK, not on the companion computer. Load via
+# QGroundControl (Vehicle Setup -> Parameters -> Tools -> Load from file), or set
+# each by hand. See third-party/uxrce-agent/AGENT.md.
+#
+# ! Every mistake in this file fails the same silent way: the agent runs, PX4 runs,
+# ! and no topics ever appear. There is no error message anywhere.
+#
+# Format: <vehicle_id> <component_id> <name> <value> <type>
+#   type 6 = int32, type 9 = float
+#
+# TODO: Confirm against the actual airframe before the first flight test.
+#     : - is the Jetson on TELEM2, or a different port?
+#     : - UXRCE_DDS_CFG's value is a port enum, not free text; QGroundControl shows
+#     :   the choices. 102 is TELEM2 on most builds but is board-dependent, so set
+#     :   it from the dropdown once and re-export this file rather than trusting it.
+
+# Which serial port runs the uXRCE-DDS client. 0 disables the client entirely.
+1	1	UXRCE_DDS_CFG	102	6
+
+# Baud rate for that port. ! Must match UXRCE_BAUD in scripts/run-agent.sh (921600).
+1	1	SER_TEL2_BAUD	921600	6
+
+# DDS domain. ! Must match ROS_DOMAIN_ID in the Jetson's environment.
+1	1	UXRCE_DDS_DOM_ID	0	6
+
+# Client key: a unique id per client. Only matters with more than one companion.
+1	1	UXRCE_DDS_KEY	1	6

@@ -16,6 +16,10 @@ add_executable(cogidrone
     # Drone
     drone.cpp
 
+    # Link
+    link/px4_dds_link.cpp
+    link/fake_link.cpp                                                                  # unused for now: the seam for tests, see link/LINK.md
+
     # Perception
     perception/perception.cpp
     perception/camera/camera.cpp
