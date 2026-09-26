@@ -46,5 +46,5 @@ void Drone::start() {
 }
 
 void Drone::stop() {
-    
+    rclcpp::shutdown();
 }
