@@ -25,6 +25,8 @@ def _px4(context):
         "PX4_SYS_AUTOSTART": "4001",
         "PX4_SIM_MODEL": "gz_" + LaunchConfiguration("model").perform(context),
         "PX4_GZ_WORLD": LaunchConfiguration("world").perform(context),
+        # Sim only: allow arming without QGroundControl connected (keep this on the real drone).
+        "PX4_PARAM_NAV_DLL_ACT": "0",
         # ROS ships its own `gz` without the simulator; point it at Gazebo Harmonic's config.
         "GZ_CONFIG_PATH": os.environ.get("GZ_CONFIG_PATH", "") + ":/usr/share/gz",
     }
