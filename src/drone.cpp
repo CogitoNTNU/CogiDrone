@@ -85,4 +85,6 @@ void Drone::start() {
     rclcpp::spin(m.node);
 }
 
-void Drone::stop() {}
+void Drone::stop() {
+    
+}

@@ -1,3 +1,6 @@
+> [!CAUTION]
+> THIS IS MOST LIKELY REDUNDANT AS WE HAVE A FLIGHTCONTROLLER 
+
 ### Control
 Turn the desired trajectory into commands:
 $$
