@@ -6,18 +6,28 @@
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/image.hpp"
 #include "std_msgs/msg/string.hpp"
+#include "vision_msgs/msg/detection2_d_array.hpp"
 
 #include "perception/models/person.h"
 #include "perception/models/head.h"
 #include "perception/models/depth_anything.h"
 
+#include "errors.h"
 
 
-namespace perception {
-    struct Detection {
-        float x, y, w, h;
-        float confidence;
-        int class_id;
+
+namespace Model {
+    // TODO: To be determined after talking to perception team lead
+    // using property = float;
+
+    // struct FusedDetections {
+    //     std::vector<std::array<property, 4>> 
+    //     float confidence;
+    //     int classId;
+    // };
+  
+    struct FusedDetections {
+        // | DEBUG
     };
 };
 
@@ -29,29 +39,30 @@ private:
 
         // Subscriptions and publishers
         rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr imageSubscription;     // Subscription for camera images
-        rclcpp::Publisher<cogidrone::msg::FusedDetections>::SharedPtr targetPublisher;  // Publisher for fused target detections
+        // TODO: Update the publisher to publish fused detections - for this, I'll have to do some research
+        // rclcpp::Publisher<cogidrone::msg::FusedDetections>::SharedPtr targetPublisher;
+        rclcpp::Publisher<vision_msgs::msg::Detection2DArray>::SharedPtr targetPublisher;
                 
         // Models
-        Person          personModel;
-        Head            headModel;
-        DepthAnything   depthAnythingModel;
+        Person         personModel;
+        Head           headModel;
+        DepthAnything  depthAnythingModel;
     } m;
 
     // * Default ctor
-    explicit Perception(M&& m) : m(std::move(m)) {}                                     // No default ctor exposed;    
+    explicit Perception(M&& m) : m(std::move(m)) {}                                     // No default ctor exposed;  
+    void wire() noexcept;                                                               // Wire the node's subscriptions and publishers to the member methods
 
     // * Callbacks
-    void onFrame(const sensor_msgs::msg::Image& msg);
+    void onFrame(const sensor_msgs::msg::Image& msg);                                   // Callback for camera images
+
+    // * Helpers
+    [[nodiscard]] std::unique_ptr<Model::FusedDetections>
+    fuse(/* const ref something */);
 
 public:
-    enum class InitError {
-        CameraNotFound,
-        ModelLoadFailed,
-    };
-    
-    
     // * Ctors & dtor
-    [[nodiscard]] static std::expected<Perception, InitError> create();
+    [[nodiscard]] static std::expected<Perception, cogidrone::Error> create();
 
     ~Perception();
 

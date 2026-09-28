@@ -11,7 +11,7 @@ Drone::~Drone() {
     }
 }
 
-std::expected<std::unique_ptr<Drone>, Drone::InitError>
+std::expected<std::unique_ptr<Drone>, cogidrone::Error>
 Drone::initiate(int argc, const char* argv[]) {
     // * 1. Initialize ROS global state, so subsystems can create nodes
     if (!rclcpp::ok()) {
@@ -19,12 +19,15 @@ Drone::initiate(int argc, const char* argv[]) {
     }
 
     // * 2. Subsystems (each may create rclcpp::Node objects)
-    auto perception = Perception::create();
-    if (!perception) {
-        // If perception failes, return the unexpected value received from the subsystem
-        // to the caller, so they can handle it appropriately
-        return std::unexpected(InitError::CameraNotFound);
-    };
+    std::optional<Perception> perception; {                                             // Local
+    auto result = Perception::create();
+        
+        if (!result) {
+            return std::unexpected(result.error());                                     // Propagate the error up to the caller
+        };
+
+        perception = std::move(*result);
+    }
 
     // * 3. Assemble
     // ? We wrap the raw pointer and let a unique_ptr take ownership to prevent leaks 
@@ -32,7 +35,7 @@ Drone::initiate(int argc, const char* argv[]) {
     // ? here because make_unique<Drone> is unavailable as the constructor is private
     return std::unique_ptr<Drone>(
         new Drone(M{                                                                    // ? We must return a Drone pointer, as the Drone 
-            .perception = std::move(perception),                                        // ? object shouldn't be copyable nor movable, so 
+            .perception = std::move(*perception),                                       // ? object shouldn't be copyable nor movable, so 
                                                                                         // ? we can't return a Drone object by value                            
         })                                                                                  
     );

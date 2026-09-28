@@ -1,38 +1,102 @@
 #include "perception.h"
-#include <vision_msgs/msg/detection2_d_array.hpp>
 
-
-std::expected<Perception, Perception::InitError> Perception::create() {
-    // TODO: IMPLEMENT THIS
-    // 1. Fallible work FIRST - models load before anything exists
-    auto yolo = Yolo::create();
-    if (!yolo) return std::unexpected(InitError::ModelLoadFailed);
-
-    // 2. Wire the node - nothing here can fail
-    _node = std::make_shared<rclcpp::Node>("perception");
-
-    m.imageSubscription = m.node->create_subscription<sensor_msgs::msg::Image>(
-        "/camera/image", rclcpp::SensorDataQoS(),
-        [&m](const sensor_msgs::msg::Image& msg) {
-            // NOTE: capturing &m by reference is WRONG here - see lifetime note below
-        });
-
-    m.targetPublisher = m.node->create_publisher<vision_msgs::msg::Detection2DArray>(
-        "/cogidrone/detections", 10);
-
-    // 3. Assemble - all pieces valid, one move
-    return Perception(M{
-        // ROS 2
-        .node = std::move(m.node),
-        .imageSubscription = std::move(m.imageSubscription),
-        .targetPublisher = std::move(m.targetPublisher),
-        .yolo = std::move(m.yolo),
-    });
-}
 
 Perception::~Perception() = default;
 
+std::expected<Perception, cogidrone::Error> Perception::create() {
+    using namespace std::literals::string_view_literals;                                // ? for "sv" suffix
+    
+    // * Failable work: model loads
+    // TODO: We can reduce code duplication by creating a templated helper function 
+    // Person model
+    std::optional<Person> personModel; {
+        auto result = Person::create();
+        if (!result) {
+            return std::unexpected(cogidrone::Error{
+                .message = "Person model load failed!"sv
+            });
+        }
+        personModel = std::move(*result);
+    }
+
+    // Head model
+    std::optional<Head> headModel; {
+        auto result = Head::create();
+        if (!result) {
+            return std::unexpected(cogidrone::Error{
+                .message = "Head model load failed!"sv
+            });
+        }
+        headModel = std::move(*result);
+    }
+
+    // DepthAnything model
+    std::optional<DepthAnything> depthAnythingModel; {
+        auto result = DepthAnything::create();
+        if (!result) {
+            return std::unexpected(cogidrone::Error{
+                .message = "DepthAnything model load failed!"sv
+            });
+        }
+        depthAnythingModel = std::move(*result);
+
+    }
+
+    // * ROS2
+    // Node
+    auto node = std::make_shared<rclcpp::Node>(
+        "perception",
+        rclcpp::NodeOptions().use_intra_process_comms(true)
+    );
+
+    // ! NOTE:
+    // ! As much as this pains me, I have to initialize a perception object here to avoid insane workarounds regarding 
+    // ! the lambda capture of the subscription callback. This is because the subscription callback needs to capture the 
+    // ! perception object in order to invoke it's member methods without copying. Therefore, since i have to use a two-
+    // ! step construction process anyway, it is better to initialize the object here and call a `wire()` method to connect 
+    // ! the subscribers and publishers, rather than relying on the caller to do it (the Drone) manually.
+    // * Partial assembly
+    auto p = Perception(M{
+        // ROS2
+        .node = std::move(node),
+        .imageSubscription = nullptr,                                                   // ? will be wired later
+        .targetPublisher = nullptr,                                                     // ? will be wired later
+        
+        // Models
+        .personModel = std::move(*personModel),
+        .headModel = std::move(*headModel),
+        .depthAnythingModel = std::move(*depthAnythingModel)
+    });
+
+    // Wire the node
+    p.wire();
+
+    // * Return the fully constructed Perception object
+    return p;
+}
+
+void Perception::wire() noexcept {
+    m.imageSubscription = m.node->create_subscription<sensor_msgs::msg::Image>(
+        "/camera/image", 
+        rclcpp::SensorDataQoS(),
+        [this](const sensor_msgs::msg::Image& msg) {
+            this->onFrame(msg);
+        }
+    );
+
+    // TODO: Update the publisher to publish fused detections - for this, I'll have to do some research
+    m.targetPublisher = m.node->create_publisher<vision_msgs::msg::Detection2DArray>(
+        "/perception/detections",
+        rclcpp::QoS(10)
+    );
+}
+
 void Perception::onFrame(const sensor_msgs::msg::Image& msg) {
-    auto detections = m.yolo.detect(to_frame(msg));
-    m.targetPublisher->publish(to_msg(detections));
+    auto people = m.personModel.detect(to_frame(msg));
+    auto heads = m.headModel.detect(to_frame(msg));
+    auto distances = m.depthAnythingModel.distance(to_frame(msg));
+
+    auto fusedDetections = fuse(/* people, heads, distances */);
+
+    m.targetPublisher->publish(std::move(fusedDetections));
 }

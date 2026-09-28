@@ -7,9 +7,7 @@ int main(int argc, const char* argv[]) {
 
     // Ensure correct initialization
     if (!result) {
-        // TODO: 
-        //     : - handle: log InitError
-        //     : - exit, right here, not 10 minutes into a flight
+        std::cerr << "Drone initialization failed: " << result.error().message << std::endl;
         return 1;
     }
 

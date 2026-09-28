@@ -93,6 +93,7 @@ ROS_PKGS=(
   ros-jazzy-geometry-msgs ros-jazzy-nav-msgs
   ros-jazzy-rosgraph-msgs ros-jazzy-statistics-msgs
   ros-jazzy-action-msgs ros-jazzy-unique-identifier-msgs
+  ros-jazzy-vision-msgs 
   ros-jazzy-tracetools ros-jazzy-libstatistics-collector
   ros-jazzy-ament-index-cpp ros-jazzy-class-loader
   ros-jazzy-console-bridge-vendor
