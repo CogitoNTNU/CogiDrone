@@ -1,46 +1,25 @@
 #include "perception.h"
 
+#include <string_view>
+
 
 Perception::~Perception() = default;
 
 std::expected<Perception, cogidrone::Error> Perception::create() {
     using namespace std::literals::string_view_literals;                                // ? for "sv" suffix
     
-    // * Failable work: model loads
-    // TODO: We can reduce code duplication by creating a templated helper function 
+    // * Failable work: Model loads
     // Person model
-    std::optional<Person> personModel; {
-        auto result = Person::create();
-        if (!result) {
-            return std::unexpected(cogidrone::Error{
-                .message = "Person model load failed!"sv
-            });
-        }
-        personModel = std::move(*result);
-    }
+    auto personModel = Model::load<Person>("Person model load failed!"sv);
+    if (!personModel) return std::unexpected(std::move(personModel.error()));
 
     // Head model
-    std::optional<Head> headModel; {
-        auto result = Head::create();
-        if (!result) {
-            return std::unexpected(cogidrone::Error{
-                .message = "Head model load failed!"sv
-            });
-        }
-        headModel = std::move(*result);
-    }
+    auto headModel = Model::load<Head>("Head model load failed!"sv);
+    if (!headModel) return std::unexpected(std::move(headModel.error()));
 
     // DepthAnything model
-    std::optional<DepthAnything> depthAnythingModel; {
-        auto result = DepthAnything::create();
-        if (!result) {
-            return std::unexpected(cogidrone::Error{
-                .message = "DepthAnything model load failed!"sv
-            });
-        }
-        depthAnythingModel = std::move(*result);
-
-    }
+    auto depthAnythingModel = Model::load<DepthAnything>("DepthAnything model load failed!"sv);
+    if (!depthAnythingModel) return std::unexpected(std::move(depthAnythingModel.error()));
 
     // * ROS2
     // Node
