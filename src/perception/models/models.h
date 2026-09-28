@@ -10,6 +10,7 @@
 // NOTE: Header only library for reused model types and structs
 
 namespace Model {
+// * Types
 // using property = float;
 
 // TODO: To be determined after talking to perception team lead
@@ -24,7 +25,7 @@ struct FusedDetections {
 };
 
 
-// * Loading
+// * Functions
 template <typename T>
 [[nodiscard]] static std::expected<T, cogidrone::Error> load(
     std::string_view errorMsg,
@@ -39,5 +40,9 @@ template <typename T>
     return std::move(result).value();
 }
 
+// TODO: Determine if this function should be a member of the Perception class or a free function in the Model namespace
+// [[nodiscard]] static std::unique_ptr<FusedDetections> fuse(/* const ref something */) {
+//     return std::make_unique<FusedDetections>();
+// }
 
 } // namespace Model

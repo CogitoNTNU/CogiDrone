@@ -11,7 +11,7 @@ file(GLOB _ros_lib_dirs ${CMAKE_SOURCE_DIR}/third-party/ros2/opt/ros/jazzy/lib)
 add_executable(cogidrone
     # Main
     main.cpp
-    test.cpp
+    # // test.cpp
 
     # Drone
     drone.cpp
@@ -51,8 +51,10 @@ target_link_libraries(cogidrone PRIVATE
     sensor_msgs__rosidl_typesupport_cpp sensor_msgs__rosidl_typesupport_c
     std_msgs__rosidl_typesupport_cpp builtin_interfaces__rosidl_typesupport_cpp
     geometry_msgs__rosidl_typesupport_cpp nav_msgs__rosidl_typesupport_cpp
-    libstatistics_collector rosgraph_msgs__rosidl_typesupport_cpp                       # `statistics_msgs`: bare msg lib doesn't exist; 
-    tracetools rcl_yaml_param_parser rcl_interfaces__rosidl_typesupport_cpp             #                    typesupport variant covers it
+    vision_msgs__rosidl_typesupport_cpp
+    libstatistics_collector statistics_msgs__rosidl_typesupport_cpp                     # // `statistics_msgs`: bare msg lib doesn't exist; 
+    rosgraph_msgs__rosidl_typesupport_cpp                                               # //                    typesupport variant covers it
+    tracetools rcl_yaml_param_parser rcl_interfaces__rosidl_typesupport_cpp             
     ament_index_cpp class_loader fastcdr fastrtps                                       # `console_bridge`: not vendored; runtime dep on the Jetson only    
 )
 

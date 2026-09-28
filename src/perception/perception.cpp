@@ -76,8 +76,14 @@ void Perception::onFrame(const sensor_msgs::msg::Image& msg) {
     auto heads = m.headModel.detect(/* toFrame */(msg));
     auto distances = m.depthAnythingModel.distance(/* toFrame */(msg));
 
-    auto fusedDetections = fuse(/* people, heads, distances */);
+    auto fusedDetections = /*Model::*/ fuse(/* people, heads, distances */);
 
     // TODO: This publish call SHOULD work seamlessly once the above mentioned TODOs are implemented
     /* m.targetPublisher->publish(std::move(fusedDetections)); */
+}
+
+
+
+[[nodiscard]] std::unique_ptr<Model::FusedDetections> fuse(/* const ref something */) {
+    return std::make_unique<Model::FusedDetections>();
 }
