@@ -7,6 +7,7 @@
 class DepthAnything {
 private:
     struct M { 
+        // TODO: Implement actual members for the model
         /* 
         engine, 
         weights 
@@ -31,7 +32,11 @@ public:
     DepthAnything(const DepthAnything&) = delete;                                       // still non-copyable (one engine)
     DepthAnything& operator=(const DepthAnything&) = delete;
 
-    // TODO: 
-    // pure computation: frame in, distances out
-    // [[nodiscard]] explicit std::vector</* type */> distance(const /* type */& frame);
+    // TODO: Implement a distance method that takes a frame and returns distances
+    // Pure computation: frame in, distances out
+    // [[nodiscard]] std::vector</* type */> distance(const /* type */& frame);
+    [[nodiscard]] bool distance(auto frame) {
+        bool DEBUG = true;
+        return DEBUG;
+    }
 };

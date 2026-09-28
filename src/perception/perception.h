@@ -8,6 +8,7 @@
 #include "std_msgs/msg/string.hpp"
 #include "vision_msgs/msg/detection2_d_array.hpp"
 
+#include "perception/models/models.h"
 #include "perception/models/person.h"
 #include "perception/models/head.h"
 #include "perception/models/depth_anything.h"
@@ -15,21 +16,6 @@
 #include "errors.h"
 
 
-
-namespace Model {
-    // TODO: To be determined after talking to perception team lead
-    // using property = float;
-
-    // struct FusedDetections {
-    //     std::vector<std::array<property, 4>> 
-    //     float confidence;
-    //     int classId;
-    // };
-  
-    struct FusedDetections {
-        // | DEBUG
-    };
-};
 
 class Perception {
 private:   

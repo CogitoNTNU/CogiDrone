@@ -92,11 +92,13 @@ void Perception::wire() noexcept {
 }
 
 void Perception::onFrame(const sensor_msgs::msg::Image& msg) {
-    auto people = m.personModel.detect(to_frame(msg));
-    auto heads = m.headModel.detect(to_frame(msg));
-    auto distances = m.depthAnythingModel.distance(to_frame(msg));
+    // TODO: Implement a toFrame function to convert the image to the correct frame for each model
+    auto people = m.personModel.detect(/* toFrame */(msg));
+    auto heads = m.headModel.detect(/* toFrame */(msg));
+    auto distances = m.depthAnythingModel.distance(/* toFrame */(msg));
 
     auto fusedDetections = fuse(/* people, heads, distances */);
 
-    m.targetPublisher->publish(std::move(fusedDetections));
+    // TODO: This publish call SHOULD work seamlessly once the above mentioned TODOs are implemented
+    /* m.targetPublisher->publish(std::move(fusedDetections)); */
 }

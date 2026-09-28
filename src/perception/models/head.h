@@ -31,7 +31,11 @@ public:
     Head(const Head&) = delete;                                                         // still non-copyable (one engine)
     Head& operator=(const Head&) = delete;
 
-    // TODO: 
-    // pure computation: frame in, detections out
-    // [[nodiscard]] explicit std::vector</* type */> detect(const /* type */& frame);
+    // TODO: Implement a detect method that takes a frame and returns detections
+    // Pure computation: frame in, detections out
+    // [[nodiscard]] std::vector</* type */> detect(const /* type */& frame);
+    [[nodiscard]] bool detect(auto frame) {
+        bool DEBUG = true;
+        return DEBUG;
+    }
 };

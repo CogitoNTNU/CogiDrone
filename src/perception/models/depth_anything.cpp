@@ -22,4 +22,4 @@ std::expected<DepthAnything, DepthAnything::InitError> DepthAnything::create() {
 // std::vector<DepthAnything::Detection> DepthAnything::distance(const Frame& frame) {
 //     // preprocess -> infer -> decode
 //     return {};
-}
+// }
