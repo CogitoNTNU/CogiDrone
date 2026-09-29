@@ -14,6 +14,18 @@
 #include "errors.h"
 
 
+// TODO: WE NEED TO REFACTOR THIS ENTIRE FILE, ALONG WITH `navigation.cpp`!
+//     : This current implementation was converted by zai/GLM-5.3 from the original Claude generated
+//     : code. The code is in the same style as the same project, but it is not idiomatic C++20, and 
+//     : it is not well-structured. The code needs to be refactored to be more readable, maintainable, 
+//     : and efficient. This includes using modern C++ features, such as smart pointers, ranges, and 
+//     : concepts, as well as improving the overall architecture of the navigation system such that
+//     : it doesn't do the tasks of the perception and estimation systems. We also have to incorporate
+//     : the flightcontroller - as much of this code is what the flightcontroller does. We also have
+//     : to split the monolithic navigation class into smaller classes that are more curated to handle
+//     : specific subtasks tasks. 
+
+
 // NOTE: Minimal linear-algebra types. Eigen is not vendored in third-party/ros2, so the
 // navigation math is kept dependency-free until Eigen is actually pulled in.
 
@@ -71,30 +83,40 @@ struct DroneState {
     rclcpp::Time timestamp{};
 };
 
+
+// ? These are runtime-tunable ROS parameters, not compile-time constants. `create()` 
+// ? overwrites them from the parameter server (YAML / `ros2 param set`), so therefore
+// ? they must stay plain, mutable, per-instance members.
 struct NavigationParams {
     // Following
-    float targetFollowDistance = 4.0f;                                                  // meters
-    float targetHeight        = 2.5f;                                                   // meters above ground
-    float maxFollowSpeed      = 3.0f;                                                   // m/s
-    float minFollowDistance   = 2.0f;                                                   // safety minimum
-    float maxFollowDistance   = 10.0f;                                                  // lose tracking beyond this
-
-    // Safety limits
-    float minAltitude    = 0.5f;                                                        // meters
-    float maxAltitude    = 10.0f;                                                       // meters
-    float safetyDistance = 1.0f;                                                        // meters from obstacles
+    float targetFollowDistance      = 4.0f;                                             // meters
+    float targetHeight              = 2.5f;                                             // meters above ground
+    float maxFollowSpeed            = 3.0f;                                             // m/s
+    float minFollowDistance         = 2.0f;                                             // safety minimum
+    float maxFollowDistance         = 10.0f;                                            // lose tracking beyond this
+  
+    // Safety limits   
+    float minAltitude               = 0.5f;                                             // meters
+    float maxAltitude               = 10.0f;                                            // meters
+    float safetyDistance            = 1.0f;                                             // meters from obstacles
 
     // Detection
-    float detectionTimeout      = 2.0f;                                                 // seconds
-    float minDetectionConfidence = 0.7f;
+    float detectionTimeout          = 2.0f;                                             // seconds
+    float minDetectionConfidence    = 0.7f;
 
     // Control gains
-    float positionPGain = 1.0f;
-    float yawPGain      = 2.0f;
+    float positionPGain             = 1.0f;
+    float yawPGain                  = 2.0f;
 
     // Update rates
-    float controlFrequency = 30.0f;                                                     // Hz
+    float controlFrequency          = 30.0f;                                            // Hz
 };
+
+// ? If we ever need to reference the default nagivation parameters, we can use this
+// ? constant - which is a copy constructed at compile time. This could be useful for
+// ? resetting the parameters to their defaults, or for comparing the current parameters
+// Compile-time default parameter set - usable in constant expressions, e.g. validation
+// inline constexpr NavigationParams DEFAULT_NAVIGATION_PARAMS{};
 
 
 class Navigation {
@@ -114,7 +136,7 @@ private:
         rclcpp::TimerBase::SharedPtr controlTimer;
 
         // State
-        NavigationParams params;
+        NavigationParams params;                                                        // ? Not const: loaded from the parameter server, may be retuned live
         MissionState state = MissionState::IDLE;
         PersonDetection person;
         DroneState drone;

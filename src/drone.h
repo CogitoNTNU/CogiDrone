@@ -1,18 +1,20 @@
 #pragma once
 
-#include "perception/perception.h"
-#include "errors.h"
-
 #include <expected>
 #include <memory>
 
+#include "perception/perception.h"
+#include "navigation/navigation.h"
+#include "errors.h"
 
 class Drone {
 private:
     // Members
     struct M {                                                                          // Assembly struct
         Perception perception;
-        // TODO: Navigation navigation;
+        nullptr_t estimation;                                                           // TODO: Implement the Estimation subsystem
+        nullptr_t representation;                                                       // TODO: Implement the Representation subsystem
+        Navigation navigation;
     } m;
 
     // * Ctors & dtor

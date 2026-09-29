@@ -27,6 +27,7 @@ add_executable(cogidrone
     # Representation
 
     # Navigation
+    navigation/navigation.cpp
 
     # Control
 
