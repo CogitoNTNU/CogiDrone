@@ -1,0 +1,37 @@
+{
+  "os":  "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "python":  "CPython 3.14.7",
+  "startedAt":  "2026-09-29T18:02:21.171221Z",
+  "program":  "/Users/evaloy/Documents/NTNU/Cogito/CogiDrone/CogiDroneGit/python/cv_training/training.py",
+  "codePath":  "python/cv_training/training.py",
+  "codePathLocal":  "python/cv_training/training.py",
+  "git":  {
+    "remote":  "https://github.com/CogitoNTNU/CogiDrone.git",
+    "commit":  "47c78ccfbf545fc86b48250e3e0cb2d65736af30"
+  },
+  "email":  "elias.nummerto@gmail.com",
+  "root":  "/Users/evaloy/Documents/NTNU/Cogito/CogiDrone/CogiDroneGit",
+  "host":  "dhcp-10-22-67-53.wlan.ntnu.no",
+  "executable":  "/Users/evaloy/Documents/NTNU/Cogito/CogiDrone/CogiDroneGit/.venv/bin/python",
+  "cpu_count":  10,
+  "cpu_count_logical":  10,
+  "disk":  {
+    "/":  {
+      "total":  "994610155520",
+      "used":  "219522510848"
+    }
+  },
+  "memory":  {
+    "total":  "34359738368"
+  },
+  "apple":  {
+    "name":  "Apple M5",
+    "ecpuCores":  6,
+    "pcpuCores":  4,
+    "gpuCores":  10,
+    "memoryGb":  32,
+    "ramTotalBytes":  "34359738368",
+    "macModel":  "Mac17,4"
+  },
+  "writerId":  "h995iv4f3l4oxaub8l4fhfuud816mo6u"
+}

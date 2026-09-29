@@ -1,0 +1,17 @@
+{
+  "os":  "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "python":  "CPython 3.14.7",
+  "startedAt":  "2026-09-29T17:45:14.472698Z",
+  "program":  "/Users/evaloy/Documents/NTNU/Cogito/CogiDrone/CogiDroneGit/wandb_test.py",
+  "codePath":  "wandb_test.py",
+  "codePathLocal":  "wandb_test.py",
+  "git":  {
+    "remote":  "https://github.com/CogitoNTNU/CogiDrone.git",
+    "commit":  "47c78ccfbf545fc86b48250e3e0cb2d65736af30"
+  },
+  "email":  "elias.nummerto@gmail.com",
+  "root":  "/Users/evaloy/Documents/NTNU/Cogito/CogiDrone/CogiDroneGit",
+  "host":  "dhcp-10-22-67-53.wlan.ntnu.no",
+  "executable":  "/Users/evaloy/Documents/NTNU/Cogito/CogiDrone/CogiDroneGit/.venv/bin/python",
+  "writerId":  "ctlc5ayxpibdgbqliyh19wwz8ekznpf5"
+}
