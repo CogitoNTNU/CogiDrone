@@ -43,8 +43,7 @@ private:
     void onFrame(const sensor_msgs::msg::Image& msg);                                   // Callback for camera images
 
     // * Helpers
-    [[nodiscard]] std::unique_ptr<Model::FusedDetections>
-    fuse(/* const ref something */);
+    [[nodiscard]] std::unique_ptr<Model::FusedDetections> fuse(/* const ref something */);
 
 public:
     // * Ctors & dtor
