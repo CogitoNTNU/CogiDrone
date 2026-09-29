@@ -1,0 +1,56 @@
+# CogiDrone simulation environment. Use scripts/sim.sh rather than calling this directly
+# (it picks the right service for your OS and writes the display settings to .env).
+#
+#   sim : Windows (WSL2) / Linux. Gazebo + PX4 SITL + ROS 2 + YOLO.
+#   dev : macOS (or anyone without the sim). ROS 2 + px4_msgs + YOLO, no Gazebo/PX4.
+
+name: cogidrone
+
+services:
+  sim:
+    build:
+      context: .
+      dockerfile: docker/sim/Dockerfile
+      target: sim
+    image: cogidrone-sim:latest
+    command: sleep infinity
+    init: true
+    shm_size: 2gb
+    volumes:
+      - .:/workspace
+      # Build output stays inside Docker volumes: faster, and keeps the repo clean.
+      - sim_build:/workspace/ros2_ws/build
+      - sim_install:/workspace/ros2_ws/install
+      - sim_log:/workspace/ros2_ws/log
+      # GUI (Gazebo window). Paths come from .env, written by scripts/sim.sh.
+      - ${X11_SOCKET_DIR:-/tmp/.X11-unix}:/tmp/.X11-unix
+      - ${WSLG_DIR:-/tmp/cogidrone-no-wslg}:/mnt/wslg
+    environment:
+      DISPLAY: ${DISPLAY:-:0}
+      WAYLAND_DISPLAY: ${WAYLAND_DISPLAY:-}
+      XDG_RUNTIME_DIR: ${SIM_XDG_RUNTIME_DIR:-/tmp/runtime-root}
+    ports:
+      - "18570:18570/udp" # QGroundControl -> PX4 SITL
+
+  dev:
+    build:
+      context: .
+      dockerfile: docker/sim/Dockerfile
+      target: dev
+    image: cogidrone-dev:latest
+    command: sleep infinity
+    init: true
+    shm_size: 1gb
+    volumes:
+      - .:/workspace
+      - dev_build:/workspace/ros2_ws/build
+      - dev_install:/workspace/ros2_ws/install
+      - dev_log:/workspace/ros2_ws/log
+
+volumes:
+  sim_build:
+  sim_install:
+  sim_log:
+  dev_build:
+  dev_install:
+  dev_log:

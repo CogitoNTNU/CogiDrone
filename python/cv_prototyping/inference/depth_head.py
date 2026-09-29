@@ -9,8 +9,8 @@ from ultralytics import YOLO
 
 from camera import open_webcam, close_webcam, COCO_CLASS_NAMES
 
-MODEL_WEIGHTS = "yolo26n.pt"
-HEAD_MODEL_WEIGHTS = "medium.pt"  # Your head detection model
+MODEL_WEIGHTS = "models/yolo26n.pt"
+HEAD_MODEL_WEIGHTS = "models/medium.pt"  # Your head detection model
 
 AVERAGE_HUMAN_HEIGHT_M = 1.70
 AVERAGE_HEAD_HEIGHT_M = 0.23      # Average human head height (~23cm)
@@ -49,7 +49,7 @@ def main() -> None:
         focal_length = w * 0.8  # Focal length dynamically scaled to webcam frame width
 
         # Primary YOLO detection on full frame
-        results = model(img, stream=True, verbose=False)
+        results = model(img, imgsz=1280, stream=True, verbose=False)
 
         # Depth estimation
         if frame_count % depth_interval == 1 or cached_depth_map is None:
@@ -78,7 +78,7 @@ def main() -> None:
                     person_crop = img[crop_y1:crop_y2, crop_x1:crop_x2]
 
                     if person_crop.size > 0:
-                        head_res = head_model(person_crop, verbose=False)
+                        head_res = head_model(person_crop, imgsz=1280, verbose=False)
                         if head_res and len(head_res[0].boxes) > 0:
                             # Pick head with highest confidence score
                             best_head_idx = int(torch.argmax(head_res[0].boxes.conf).item())

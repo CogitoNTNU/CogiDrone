@@ -23,13 +23,12 @@ The Jetson should not directly control the four motors. The Pixhawk must remain 
 
 ## Recommended software stack
 
-I would choose:
-
 - **PX4** on the Pixhawk 6C
 - **QGroundControl** for configuration, calibration, missions, and flight monitoring
 - **ROS 2** on the Jetson for camera, SLAM, transforms, and perception
-- **MAVSDK C++** initially for simple Jetson-to-Pixhawk commands
-- **MAVLink** as the communication protocol
+<!-- - **MAVSDK C++** initially for simple Jetson-to-Pixhawk commands -->
+- **uXRCE-DDS** (or **Zenoh**) for bridging PX4-uORB topics to ROS 2 (THESE ARE THE ONLY TWO SUPPORTED AS MIDDLEWARE FOR PX4!!)
+<!-- - **MAVLink** as the communication protocol --> -->
 - **YOLO with TensorRT** for Jetson inference
 - **RealSense ROS 2 wrapper** for D435i color, depth, and IMU data
 

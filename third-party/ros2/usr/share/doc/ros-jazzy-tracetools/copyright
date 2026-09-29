@@ -1,0 +1,9 @@
+Format: Bloom subset of https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: tracetools
+Upstream-Contact: https://github.com/ros2/ros2_tracing/issues
+Source: https://github.com/ros2/ros2_tracing
+
+Files: See file headers in repository for details
+Copyright: See package copyright in source code for details
+License: Apache 2.0
+ See repository for full license text
