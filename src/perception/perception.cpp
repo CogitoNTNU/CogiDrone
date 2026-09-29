@@ -84,6 +84,6 @@ void Perception::onFrame(const sensor_msgs::msg::Image& msg) {
 
 
 
-[[nodiscard]] std::unique_ptr<Model::FusedDetections> fuse(/* const ref something */) {
+[[nodiscard]] std::unique_ptr<Model::FusedDetections> Perception::fuse(/* const ref something */) {
     return std::make_unique<Model::FusedDetections>();
 }
