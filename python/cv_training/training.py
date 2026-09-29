@@ -1,11 +1,24 @@
-from ultralytics import YOLO
+import wandb
+from ultralytics import YOLO, settings
+
+print(f"Weights & Biases SDK: {wandb.__version__}")
+
+# Enable Ultralytics' built-in training callbacks (this persists in settings.json).
+settings.update({"wandb": True})
 
 def main():
     #Load pretrained model
     model = YOLO("yolo26n.pt")
 
     #trains model with data.yaml from personens seen from above
-    results = model.train(data="./python/dataset/search-and-rescue/data.yaml", epochs=10, imgsz=640, project="./runs", device=0)
+    results = model.train(
+        data="./python/dataset/search-and-rescue/data.yaml",
+        epochs=10,
+        imgsz=640,
+        project="cogidrone-search-and-rescue",
+        name="yolo26n",
+        device=0,
+    )
 
     #Validitating with best.pt on val-datasett
     metrics = model.val()
