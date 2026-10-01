@@ -1,0 +1,13 @@
+#!/bin/sh
+# QGroundControl launcher (install-user.sh links it as $COGI_DEPS/bin/qgc).
+#
+# SDL (inside QGC) auto-generates a gamepad profile for EdgeTX radios (RadioMaster Pocket, USB
+# 1209:4f54) that puts the throttle (Z axis) on a 0..max "trigger": QGC then sees the throttle at
+# half range and joystick calibration never completes. Give SDL a mapping with all four sticks on
+# full-range axes: left stick = yaw (RX) / throttle (Z), right stick = roll (X) / pitch (Y).
+# (SDL_GAMECONTROLLER_IGNORE_DEVICES does not work: SDL then hides the radio completely.)
+M="leftx:a3,lefty:a2,rightx:a0,righty:a1,a:b0,b:b1,x:b2,y:b3,platform:Linux,"
+export SDL_GAMECONTROLLERCONFIG="0300000009120000544f000011010000,EdgeTX Radiomaster Pocket Joystick,$M
+0300000009120000544f000000000000,EdgeTX Radiomaster Pocket Joystick,$M${SDL_GAMECONTROLLERCONFIG:+
+$SDL_GAMECONTROLLERCONFIG}"
+exec "${COGI_DEPS:-$HOME/cogidrone_deps}/bin/QGroundControl.AppImage" "$@"

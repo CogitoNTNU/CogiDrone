@@ -15,6 +15,8 @@ v2.4.3, px4_msgs `release/1.17` and YOLO (ultralytics, CPU). All versions are pi
 
 **Recommended PC:** 16 GB RAM and 30 GB free disk. 8 GB works in headless mode.
 
+**On a Jetson?** Don't use Docker there. See [jetson.md](jetson.md) for the native install.
+
 ## 1. Install (once)
 
 **Windows**

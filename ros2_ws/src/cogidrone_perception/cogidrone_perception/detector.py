@@ -7,6 +7,8 @@ Subscribes to a camera image, runs YOLO and publishes the detections.
          /cogidrone/detections/image      sensor_msgs/Image   (boxes drawn, for rqt_image_view)
 """
 
+import os
+
 import numpy as np
 import rclpy
 from rclpy.node import Node
@@ -41,9 +43,12 @@ class Detector(Node):
     def __init__(self):
         super().__init__("detector")
         self.declare_parameter("image_topic", "/camera/camera/color/image_raw")
-        self.declare_parameter("model", "/opt/models/yolo11n.pt")
+        # Defaults: Docker image paths, or what scripts/jetson/env.sh exports on a native Jetson.
+        self.declare_parameter(
+            "model", os.environ.get("COGIDRONE_YOLO_MODEL", "/opt/models/yolo11n.pt")
+        )
         self.declare_parameter("confidence", 0.4)
-        self.declare_parameter("device", "cpu")
+        self.declare_parameter("device", os.environ.get("COGIDRONE_YOLO_DEVICE", "cpu"))
         self.declare_parameter("publish_annotated", True)
 
         model_path = self.get_parameter("model").value
