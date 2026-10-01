@@ -31,7 +31,7 @@ def main():
 
     # 4. Train model
     results = model.train(
-        data="./python/dataset/search-and-rescue/data.yaml",
+        data="./python/dataset/final_dataset/data.yaml",
         epochs=10,
         imgsz=640,
         project="CogiDroneTraining",
