@@ -192,7 +192,7 @@ def horizon_line(width: int, intr: CameraIntrinsics, pose: CameraPose) -> tuple[
 # Live-løkke
 # ---------------------------------------------------------
 def main() -> None:
-    cap = open_webcam(width=1280, height=720, camera_index=1)
+    cap = open_webcam(width=1280, height=720, camera_index=0)
     model = YOLO(MODEL_WEIGHTS)
 
     test_pose = CameraPose(TEST_CAMERA_HEIGHT_M, TEST_CAMERA_PITCH_DEG, TEST_CAMERA_ROLL_DEG)

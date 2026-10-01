@@ -1,0 +1,60 @@
+_wandb:
+    value:
+        cli_version: 0.30.0
+        e:
+            hlclmrsf1xcp85vsuvd4yuebg6oqqg4h:
+                codePath: python\cv_training\training.py
+                codePathLocal: python\cv_training\training.py
+                cpu_count: 8
+                cpu_count_logical: 12
+                cudaVersion: "12.7"
+                disk:
+                    /:
+                        total: "999044747264"
+                        used: "802437267456"
+                email: muh.muwaffaq@gmail.com
+                executable: C:\Waffle\Projects\Cogito\CogiDrone\.venv\Scripts\python.exe
+                git:
+                    commit: 298fe07051f7e7f4db823def4321e1b40649d5c8
+                    remote: https://github.com/CogitoNTNU/CogiDrone
+                gpu: NVIDIA GeForce RTX 3060 Laptop GPU
+                gpu_count: 1
+                gpu_nvidia:
+                    - architecture: Ampere
+                      cudaCores: 3840
+                      memoryTotal: "6442450944"
+                      name: NVIDIA GeForce RTX 3060 Laptop GPU
+                      uuid: GPU-dbe368f0-fe2a-d600-b524-27c5c15d5c79
+                host: WaffleMcTUF
+                memory:
+                    total: "16782389248"
+                os: Windows-11-10.0.26200-SP0
+                program: c:\Waffle\Projects\Cogito\CogiDrone\python\cv_training\training.py
+                python: CPython 3.12.9
+                root: C:\Waffle\Projects\Cogito\CogiDrone
+                startedAt: "2026-09-29T18:09:12.777690Z"
+                writerId: hlclmrsf1xcp85vsuvd4yuebg6oqqg4h
+        m: []
+        python_version: 3.12.9
+        t:
+            "1":
+                - 1
+            "2":
+                - 1
+                - 41
+            "3":
+                - 16
+            "4": 3.12.9
+            "5": 0.30.0
+            "8":
+                - 3
+            "12": 0.30.0
+            "13": windows-amd64
+architecture:
+    value: CNN
+dataset:
+    value: CIFAR-100
+epochs:
+    value: 10
+learning_rate:
+    value: 0.02

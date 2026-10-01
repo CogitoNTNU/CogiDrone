@@ -17,7 +17,7 @@ AVERAGE_HEAD_HEIGHT_M = 0.23      # Average human head height (~23cm)
 
 
 def main() -> None:
-    cap = open_webcam(width=1280, height=720, camera_index=1)
+    cap = open_webcam(width=1280, height=720, camera_index=0)
     
     # Load both models once before the live loop
     model = YOLO(MODEL_WEIGHTS)
