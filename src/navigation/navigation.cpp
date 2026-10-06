@@ -148,14 +148,14 @@ void Navigation::onDetections(const vision_msgs::msg::Detection2DArray& msg) {
     // * Pick the most confident detection in the array
     const vision_msgs::msg::Detection2D* best = nullptr;
     for (const auto& detection : msg.detections) {
-        if (detection.results.empty()) continue;                                      // ? malformed entry
+        if (detection.results.empty()) continue;                                        // ? malformed entry
         if (!best || detection.results.front().hypothesis.score
                    > best->results.front().hypothesis.score) {
             best = &detection;
         }
     }
 
-    if (!best) {                                                                       // ? no usable detection in this frame
+    if (!best) {                                                                        // ? no usable detection in this frame
         m.person.valid = false;
         return;
     }
@@ -222,7 +222,7 @@ void Navigation::onControlTick() {
 
     switch (m.state) {
         case MissionState::IDLE:
-            break;                                                                     // Waiting for mission start
+            break;                                                                      // Waiting for mission start
 
         case MissionState::SEARCHING:
         case MissionState::PERSON_LOST:
@@ -253,7 +253,7 @@ void Navigation::onControlTick() {
             break;
 
         case MissionState::EMERGENCY:
-            publishVelocity(Vec3{}, 0.0f);                                             // Emergency stop
+            publishVelocity(Vec3{}, 0.0f);                                              // Emergency stop
             break;
     }
 
@@ -268,7 +268,7 @@ void Navigation::updateStateMachine() {
 
     switch (m.state) {
         case MissionState::IDLE:
-            break;                                                                     // ? start command arrives via onManualOverride
+            break;                                                                      // ? start command arrives via onManualOverride
 
         case MissionState::SEARCHING:
             if (detectionIsValid()) next = MissionState::PERSON_DETECTED;
@@ -399,9 +399,9 @@ Vec3 Navigation::cameraToWorld(const Vec3& camera) const {
 
 // * Safety
 bool Navigation::commandIsSafe(const Vec3& velocity) const {
-    if (m.drone.position.z < m.params.minAltitude)  return false;                      // ? too low
-    if (m.drone.position.z > m.params.maxAltitude)  return false;                      // ? too high
-    if (velocity.norm() > m.params.maxFollowSpeed)  return false;                      // ? too fast
+    if (m.drone.position.z < m.params.minAltitude)  return false;                       // ? too low
+    if (m.drone.position.z > m.params.maxAltitude)  return false;                       // ? too high
+    if (velocity.norm() > m.params.maxFollowSpeed)  return false;                       // ? too fast
     // TODO: Obstacle distance checks against the representation layer
     return true;
 }
@@ -426,7 +426,7 @@ bool Navigation::personIsLost() const {
 
 // * Publishing
 void Navigation::publishVelocity(const Vec3& velocity, float yawRate) {
-    auto msg = std::make_unique<geometry_msgs::msg::TwistStamped>();                   // ? unique_ptr publish: zero-copy intra-process
+    auto msg = std::make_unique<geometry_msgs::msg::TwistStamped>();                    // ? unique_ptr publish: zero-copy intra-process
     msg->header.stamp = m.node->now();
     msg->header.frame_id = "base_link";
     msg->twist.linear.x = velocity.x;

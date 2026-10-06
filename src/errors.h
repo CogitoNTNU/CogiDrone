@@ -8,7 +8,6 @@ namespace cogidrone {
 
 struct Error {
     std::string_view message;
-    // std::source_location location;                                                      // file/line captured at construction - free
     std::source_location location = std::source_location::current();                    // file/line captured at construction - free
 
     // template <typename S>

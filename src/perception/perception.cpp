@@ -36,11 +36,11 @@ std::expected<std::unique_ptr<Perception>, cogidrone::Error> Perception::create(
     // ! the subscribers and publishers, rather than relying on the caller to do it (the Drone) manually.
     // * Partial assembly
     auto p = std::unique_ptr<Perception>(
-        new Perception(M{                                                                   // ? Transfer ownership into unique_ptr as ctor is private
+        new Perception(M{                                                               // ? Transfer ownership into unique_ptr as ctor is private
             // ROS2
             .node = std::move(node),
-            .imageSubscription = nullptr,                                                   // ? will be wired later
-            .targetPublisher = nullptr,                                                     // ? will be wired later
+            .imageSubscription = nullptr,                                               // ? will be wired later
+            .targetPublisher = nullptr,                                                 // ? will be wired later
             
             // Models
             .personModel = std::move(*personModel),

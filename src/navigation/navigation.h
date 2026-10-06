@@ -39,7 +39,7 @@ struct Vec3 {
     [[nodiscard]] constexpr Vec3 operator-(const Vec3& o) const noexcept { return {x - o.x, y - o.y, z - o.z}; }
     [[nodiscard]] constexpr Vec3 operator*(float s) const noexcept { return {x * s, y * s, z * s}; }
     [[nodiscard]] float norm() const noexcept { return std::sqrt(x * x + y * y + z * z); }
-    [[nodiscard]] Vec3 normalized() const noexcept;                                    // ? zero-safe
+    [[nodiscard]] Vec3 normalized() const noexcept;                                     // ? zero-safe
 };
 
 struct Quat {
@@ -49,8 +49,8 @@ struct Quat {
     float z = 0.0f;
 };
 
-[[nodiscard]] Vec3 rotate(const Quat& q, const Vec3& v) noexcept;                      // v' = q * v * q^-1
-[[nodiscard]] float yawOf(const Quat& q) noexcept;                                     // ZYX yaw extraction
+[[nodiscard]] Vec3 rotate(const Quat& q, const Vec3& v) noexcept;                       // v' = q * v * q^-1
+[[nodiscard]] float yawOf(const Quat& q) noexcept;                                      // ZYX yaw extraction
 
 
 // * Mission states
@@ -153,7 +153,7 @@ private:
     void wire() noexcept;                                                               // Wire the node's subscriptions and publishers to the member methods
 
     // * Callbacks
-    void onDetections(const vision_msgs::msg::Detection2DArray& msg);                    // Fused detections from perception
+    void onDetections(const vision_msgs::msg::Detection2DArray& msg);                   // Fused detections from perception
     void onOdometry(const nav_msgs::msg::Odometry& msg);                                // VIO odometry from estimation
     void onManualOverride(const std_msgs::msg::String& msg);                            // Manual override commands
     void onControlTick();                                                               // Main control loop, runs at params.controlFrequency
@@ -171,7 +171,7 @@ private:
     // * Navigation math
     [[nodiscard]] Vec3 followTarget() const;                                            // Target position behind the person
     [[nodiscard]] Vec3 velocityTowards(const Vec3& target) const;                       // P-controller velocity command
-    [[nodiscard]] float desiredYawTowards(const Vec3& target) const;                     // Yaw to face the target
+    [[nodiscard]] float desiredYawTowards(const Vec3& target) const;                    // Yaw to face the target
     [[nodiscard]] Vec3 cameraToWorld(const Vec3& camera) const;                         // Camera frame -> world frame
 
     // * Safety
