@@ -5,7 +5,7 @@
 
 Perception::~Perception() = default;
 
-std::expected<Perception, cogidrone::Error> Perception::create() {
+std::expected<std::unique_ptr<Perception>, cogidrone::Error> Perception::create() {
     using namespace std::literals::string_view_literals;                                // ? for "sv" suffix
     
     // * Failable work: Model loads
@@ -35,20 +35,22 @@ std::expected<Perception, cogidrone::Error> Perception::create() {
     // ! step construction process anyway, it is better to initialize the object here and call a `wire()` method to connect 
     // ! the subscribers and publishers, rather than relying on the caller to do it (the Drone) manually.
     // * Partial assembly
-    auto p = Perception(M{
-        // ROS2
-        .node = std::move(node),
-        .imageSubscription = nullptr,                                                   // ? will be wired later
-        .targetPublisher = nullptr,                                                     // ? will be wired later
-        
-        // Models
-        .personModel = std::move(*personModel),
-        .headModel = std::move(*headModel),
-        .depthAnythingModel = std::move(*depthAnythingModel)
-    });
+    auto p = std::unique_ptr<Perception>(
+        new Perception(M{                                                                   // ? Transfer ownership into unique_ptr as ctor is private
+            // ROS2
+            .node = std::move(node),
+            .imageSubscription = nullptr,                                                   // ? will be wired later
+            .targetPublisher = nullptr,                                                     // ? will be wired later
+            
+            // Models
+            .personModel = std::move(*personModel),
+            .headModel = std::move(*headModel),
+            .depthAnythingModel = std::move(*depthAnythingModel)
+        })
+    );
 
     // Wire the node
-    p.wire();
+    p->wire();
 
     // * Return the fully constructed Perception object
     return p;
@@ -58,9 +60,9 @@ void Perception::wire() noexcept {
     m.imageSubscription = m.node->create_subscription<sensor_msgs::msg::Image>(
         "/camera/image", 
         rclcpp::SensorDataQoS(),
-        [this](const sensor_msgs::msg::Image& msg) {                                    // ! This doesn't work. Capturing `this` here causes a dangling pointer due to the fact that perception is movable, and get's moved twice in `drone.cpp`. Fix: make perception non-movable and owned via unique_ptr
-            this->onFrame(msg);
-        }
+        [this](const sensor_msgs::msg::Image& msg) {                                    // ! This doesn't work. Capturing `this` here causes a dangling pointer 
+            this->onFrame(msg);                                                         // ! due to the fact that perception is movable, and get's moved twice 
+        }                                                                               // ! in `drone.cpp`. Fix: make perception non-movable and owned via unique_ptr
     );
 
     // TODO: Update the publisher to publish fused detections - for this, I'll have to do some research

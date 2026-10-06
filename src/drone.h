@@ -11,7 +11,7 @@ class Drone {
 private:
     // Members
     struct M {                                                                          // Assembly struct
-        Perception perception;
+        std::unique_ptr<Perception> perception;
         nullptr_t estimation;                                                           // TODO: Implement the Estimation subsystem
         nullptr_t representation;                                                       // TODO: Implement the Representation subsystem
         Navigation navigation;

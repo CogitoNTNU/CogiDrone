@@ -47,13 +47,12 @@ private:
 
 public:
     // * Ctors & dtor
-    [[nodiscard]] static std::expected<Perception, cogidrone::Error> create();
+    [[nodiscard]] static std::expected<std::unique_ptr<Perception>, cogidrone::Error> create();
 
     ~Perception();
 
-    Perception(Perception&&) noexcept = default;                                        // movable
-    Perception& operator=(Perception&&) noexcept = default;
-
+    Perception(Perception&&) noexcept = delete;                                         // ? non-movable, causes dangling [this] pointers in subscription callbacks
+    Perception& operator=(Perception&&) noexcept = delete;
     Perception(const Perception&) = delete;                                             // non-copyable (one node, one camera)
     Perception& operator=(const Perception&) = delete;
 

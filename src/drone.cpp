@@ -20,15 +20,15 @@ Drone::initiate(int argc, const char* argv[]) {
 
     // * 2. Subsystems (each may create rclcpp::Node objects)
     // 1. Perception
-    std::optional<Perception> perception; {                                             // Local
+    std::optional<std::unique_ptr<Perception>> perception; {                            // Local
         auto result = Perception::create();
         
         if (!result) {
             return std::unexpected(result.error());                                     // Propagate the error up to the caller
         };
 
-        perception = std::move(*result);
-    }
+        perception = std::move(*result);                                                // ! THIS CAUSES A MOVE OF THE PERCEPTION OBJECT AFTER WE'VE CAPTURED 
+    }                                                                                   // ! `this` IN THE SUBSCRIPTION CALLBACK, LEADING TO A DANGLING POINTER. 
 
     // 4. Navigation
     std::optional<Navigation> navigation; {
@@ -63,7 +63,7 @@ void Drone::start() {
     // TODO: Ensure that this is the correct place and design choice for starting the Drone object
     rclcpp::executors::MultiThreadedExecutor executor;                                  // Local
     
-    executor.add_node(m.perception.node());
+    executor.add_node(m.perception->node());
     executor.add_node(m.navigation.node());
     
     executor.spin();                                                                    // ! Blocks until shutdown
