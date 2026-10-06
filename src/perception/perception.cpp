@@ -58,7 +58,7 @@ void Perception::wire() noexcept {
     m.imageSubscription = m.node->create_subscription<sensor_msgs::msg::Image>(
         "/camera/image", 
         rclcpp::SensorDataQoS(),
-        [this](const sensor_msgs::msg::Image& msg) {
+        [this](const sensor_msgs::msg::Image& msg) {                                    // ! This doesn't work. Capturing `this` here causes a dangling pointer due to the fact that perception is movable, and get's moved twice in `drone.cpp`. Fix: make perception non-movable and owned via unique_ptr
             this->onFrame(msg);
         }
     );
@@ -81,7 +81,6 @@ void Perception::onFrame(const sensor_msgs::msg::Image& msg) {
     // TODO: This publish call SHOULD work seamlessly once the above mentioned TODOs are implemented
     /* m.targetPublisher->publish(std::move(fusedDetections)); */
 }
-
 
 
 [[nodiscard]] std::unique_ptr<Model::FusedDetections> Perception::fuse(/* const ref something */) {
