@@ -185,12 +185,12 @@ private:
 
 public:
     // * Ctors & dtor
-    [[nodiscard]] static std::expected<Navigation, cogidrone::Error> create();
+    [[nodiscard]] static std::expected<std::unique_ptr<Navigation>, cogidrone::Error> create();
 
     ~Navigation();
 
-    Navigation(Navigation&&) noexcept = default;                                        // movable
-    Navigation& operator=(Navigation&&) noexcept = default;
+    Navigation(Navigation&&) noexcept = delete;                                         // non-movable, causes dangling [this] pointers in subscription callbacks
+    Navigation& operator=(Navigation&&) noexcept = delete;
 
     Navigation(const Navigation&) = delete;                                             // non-copyable (one node, one drone)
     Navigation& operator=(const Navigation&) = delete;

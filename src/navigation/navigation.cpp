@@ -43,7 +43,7 @@ float yawOf(const Quat& q) noexcept {
 // * Ctors & dtor
 Navigation::~Navigation() = default;
 
-std::expected<Navigation, cogidrone::Error> Navigation::create() {
+std::expected<std::unique_ptr<Navigation>, cogidrone::Error> Navigation::create() {
     // * ROS2
     // Node
     auto node = std::make_shared<rclcpp::Node>(
@@ -67,23 +67,25 @@ std::expected<Navigation, cogidrone::Error> Navigation::create() {
     node->get_parameter("min_detection_confidence", params.minDetectionConfidence);
 
     // * Partial assembly
-    auto n = Navigation(M{
-        // ROS2
-        .node = std::move(node),
-        .detectionSubscription = nullptr,                                             // ? will be wired later
-        .odometrySubscription = nullptr,                                               // ? will be wired later
-        .manualOverrideSubscription = nullptr,                                         // ? will be wired later
-        .velocityPublisher = nullptr,                                                  // ? will be wired later
-        .missionStatusPublisher = nullptr,                                             // ? will be wired later
-        .controlTimer = nullptr,                                                       // ? will be wired later
+    auto n = std::unique_ptr<Navigation>(
+        new Navigation(M{                                                               // ? Transfer ownership into unique_ptr as ctor is private
+            // ROS2
+            .node = std::move(node),
+            .detectionSubscription = nullptr,                                           // ? will be wired later
+            .odometrySubscription = nullptr,                                            // ? will be wired later
+            .manualOverrideSubscription = nullptr,                                      // ? will be wired later
+            .velocityPublisher = nullptr,                                               // ? will be wired later
+            .missionStatusPublisher = nullptr,                                          // ? will be wired later
+            .controlTimer = nullptr,                                                    // ? will be wired later
 
-        // State
-        .params = std::move(params)
-        // ? remaining members default-initialize; timestamps are set in wire()
-    });
+            // State
+            .params = std::move(params)
+            // ? remaining members default-initialize; timestamps are set in wire()
+        })
+    );
 
     // Wire the node
-    n.wire();
+    n->wire();
 
     // * Return the fully constructed Navigation object
     return n;

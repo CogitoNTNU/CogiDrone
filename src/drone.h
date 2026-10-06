@@ -14,12 +14,11 @@ private:
         std::unique_ptr<Perception> perception;
         nullptr_t estimation;                                                           // TODO: Implement the Estimation subsystem
         nullptr_t representation;                                                       // TODO: Implement the Representation subsystem
-        Navigation navigation;
+        std::unique_ptr<Navigation> navigation;
     } m;
 
     // * Ctors & dtor
     // Ctor
-    // TODO: Fix ctor
     explicit Drone(M&& m) : m(std::move(m)) {}                                          // No default ctor exposed
 
 public:
