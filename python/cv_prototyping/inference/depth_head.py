@@ -11,9 +11,28 @@ from camera import open_webcam, close_webcam, COCO_CLASS_NAMES
 
 MODEL_WEIGHTS = "models/yolo26n.pt"
 HEAD_MODEL_WEIGHTS = "models/medium.pt"  # Your head detection model
+PERSON_CONF_THRESHOLD = 0.10
+OTHER_CONF_THRESHOLD = 0.25
 
 AVERAGE_HUMAN_HEIGHT_M = 1.70
 AVERAGE_HEAD_HEIGHT_M = 0.23      # Average human head height (~23cm)
+
+def offset_from_center(x1, y1, x2, y2, frame_w, frame_h):
+    """Returnerer (dx, dy) i piksler fra skjermens midte til midten av boksen.
+    dx > 0: target er til høyre for midten
+    dy > 0: target er under midten (bildekoordinater, y går nedover)
+    """
+    cx = (x1 + x2) / 2
+    cy = (y1 + y2) / 2
+    dx = cx - frame_w / 2
+    dy = cy - frame_h / 2
+    return dx, dy
+
+def offset_in_meters(dx, dy, distance, focal_length):
+    """Gjør pikselavstand (dx, dy) om til meter ved hjelp av distansen til target."""
+    x_m = dx * distance / focal_length
+    y_m = dy * distance / focal_length
+    return x_m, y_m
 
 
 def main() -> None:
@@ -49,7 +68,9 @@ def main() -> None:
         focal_length = w * 0.8  # Focal length dynamically scaled to webcam frame width
 
         # Primary YOLO detection on full frame
-        results = model(img, imgsz=1280, stream=True, verbose=False)
+        results = model(
+            img, imgsz=1280, conf=PERSON_CONF_THRESHOLD, stream=True, verbose=False
+        )
 
         # Depth estimation
         if frame_count % depth_interval == 1 or cached_depth_map is None:
@@ -62,9 +83,12 @@ def main() -> None:
             for box in r.boxes:
                 x1, y1, x2, y2 = map(int, box.xyxy[0])
                 cls = int(box.cls[0])
+                confidence = float(box.conf[0])
+                if cls != 0 and confidence < OTHER_CONF_THRESHOLD:
+                    continue
                 cls_name = COCO_CLASS_NAMES[cls] if cls < len(COCO_CLASS_NAMES) else "objekt"
 
-                geom_dist = 0.0
+                geom_dist = 0.0 
                 head_dist = None
 
                 if cls_name == "person":
@@ -108,6 +132,29 @@ def main() -> None:
                 # Draw main person bounding box in MAGENTA
                 cv2.rectangle(img, (x1, y1), (x2, y2), (255, 0, 255), 3)
 
+                dx, dy = offset_from_center(x1, y1, x2, y2, w, h)
+                box_cx, box_cy = (x1 + x2) // 2, (y1 + y2) // 2
+
+                # Linje fra bildets midte til midten av boksen
+                cv2.line(img, (w // 2, h // 2), (box_cx, box_cy), (0, 255, 0), 2)
+
+                # dx, dy som tekst under boksen
+                cv2.putText(
+                    img, f"dx={dx:.0f} dy={dy:.0f}", (x1, min(y2 + 25, h - 10)),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2
+                    )
+
+                if cls_name == "person":
+                    distance = head_dist if head_dist is not None else geom_dist
+                    x_m, y_m = offset_in_meters(dx, dy, distance, focal_length)
+
+                    cv2.putText(
+                        img, f"X={x_m:.2f}m Y={y_m:.2f}m Z={distance:.2f}m",
+                        (x1, min(y2 + 50, h - 10)),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2
+                    )
+                    
+
                 # Format text label dynamically
                 if cls_name == "person":
                     if head_dist is not None:
@@ -122,6 +169,8 @@ def main() -> None:
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 0), 2
                 )
 
+        # Kryss i bildets midte
+        cv2.drawMarker(img, (w // 2, h // 2), (0, 255, 255), cv2.MARKER_CROSS, 30, 2)
         cv2.imshow("Webcam - YOLO + Depth Anything V2", img)
         if cv2.waitKey(1) == ord("q"):
             break
