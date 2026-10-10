@@ -9,12 +9,10 @@ file(GLOB _ros_lib_dirs ${CMAKE_SOURCE_DIR}/third-party/ros2/opt/ros/jazzy/lib)
 
 # * Sources
 add_executable(cogidrone
-    # Main
+    # Application
     main.cpp
-    # // test.cpp
-
-    # Drone
     drone.cpp
+
 
     # Perception
     perception/perception.cpp
@@ -32,6 +30,10 @@ add_executable(cogidrone
     # Control
 
     # Act
+
+
+    # Helpers
+    logging.cpp
 )
 
 # * Include

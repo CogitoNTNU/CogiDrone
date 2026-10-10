@@ -36,6 +36,7 @@ public:
     // Pure computation: frame in, distances out
     // [[nodiscard]] std::vector</* type */> distance(const /* type */& frame);
     [[nodiscard]] bool distance(auto frame) {
+        (void)frame;                                                                    // Suppress unused parameter warning
         bool DEBUG = true;
         return DEBUG;
     }

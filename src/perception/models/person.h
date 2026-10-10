@@ -35,6 +35,7 @@ public:
     // Pure computation: frame in, detections out
     // [[nodiscard]] std::vector</* type */> detect(const /* type */& frame);
     [[nodiscard]] bool detect(auto frame) {
+        (void)frame;                                                                    // Suppress unused parameter warning
         bool DEBUG = true;
         return DEBUG;
     }

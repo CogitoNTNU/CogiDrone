@@ -22,7 +22,7 @@ void setLoggingLevel(LOGGING_LEVEL level);
 
 namespace cogidrone {
 // Log function declaration
-void cogidrone::log(
+void log(
     const LOGGING_LEVEL level, 
     std::string_view message, 
     std::source_location location = std::source_location::current()
