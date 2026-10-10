@@ -36,7 +36,7 @@ void setLoggingLevel(const LOGGING_LEVEL LEVEL) {
 
 
 // Log function
-void log(
+void cogidrone::log(
     const LOGGING_LEVEL LEVEL, 
     std::string_view message, 
     std::source_location location
