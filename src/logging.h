@@ -18,7 +18,8 @@ enum class LOGGING_LEVEL : std::uint8_t {
     __LEVEL_COUNT                                                                       // ? Sentinel value for the number of logging levels
 };
 
-void setLoggingLevel(LOGGING_LEVEL level);
+void setLoggingLevel(const LOGGING_LEVEL level);
+
 
 namespace cogidrone {
 // Log function declaration
@@ -37,7 +38,5 @@ struct Error {
     // Error(S&& msg, std::source_location loc = std::source_location::current())
     //     : message(std::forward<S>(msg)), location(loc) {}
 };
-
-
 
 } // namespace cogidrone
