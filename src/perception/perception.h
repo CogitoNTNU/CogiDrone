@@ -13,7 +13,7 @@
 #include "perception/models/head.h"
 #include "perception/models/depth_anything.h"
 
-#include "errors.h"
+#include "logging.h"
 
 
 

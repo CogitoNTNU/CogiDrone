@@ -11,7 +11,7 @@
 #include "std_msgs/msg/string.hpp"
 #include "vision_msgs/msg/detection2_d_array.hpp"
 
-#include "errors.h"
+#include "logging.h"
 
 
 // TODO: WE NEED TO REFACTOR THIS ENTIRE FILE, ALONG WITH `navigation.cpp`!

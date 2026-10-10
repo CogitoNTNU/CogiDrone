@@ -3,6 +3,7 @@
 #include <string_view>
 
 
+
 Perception::~Perception() = default;
 
 std::expected<std::unique_ptr<Perception>, cogidrone::Error> Perception::create() {
@@ -12,14 +13,17 @@ std::expected<std::unique_ptr<Perception>, cogidrone::Error> Perception::create(
     // Person model
     auto personModel = Model::load<Person>("Person model load failed!"sv);
     if (!personModel) return std::unexpected(std::move(personModel.error()));
+    cogidrone::log(LOGGING_LEVEL::INFO, "Person model loaded successfully");
 
     // Head model
     auto headModel = Model::load<Head>("Head model load failed!"sv);
     if (!headModel) return std::unexpected(std::move(headModel.error()));
+    cogidrone::log(LOGGING_LEVEL::INFO, "Head model loaded successfully");
 
     // DepthAnything model
     auto depthAnythingModel = Model::load<DepthAnything>("DepthAnything model load failed!"sv);
     if (!depthAnythingModel) return std::unexpected(std::move(depthAnythingModel.error()));
+    cogidrone::log(LOGGING_LEVEL::INFO, "DepthAnything model loaded successfully");
 
     // * ROS2
     // Node
@@ -27,6 +31,8 @@ std::expected<std::unique_ptr<Perception>, cogidrone::Error> Perception::create(
         "perception",
         rclcpp::NodeOptions().use_intra_process_comms(true)
     );
+    cogidrone::log(LOGGING_LEVEL::INFO, "ROS2 IPC node created successfully");
+
 
     // ! NOTE:
     // ! As much as this pains me, I have to initialize a perception object here to avoid insane workarounds regarding 
@@ -48,9 +54,11 @@ std::expected<std::unique_ptr<Perception>, cogidrone::Error> Perception::create(
             .depthAnythingModel = std::move(*depthAnythingModel)
         })
     );
+    cogidrone::log(LOGGING_LEVEL::INFO, "Perception object partially constructed");
 
     // Wire the node
-    p->wire();
+    p->wire();                                      
+    cogidrone::log(LOGGING_LEVEL::INFO, "Perception object wired successfully");
 
     // * Return the fully constructed Perception object
     return p;

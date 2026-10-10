@@ -4,7 +4,7 @@
 #include <string_view>
 #include <source_location>
 
-#include "errors.h"
+#include "logging.h"
 
 
 // NOTE: Header only library for reused model types and structs

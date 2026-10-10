@@ -2,6 +2,8 @@
 
 #include <rclcpp/rclcpp.hpp>
 
+#include "logging.h"
+
 
 // * Ctor & dtor
 Drone::~Drone() {
@@ -17,6 +19,8 @@ Drone::initiate(int argc, const char* argv[]) {
     if (!rclcpp::ok()) {
         rclcpp::init(argc, argv);
     }
+    cogidrone::log(LOGGING_LEVEL::INFO, "ROS context initialized successfully");
+    
 
     // * 2. Subsystems (each may create rclcpp::Node objects)
     // 1. Perception
@@ -29,6 +33,7 @@ Drone::initiate(int argc, const char* argv[]) {
 
         perception = std::move(*result);                                                
     }
+    cogidrone::log(LOGGING_LEVEL::INFO, "Perception subsystem created successfully");
 
     // 4. Navigation
     std::optional<std::unique_ptr<Navigation>> navigation; {
@@ -40,6 +45,8 @@ Drone::initiate(int argc, const char* argv[]) {
 
         navigation = std::move(*result);
     }
+    cogidrone::log(LOGGING_LEVEL::INFO, "Navigation subsystem created successfully");
+
 
     // * 3. Assemble
     // ? We wrap the raw pointer and let a unique_ptr take ownership to prevent leaks 
@@ -66,8 +73,12 @@ void Drone::start() {
     executor.add_node(m.perception->node());
     executor.add_node(m.navigation->node());
     
+    cogidrone::log(LOGGING_LEVEL::INFO, "Nodes added successfully, spinning executor...");
+    
     executor.spin();                                                                    // ! Blocks until shutdown
     // executor destroyed here - releases its node references
+    
+    cogidrone::log(LOGGING_LEVEL::INFO, "Shutting down...");
 }
 
 void Drone::stop() {

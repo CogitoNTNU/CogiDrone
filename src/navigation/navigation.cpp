@@ -50,6 +50,8 @@ std::expected<std::unique_ptr<Navigation>, cogidrone::Error> Navigation::create(
         "navigation",
         rclcpp::NodeOptions().use_intra_process_comms(true)
     );
+    cogidrone::log(LOGGING_LEVEL::INFO, "ROS2 IPC node created successfully");
+
 
     // * Parameters (non-failable: defaults live in NavigationParams)
     NavigationParams params;
@@ -65,6 +67,7 @@ std::expected<std::unique_ptr<Navigation>, cogidrone::Error> Navigation::create(
     node->get_parameter("control_frequency", params.controlFrequency);
     node->get_parameter("detection_timeout", params.detectionTimeout);
     node->get_parameter("min_detection_confidence", params.minDetectionConfidence);
+    cogidrone::log(LOGGING_LEVEL::INFO, "Navigation parameters initialized successfully");
 
     // * Partial assembly
     auto n = std::unique_ptr<Navigation>(
@@ -83,9 +86,11 @@ std::expected<std::unique_ptr<Navigation>, cogidrone::Error> Navigation::create(
             // ? remaining members default-initialize; timestamps are set in wire()
         })
     );
+    cogidrone::log(LOGGING_LEVEL::INFO, "Navigation object partially constructed");
 
     // Wire the node
     n->wire();
+    cogidrone::log(LOGGING_LEVEL::INFO, "Navigation object wired successfully");
 
     // * Return the fully constructed Navigation object
     return n;

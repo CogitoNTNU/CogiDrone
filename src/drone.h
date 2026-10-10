@@ -5,7 +5,7 @@
 
 #include "perception/perception.h"
 #include "navigation/navigation.h"
-#include "errors.h"
+#include "logging.h"
 
 class Drone {
 private:
