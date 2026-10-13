@@ -51,8 +51,8 @@ public:
 
     ~Perception();
 
-    Perception(Perception&&) noexcept = delete;                                         // ? non-movable, causes dangling [this] pointers in subscription callbacks
-    Perception& operator=(Perception&&) noexcept = delete;
+    Perception(Perception&&) noexcept = delete;                                         // ? non-movable, otherwise it causes dangling
+    Perception& operator=(Perception&&) noexcept = delete;                              // ? [this] pointers in subscription callbacks
     Perception(const Perception&) = delete;                                             // non-copyable (one node, one camera)
     Perception& operator=(const Perception&) = delete;
 
