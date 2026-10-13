@@ -6,6 +6,11 @@
 
 
 
+/**
+ * @brief The Pixhawk class represents the Pixhawk flight controller.
+ * This class is responsible for communicating with the Pixhawk flight controller 
+ * and managing its state; e.g.: Pixhawk.arm();
+ */
 class Pixhawk {
 private:
     // * Ctors & dtor
