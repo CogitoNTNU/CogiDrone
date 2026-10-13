@@ -32,12 +32,12 @@ def main():
     # 4. Train model
     results = model.train(
         data="./python/dataset/final_dataset/data.yaml",
-        epochs=10,
+        epochs=100,
         imgsz=640,
         project="CogiDroneTraining",
         name="yolo26n",
         device=device,
-        lr0=0.02, #learning rate
+        lr0=0.01, #learning rate
         plots=True  # Ensures loss and metric plots are generated for W&B upload
     )
 

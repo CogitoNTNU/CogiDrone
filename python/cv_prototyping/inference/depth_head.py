@@ -9,7 +9,7 @@ from ultralytics import YOLO
 
 from camera import open_webcam, close_webcam, COCO_CLASS_NAMES
 
-MODEL_WEIGHTS = "models/yolo26n.pt"
+MODEL_WEIGHTS = "weights/yolo26n.pt" #"models/yolo26n.pt"
 HEAD_MODEL_WEIGHTS = "models/medium.pt"  # Your head detection model
 PERSON_CONF_THRESHOLD = 0.10
 OTHER_CONF_THRESHOLD = 0.25
@@ -36,7 +36,7 @@ def offset_in_meters(dx, dy, distance, focal_length):
 
 
 def main() -> None:
-    cap = open_webcam(width=1280, height=720, camera_index=0)
+    cap = open_webcam(width=640, height=480, camera_index=1)
     
     # Load both models once before the live loop
     model = YOLO(MODEL_WEIGHTS)
@@ -69,7 +69,7 @@ def main() -> None:
 
         # Primary YOLO detection on full frame
         results = model(
-            img, imgsz=1280, conf=PERSON_CONF_THRESHOLD, stream=True, verbose=False
+            img, imgsz=640, conf=PERSON_CONF_THRESHOLD, stream=True, verbose=False
         )
 
         # Depth estimation
@@ -86,7 +86,10 @@ def main() -> None:
                 confidence = float(box.conf[0])
                 if cls != 0 and confidence < OTHER_CONF_THRESHOLD:
                     continue
-                cls_name = COCO_CLASS_NAMES[cls] if cls < len(COCO_CLASS_NAMES) else "objekt"
+                if cls < len(COCO_CLASS_NAMES):
+                    cls_name = COCO_CLASS_NAMES[cls]
+                else:
+                    continue  # Skip unknown classes
 
                 geom_dist = 0.0 
                 head_dist = None
@@ -102,7 +105,7 @@ def main() -> None:
                     person_crop = img[crop_y1:crop_y2, crop_x1:crop_x2]
 
                     if person_crop.size > 0:
-                        head_res = head_model(person_crop, imgsz=1280, verbose=False)
+                        head_res = head_model(person_crop, imgsz=640, verbose=False)
                         if head_res and len(head_res[0].boxes) > 0:
                             # Pick head with highest confidence score
                             best_head_idx = int(torch.argmax(head_res[0].boxes.conf).item())
@@ -144,15 +147,15 @@ def main() -> None:
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2
                     )
 
-                if cls_name == "person":
-                    distance = head_dist if head_dist is not None else geom_dist
-                    x_m, y_m = offset_in_meters(dx, dy, distance, focal_length)
+                # if cls_name == "person":
+                #     distance = head_dist if head_dist is not None else geom_dist
+                #     x_m, y_m = offset_in_meters(dx, dy, distance, focal_length)
 
-                    cv2.putText(
-                        img, f"X={x_m:.2f}m Y={y_m:.2f}m Z={distance:.2f}m",
-                        (x1, min(y2 + 50, h - 10)),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2
-                    )
+                #     cv2.putText(
+                #         img, f"X={x_m:.2f}m Y={y_m:.2f}m Z={distance:.2f}m",
+                #         (x1, min(y2 + 50, h - 10)),
+                #         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2
+                #     )
                     
 
                 # Format text label dynamically

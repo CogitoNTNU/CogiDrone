@@ -1,0 +1,17 @@
+SCUT-HEAD:
+https://github.com/Abcfsa/YOLOv8_head_detector
+
+search-and-rescue:
+https://www.kaggle.com/datasets/nikolasgegenava/sard-search-and-rescue
+
+search-and-rescue-2:
+https://www.kaggle.com/datasets/nikolasgegenava/sard-2-search-and-rescue-dataset-extra-classes
+
+NTUT:
+https://www.kaggle.com/datasets/kuantinglai/ntut-4k-drone-photo-dataset-for-human-detection
+
+RoadVehiclesYOLODatasetPro:
+https://www.kaggle.com/datasets/redzapdos123/aerial-view-of-vehicles-and-humans-dataset-yolo
+
+DroneSwarm:
+https://www.kaggle.com/datasets/arturkrush/drone-swarm-yolo-dataset

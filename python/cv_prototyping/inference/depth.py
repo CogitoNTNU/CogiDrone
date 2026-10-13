@@ -9,7 +9,7 @@ from ultralytics import YOLO
 
 from camera import open_webcam, close_webcam, COCO_CLASS_NAMES
 
-MODEL_WEIGHTS = "yolo26n.pt"
+MODEL_WEIGHTS = "weights/yolo26n.pt"# "yolo26n.pt"
 AVERAGE_HUMAN_HEIGHT_M = 1.70
 
 

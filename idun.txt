@@ -1,0 +1,11 @@
+scp file.txt muhammhm@idun-login1.hpc.ntnu.no:~/
+
+ssh muhammhm@idun-login1.hpc.ntnu.no
+
+ls -a
+
+module avail Python
+
+sbatch run_yolo.sh
+
+uv pip install --torch-backend=cu121 -r requirements_idun.txt
