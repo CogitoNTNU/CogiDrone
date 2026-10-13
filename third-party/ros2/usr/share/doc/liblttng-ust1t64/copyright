@@ -1,0 +1,901 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: lttng-ust
+Upstream-Contact: https://lists.lttng.org/cgi-bin/mailman/listinfo/lttng-dev
+
+Files: *
+Copyright: 2009-2012, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+           2010-2012, David Goulet <david.goulet@polymtl.ca>
+           2011-2012, Julien Desfossez <julien.desfossez@polymtl.ca>
+           2010, Nils Carlson <nils.carlson@ericsson.com>
+           2009, Pierre-Marc Fournier
+License: LGPL-2.1
+
+Files: debian/*
+Copyright: 2011-2013, Alexandre Montplaisir <alexmonthy@voxpopuli.im>
+           2010-2013, Jon Bernard <jbernard@debian.org>
+           2015-2022, Michael Jeanson <mjeanson@debian.org>
+License: GPL-3
+
+Files: doc/*
+Copyright: 2011, 2012, Julien Desfossez <julien.desfossez@polymtl.ca>
+  2010-2012, David Goulet <david.goulet@polymtl.ca>
+  2010, Nils Carlson <nils.carlson@ericsson.com>
+  2009-2012, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+  2009, Pierre-Marc Fournier
+License: LGPL-2.1
+
+Files: doc/examples/clock-override/lttng-ust-clock-override-example.c
+Copyright: 2014, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: Expat
+
+Files: doc/examples/cmake-multiple-shared-libraries/*
+Copyright: 2016, Sebastien Boisvert <sboisvert@gydle.com>
+License: Expat
+
+Files: doc/examples/cmake-multiple-shared-libraries/cmake/*
+Copyright: 2016, Philippe Proulx <pproulx@efficios.com>
+  2016, Kitware, Inc.
+License: LGPL-2.1+
+
+Files: doc/examples/cmake-multiple-shared-libraries/trace.sh
+Copyright: 2011, 2012, Julien Desfossez <julien.desfossez@polymtl.ca>
+  2010-2012, David Goulet <david.goulet@polymtl.ca>
+  2010, Nils Carlson <nils.carlson@ericsson.com>
+  2009-2012, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+  2009, Pierre-Marc Fournier
+License: LGPL-2.1+
+
+Files: doc/examples/demo-tracef/*
+Copyright: 2011-2014, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+  2009, 2010, Pierre-Marc Fournier
+License: LGPL-2.1
+
+Files: doc/examples/demo-tracelog/*
+Copyright: 2011-2014, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+  2009, 2010, Pierre-Marc Fournier
+License: LGPL-2.1
+
+Files: doc/examples/demo/*
+Copyright: 2011, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: Expat
+
+Files: doc/examples/demo/demo.c
+Copyright: 2011-2014, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+  2009, 2010, Pierre-Marc Fournier
+License: LGPL-2.1
+
+Files: doc/examples/easy-ust/*
+Copyright: 2011, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: Expat
+
+Files: doc/examples/easy-ust/sample.c
+Copyright: 2012, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+  2011, 2012, Matthew Khouzam <matthew.khouzam@ericsson.com>
+License: Expat
+
+Files: doc/examples/easy-ust/sample_component_provider.h
+Copyright: 2011, 2012, Matthew Khouzam <matthew.khouzam@ericsson.com>
+  2011, 2012, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: Expat
+
+Files: doc/examples/gen-tp/*
+Copyright: 2012, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+  2011, 2012, Matthew Khouzam <matthew.khouzam@ericsson.com>
+License: Expat
+
+Files: doc/examples/getcpu-override/lttng-ust-getcpu-override-example.c
+Copyright: 2014, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: Expat
+
+Files: doc/examples/hello-static-lib/*
+Copyright: 2011, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: Expat
+
+Files: doc/examples/hello-static-lib/hello.c
+Copyright: 2011-2014, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+  2009, 2010, Pierre-Marc Fournier
+License: LGPL-2.1
+
+Files: doc/examples/java-jul/ApplicationContextExample.java
+Copyright: 2016, - EfficiOS Inc., Alexandre Montplaisir <alexmonthy@efficios.com>
+License: Expat
+
+Files: doc/examples/java-jul/FilterChangeListenerExample.java
+Copyright: 2015, - EfficiOS Inc., Alexandre Montplaisir <alexmonthy@efficios.com>
+License: Expat
+
+Files: doc/examples/java-jul/Hello.java
+Copyright: 2015, - EfficiOS Inc., Alexandre Montplaisir <alexmonthy@efficios.com> / 2013, - David Goulet <dgoulet@efficios.com>
+License: Expat
+
+Files: doc/examples/java-log4j/HelloLog4j.java
+Copyright: 2015, - EfficiOS Inc., Alexandre Montplaisir <alexmonthy@efficios.com> / 2014, - Christian Babeux <christian.babeux@efficios.com>
+License: Expat
+
+Files: doc/examples/java-log4j2-basic/HelloLog4j2.java
+Copyright: 2022, EfficiOS Inc.
+License: Expat
+
+Files: doc/examples/java-log4j2-ctx/HelloLog4j2Ctx.java
+Copyright: 2022, EfficiOS Inc.
+License: Expat
+
+Files: doc/examples/java-log4j2-prog/HelloLog4j2Prog.java
+Copyright: 2022, EfficiOS Inc.
+License: Expat
+
+Files: include/*
+Copyright: 2011-2014, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+  2009, 2010, Pierre-Marc Fournier
+License: LGPL-2.1
+
+Files: include/lttng/*
+Copyright: 2011-2012, - Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: Expat
+
+Files: src/common/align.h
+Copyright: 2010-2011, - Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: Expat
+
+Files: src/common/bitfield.h
+Copyright: 2010-2019, - Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: Expat
+
+Files: include/lttng/tp/lttng-ust-tracef.h
+Copyright: 2011-2014, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: Expat
+
+Files: include/lttng/tp/lttng-ust-tracelog.h
+Copyright: 2011-2015, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: Expat
+
+Files: include/lttng/tracef.h
+Copyright: 2013, 2014, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: Expat
+
+Files: include/lttng/tracelog.h
+Copyright: 2013-2015, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: Expat
+
+Files: include/lttng/tracepoint-event.h
+  include/lttng/ust-tracepoint-event-nowrite.h
+  include/lttng/ust-tracepoint-event-reset.h
+  include/lttng/ust-tracepoint-event-write.h
+  include/lttng/ust-version.h.in
+Copyright: 2011, - Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: Expat
+
+Files: include/lttng/ust-abi.h
+  include/lttng/ust-events.h
+Copyright: 2010-2012, - Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: Expat
+
+Files: include/lttng/ust-clock.h
+  include/lttng/ust-getcpu.h
+Copyright: 2014, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: LGPL-2.1
+
+Files: include/lttng/ust-ctl.h
+Copyright: 2011-2013, - Mathieu Desnoyers <mathieu.desnoyers@efficios.com> / 2011, - Julien Desfossez <julien.desfossez@polymtl.ca>
+License: GPL-2
+
+Files: src/common/compat/dlfcn.h
+Copyright: 2014, - Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: Expat
+
+Files: src/common/elf.h
+  src/common/elf.c
+Copyright: 2015, Antoine Busque <abusque@efficios.com>
+License: LGPL-2.1+
+
+Files: include/lttng/ust-endian.h
+  src/common/compat/tid.h
+Copyright: 2012, - Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: Expat
+
+Files: include/lttng/ust-error.h
+Copyright: 2011, - David Goulet <david.goulet@polymtl.ca>
+License: LGPL-2.1
+
+Files: include/lttng/ust-tracer.h
+Copyright: 2011-2012, - Mathieu Desnoyers <mathieu.desnoyers@efficios.com> / 2005-2011, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: Expat
+
+Files: src/common/ust-fd.h
+Copyright: 2016, - Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust-ctl/*
+Copyright: 2011-2013, - Mathieu Desnoyers <mathieu.desnoyers@efficios.com> / 2011, - Julien Desfossez <julien.desfossez@polymtl.ca>
+License: GPL-2
+
+Files: src/lib/lttng-ust-cyg-profile/*
+Copyright: 2011, 2012, Julien Desfossez <julien.desfossez@polymtl.ca>
+  2010-2012, David Goulet <david.goulet@polymtl.ca>
+  2010, Nils Carlson <nils.carlson@ericsson.com>
+  2009-2012, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+  2009, Pierre-Marc Fournier
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust-cyg-profile/lttng-ust-cyg-profile-fast.c
+  src/lib/lttng-ust-cyg-profile/lttng-ust-cyg-profile.c
+Copyright: 2011-2013, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: LGPL-2.1+
+
+Files: src/lib/lttng-ust-cyg-profile/lttng-ust-cyg-profile-fast.h
+  src/lib/lttng-ust-cyg-profile/lttng-ust-cyg-profile.h
+Copyright: 2011-2013, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: Expat
+
+Files: src/lib/lttng-ust-dl/*
+Copyright: 2015, Antoine Busque <abusque@efficios.com>
+  2013, Paul Woegerer <paul.woegerer@mentor.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust-dl/lttng-ust-dl.c
+Copyright: 2016, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+  2015, Antoine Busque <abusque@efficios.com>
+  2013, Paul Woegerer <paul.woegerer@mentor.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust-dl/ust_dl.c
+Copyright: 2013, Paul Woegerer <paul_woegerer@mentor.com>
+License: LGPL-2.1+
+
+Files: src/lib/lttng-ust-dl/ust_dl.h
+Copyright: 2015, Antoine Busque <abusque@efficios.com>
+  2013, Paul Woegerer <paul_woegerer@mentor.com>
+License: Expat
+
+Files: src/lib/lttng-ust-fd/*
+Copyright: 2011, 2012, Julien Desfossez <julien.desfossez@polymtl.ca>
+  2010-2012, David Goulet <david.goulet@polymtl.ca>
+  2010, Nils Carlson <nils.carlson@ericsson.com>
+  2009-2012, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+  2009, Pierre-Marc Fournier
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust-fd/lttng-ust-fd.c
+Copyright: 2016, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust-fork/*
+Copyright: 2011-2014, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+  2009, 2010, Pierre-Marc Fournier
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust-java-agent/*
+Copyright: 2011, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust-java-agent/java/*
+Copyright: 2015, - EfficiOS Inc., Alexandre Montplaisir <alexmonthy@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust-java-agent/java/lttng-ust-agent-common/org/lttng/ust/agent/AbstractLttngAgent.java
+Copyright: 2015, - EfficiOS Inc., Alexandre Montplaisir <alexmonthy@efficios.com> / 2013, - David Goulet <dgoulet@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust-java-agent/java/lttng-ust-agent-common/org/lttng/ust/agent/EventNamePattern.java
+Copyright: 2017, - EfficiOS Inc., Philippe Proulx <pproulx@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust-java-agent/java/lttng-ust-agent-common/org/lttng/ust/agent/LTTngAgent.java
+Copyright: 2013, - David Goulet <dgoulet@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust-java-agent/java/lttng-ust-agent-common/org/lttng/ust/agent/client/*
+Copyright: 2015, - EfficiOS Inc., Alexandre Montplaisir <alexmonthy@efficios.com> / 2013, - David Goulet <dgoulet@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust-java-agent/java/lttng-ust-agent-common/org/lttng/ust/agent/client/ILttngTcpClientListener.java
+Copyright: 2015, - EfficiOS Inc., Alexandre Montplaisir <alexmonthy@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust-java-agent/java/lttng-ust-agent-common/org/lttng/ust/agent/client/LttngTcpSessiondClient.java
+Copyright: 2015-2016, EfficiOS Inc., Alexandre Montplaisir <alexmonthy@efficios.com> / 2013, - David Goulet <dgoulet@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust-java-agent/java/lttng-ust-agent-common/org/lttng/ust/agent/client/SessiondCommand.java
+Copyright: 2015-2016, - EfficiOS Inc., Alexandre Montplaisir <alexmonthy@efficios.com> / 2013, - David Goulet <dgoulet@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust-java-agent/java/lttng-ust-agent-common/org/lttng/ust/agent/client/SessiondDisableAppContextCommand.java
+  src/lib/lttng-ust-java-agent/java/lttng-ust-agent-common/org/lttng/ust/agent/client/SessiondEnableAppContextCommand.java
+Copyright: 2016, - EfficiOS Inc., Alexandre Montplaisir <alexmonthy@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust-java-agent/java/lttng-ust-agent-common/org/lttng/ust/agent/context/ContextInfoSerializer.java
+  src/lib/lttng-ust-java-agent/java/lttng-ust-agent-common/org/lttng/ust/agent/context/LttngContextApi.java
+Copyright: 2016, - EfficiOS Inc., Alexandre Montplaisir <alexmonthy@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust-java-agent/java/lttng-ust-agent-common/org/lttng/ust/agent/utils/*
+Copyright: 2016, - EfficiOS Inc., Alexandre Montplaisir <alexmonthy@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust-java-agent/java/lttng-ust-agent-jul/org/*
+Copyright: 2015, - EfficiOS Inc., Alexandre Montplaisir <alexmonthy@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust-java-agent/java/lttng-ust-agent-jul/org/lttng/ust/agent/jul/LttngJulApi.java
+Copyright: 2016, - EfficiOS Inc., Alexandre Montplaisir <alexmonthy@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust-java-agent/java/lttng-ust-agent-jul/org/lttng/ust/agent/jul/LttngLogHandler.java
+Copyright: 2015, - EfficiOS Inc., Alexandre Montplaisir <alexmonthy@efficios.com> / 2013, - David Goulet <dgoulet@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust-java-agent/java/lttng-ust-agent-log4j/*
+Copyright: 2015, - EfficiOS Inc., Alexandre Montplaisir <alexmonthy@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust-java-agent/java/lttng-ust-agent-log4j/org/lttng/ust/agent/log4j/LttngLog4jApi.java
+Copyright: 2016, - EfficiOS Inc., Alexandre Montplaisir <alexmonthy@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust-java-agent/java/lttng-ust-agent-log4j/org/lttng/ust/agent/log4j/LttngLogAppender.java
+Copyright: 2015, - EfficiOS Inc., Alexandre Montplaisir <alexmonthy@efficios.com> / 2014, - Christian Babeux <christian.babeux@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust-java-agent/java/lttng-ust-agent-log4j2/*
+Copyright: 2015-2022, EfficiOS Inc.
+  2015, 2016, Alexandre Montplaisir <alexmonthy@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust-java-agent/java/lttng-ust-agent-log4j2/org/lttng/ust/agent/log4j2/LttngLogAppender.java
+Copyright: 2015-2022, EfficiOS Inc.
+  2015, Alexandre Montplaisir <alexmonthy@efficios.com>
+  2014, Christian Babeux <christian.babeux@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust-java-agent/jni/common/*
+Copyright: 2016, - EfficiOS Inc., Alexandre Montplaisir <alexmonthy@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust-java-agent/jni/jul/lttng_ust_jul.c
+Copyright: 2016, - EfficiOS Inc., Alexandre Montplaisir <alexmonthy@efficios.com> / 2011-2012, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust-java-agent/jni/log4j/lttng_ust_log4j.c
+Copyright: 2016, - EfficiOS Inc., Alexandre Montplaisir <alexmonthy@efficios.com> / 2011-2012, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust-java/*
+Copyright: 2011, 2012, Julien Desfossez <julien.desfossez@polymtl.ca>
+  2010-2012, David Goulet <david.goulet@polymtl.ca>
+  2010, Nils Carlson <nils.carlson@ericsson.com>
+  2009-2012, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+  2009, Pierre-Marc Fournier
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust-java/LTTngUst.c
+Copyright: 2011, 2012, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust-java/lttng_ust_java.h
+Copyright: 2011, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust-java/org/*
+Copyright: 2012, Alexandre Montplaisir <alexandre.montplaisir@polymtl.ca>
+  2011, 2012, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust-libc-wrapper/*
+Copyright: 2011, 2012, Julien Desfossez <julien.desfossez@polymtl.ca>
+  2010-2012, David Goulet <david.goulet@polymtl.ca>
+  2010, Nils Carlson <nils.carlson@ericsson.com>
+  2009-2012, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+  2009, Pierre-Marc Fournier
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust-libc-wrapper/lttng-ust-malloc.c
+Copyright: 2011, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+  2009, Pierre-Marc Fournier
+License: LGPL-2.1+
+
+Files: src/lib/lttng-ust-pthread-wrapper/lttng-ust-pthread.c
+Copyright: 2013, Mentor Graphics
+License: LGPL-2.1+
+
+Files: src/lib/lttng-ust-libc-wrapper/ust_libc.h
+Copyright: 2011, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: Expat
+
+Files: src/lib/lttng-ust-pthread-wrapper/ust_pthread.h
+Copyright: 2013, Mentor Graphics
+License: Expat
+
+Files: src/lib/lttng-ust-python-agent/*
+Copyright: 2014, - David Goulet <dgoulet@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust/*
+Copyright: 2010-2012, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: LGPL-2.1
+
+Files: src/common/clock.h
+Copyright: 2011-2014, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+  2009, 2010, Pierre-Marc Fournier
+License: LGPL-2.1
+
+Files: src/common/getenv.c
+Copyright: 2017, - Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: LGPL-2.1
+
+Files: src/common/getenv.h
+Copyright: 2015, - Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: LGPL-2.1
+
+Files: src/common/jhash.h
+  src/common/wait.h
+Copyright: 2011, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust-common/getcpu.c
+Copyright: 2014, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust/lttng-context-cpu-id.c
+Copyright: 2009-2015, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust/lttng-context-ip.c
+  src/lib/lttng-ust/lttng-context-procname.c
+  src/lib/lttng-ust/lttng-context-vpid.c
+  src/lib/lttng-ust/lttng-context-vtid.c
+Copyright: 2009-2012, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust/lttng-context-perf-counters.c
+Copyright: 2009-2014, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust/lttng-context-provider.c
+Copyright: 2016, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust/lttng-context-pthread-id.c
+Copyright: 2009-2011, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust/lttng-context.c
+  src/common/core.c
+Copyright: 2011, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust/lttng-probes.c
+Copyright: 2010-2012, - Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust/lttng-tracer-core.h
+  src/common/tracer.h
+Copyright: 2005-2011, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust/lttng-ust-comm.c
+Copyright: 2011, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+  2011, David Goulet <david.goulet@polymtl.ca>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust/lttng-ust-statedump-provider.h
+Copyright: 2015, Antoine Busque <abusque@efficios.com>
+  2013, Paul Woegerer <paul_woegerer@mentor.com>
+License: Expat
+
+Files: src/lib/lttng-ust/lttng-ust-statedump.c
+Copyright: 2016, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+  2015, Antoine Busque <abusque@efficios.com>
+  2013, Paul Woegerer <paul_woegerer@mentor.com>
+License: LGPL-2.1+
+
+Files: src/lib/lttng-ust/lttng-ust-statedump.h
+Copyright: 2015, Antoine Busque <abusque@efficios.com>
+  2013, Paul Woegerer <paul_woegerer@mentor.com>
+License: LGPL-2.1+
+
+Files: src/lib/lttng-ust/lttng-ust-tracef-provider.h
+Copyright: 2011-2014, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: Expat
+
+Files: src/lib/lttng-ust/lttng-ust-tracelog-provider.h
+Copyright: 2011-2015, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: Expat
+
+Files: src/lib/lttng-ust/perf_event.h
+Copyright: 2008-2011, Red Hat, Inc., Peter Zijlstra
+  2008-2011, Red Hat, Inc., Ingo Molnar
+  2008, 2009, Thomas Gleixner <tglx@linutronix.de>
+License: GPL-2
+
+Files: src/common/strutils.c
+  src/common/strutils.h
+Copyright: 2017, - Philippe Proulx <pproulx@efficios.com>
+License: Expat
+
+Files: src/lib/lttng-ust/tracef.c
+  src/lib/lttng-ust/tracelog.c
+Copyright: 2013, 2014, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: Expat
+
+Files: src/lib/lttng-ust-tracepoint/tracepoint.h
+Copyright: 2011, - Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust-tracepoint/tracepoint-weak-test.c
+Copyright: 2016, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust-tracepoint/tracepoint.c
+Copyright: 2009, Pierre-Marc Fournier
+  2008-2011, Mathieu Desnoyers
+License: LGPL-2.1
+
+Files: src/lib/lttng-ust/ust_lib.c
+Copyright: 2016, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+  2013, Paul Woegerer <paul_woegerer@mentor.com>
+License: LGPL-2.1+
+
+Files: src/lib/lttng-ust/ust_lib.h
+Copyright: 2016, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+  2015, Antoine Busque <abusque@efficios.com>
+  2013, Paul Woegerer <paul_woegerer@mentor.com>
+License: Expat
+
+Files: src/common/ringbuffer/*
+Copyright: 2005-2012, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: LGPL-2.1
+
+Files: src/common/ringbuffer/api.h
+Copyright: 2010-2012, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: LGPL-2.1
+
+Files: src/common/ringbuffer/backend.h
+  src/common/ringbuffer/nohz.h
+  src/common/ringbuffer/shm.h
+  src/common/ringbuffer/shm_internal.h
+  src/common/ringbuffer/shm_types.h
+  src/common/smp.h
+Copyright: 2011, 2012, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: LGPL-2.1
+
+Files: src/common/ringbuffer/backend_types.h
+Copyright: 2008-2012, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: LGPL-2.1
+
+Files: src/common/getcpu.h
+Copyright: 2011, - Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: LGPL-2.1
+
+Files: src/common/compat/mmap.h
+Copyright: 2019, - Jonathan Rajotte <jonathan.rajotte-julien@efficios.com>
+License: LGPL-2.1
+
+Files: src/common/ringbuffer/rb-init.h
+Copyright: 2012-2016, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: LGPL-2.1
+
+Files: src/common/smp.c
+Copyright: 2019, Michael Jeanson <mjeanson@efficios.com>
+  2011, 2012, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: LGPL-2.1
+
+Files: src/common/ringbuffer/vatomic.h
+Copyright: 2010-2012, - Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: Expat
+
+Files: m4/*
+Copyright: 2008, Stephane Bortzmeyer <bortzmeyer@pasteur.fr>
+License: GPL-2+
+
+Files: m4/ax_c___attribute__.m4
+Copyright: 2008, Stepan Kasal <skasal@redhat.com>
+  2008, Ryan McCabe <ryan@numb.org>
+  2008, Christian Haggstrom
+License: GPL-2+
+
+Files: m4/ax_java_options.m4
+  m4/ax_try_compile_java.m4
+Copyright: 2008, Devin Weaver <ktohg@tritarget.com>
+License: FSFAP
+
+Files: m4/ax_jni_include_dir.m4
+Copyright: 2008, Don Anderson <dda@sleepycat.com>
+License: FSFAP
+
+Files: m4/ax_prog_jar.m4
+Copyright: 2008, Egon Willighagen <e.willighagen@science.ru.nl>
+License: FSFAP
+
+Files: m4/ax_prog_java.m4
+  m4/ax_sys_weak_alias.m4
+  m4/pprint.m4
+Copyright: 2011, 2012, Julien Desfossez <julien.desfossez@polymtl.ca>
+  2010-2012, David Goulet <david.goulet@polymtl.ca>
+  2010, Nils Carlson <nils.carlson@ericsson.com>
+  2009-2012, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+  2009, Pierre-Marc Fournier
+License: LGPL-2.1+
+
+Files: m4/ax_prog_javah.m4
+Copyright: 2008, Luc Maisonobe <luc@spaceroots.org>
+License: FSFAP
+
+Files: m4/libtool.m4
+Copyright: 1996-2001, 2003-2015, Free Software Foundation, Inc.
+License: GPL-2+
+
+Files: m4/ltoptions.m4
+Copyright: 2004, 2005, 2007-2009, 2011-2015, Free Software
+License: GPL-2+
+
+Files: m4/ltsugar.m4
+  m4/ltversion.m4
+  m4/lt~obsolete.m4
+Copyright: 1994-2015, Free Software Foundation, Inc.
+License: GPL-2+
+
+Files: src/python-lttngust/*
+Copyright: 2015, - Philippe Proulx <pproulx@efficios.com> / 2014, - David Goulet <dgoulet@efficios.com>
+License: LGPL-2.1
+
+Files: src/python-lttngust/lttngust/__init__.py
+  src/python-lttngust/lttngust/debug.py
+Copyright: 2015, - Philippe Proulx <pproulx@efficios.com>
+License: LGPL-2.1
+
+Files: src/python-lttngust/lttngust/cmd.py
+Copyright: 2015, - Philippe Proulx <pproulx@efficios.com> / 2015, - Jérémie Galarneau <jeremie.galarneau@efficios.com> / 2014, - David Goulet <dgoulet@efficios.com>
+License: LGPL-2.1
+
+Files: src/python-lttngust/setup.py.in
+Copyright: 2015, - Jonathan Rajotte <jonathan.rajotte-julien@efficios.com>
+License: LGPL-2.1
+
+Files: src/common/snprintf/*
+Copyright: 1990, 1991, 1993, The Regents of the University of California.
+License: BSD-3-clause
+
+Files: src/common/snprintf/fileext.h
+  src/common/snprintf/wcio.h
+Copyright: 2001, Citrus Project
+License: BSD-2-clause
+
+Files: tests/*
+Copyright: 2011, 2012, Julien Desfossez <julien.desfossez@polymtl.ca>
+  2010-2012, David Goulet <david.goulet@polymtl.ca>
+  2010, Nils Carlson <nils.carlson@ericsson.com>
+  2009-2012, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+  2009, Pierre-Marc Fournier
+License: LGPL-2.1
+
+Files: tests/benchmark/bench.c
+Copyright: 2010, - Douglas Santos <douglas.santos@polymtl.ca>
+License: GPL-2+
+
+Files: tests/benchmark/tp.c
+  tests/benchmark/ust_tests_benchmark.h
+Copyright: 2013, Zifei Tong <soariez@gmail.com>
+License: Expat
+
+Files: tests/compile/api0/ctf-types/*
+Copyright: 2014, Geneviève Bastien <gbastien@versatic.net>
+License: Expat
+
+Files: tests/compile/api0/ctf-types/ctf-types.c
+Copyright: 2014, Geneviève Bastien <gbastien@versatic.net>
+License: LGPL-2.1
+
+Files: tests/unit/gcc-weak-hidden/main.c
+Copyright: 2016, - Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: LGPL-2.1+
+
+Files: tests/compile/api0/hello.cxx/*
+Copyright: 2011, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: Expat
+
+Files: tests/compile/api0/hello.cxx/hello.cpp
+Copyright: 2011-2014, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+  2009, 2010, Pierre-Marc Fournier
+License: LGPL-2.1
+
+Files: tests/compile/api0/hello/*
+Copyright: 2011, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: Expat
+
+Files: tests/compile/api0/hello/hello.c
+Copyright: 2011-2014, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+  2009, 2010, Pierre-Marc Fournier
+License: LGPL-2.1
+
+Files: tests/compile/api0/same_line_tracepoint/*
+Copyright: 2011, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: Expat
+
+Files: tests/compile/api0/same_line_tracepoint/same_line_tracepoint.c
+Copyright: 2013, Jérémie Galarneau
+License: LGPL-2.1+
+
+Files: tests/unit/snprintf/snprintf.c
+Copyright: 2009, Pierre-Marc Fournier
+License: LGPL-2.1+
+
+Files: tests/compile/api1/test-app-ctx/*
+Copyright: 2011, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+License: Expat
+
+Files: tests/compile/api1/test-app-ctx/hello.c
+Copyright: 2011-2014, Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+  2009, 2010, Pierre-Marc Fournier
+License: LGPL-2.1
+
+Files: tests/unit/ust-elf/ust-elf.c
+Copyright: 2015, Antoine Busque <abusque@efficios.com>
+License: LGPL-2.1+
+
+Files: tests/utils/*
+Copyright: 2004, Nik Clayton
+License: BSD-2-clause
+
+Files: tests/utils/tap.sh
+Copyright: 2010, Patrick LeBoutillier <patrick.leboutillier@gmail.com>
+License: GPL-3+
+
+Files: tools/*
+Copyright: 2012, Yannick Brosseau <yannick.brosseau@gmail.com>
+License: GPL-2
+
+License: BSD-2-clause
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions
+ are met:
+ 1. Redistributions of source code must retain the above copyright
+    notice, this list of conditions and the following disclaimer.
+ 2. Redistributions in binary form must reproduce the above copyright
+    notice, this list of conditions and the following disclaimer in the
+    documentation and/or other materials provided with the distribution.
+ .
+ THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ SUCH DAMAGE.
+
+License: BSD-3-clause
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions
+ are met:
+ 1. Redistributions of source code must retain the above copyright
+    notice, this list of conditions and the following disclaimer.
+ 2. Redistributions in binary form must reproduce the above copyright
+    notice, this list of conditions and the following disclaimer in the
+    documentation and/or other materials provided with the distribution.
+ 3. Neither the name of the University nor the names of its contributors
+    may be used to endorse or promote products derived from this software
+    without specific prior written permission.
+ .
+ THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ SUCH DAMAGE.
+
+License: Expat
+ The MIT License
+ .
+ Permission is hereby granted, free of charge, to any person
+ obtaining a copy of this software and associated
+ documentation files (the "Software"), to deal in the Software
+ without restriction, including without limitation the rights to
+ use, copy, modify, merge, publish, distribute, sublicense,
+ and/or sell copies of the Software, and to permit persons to
+ whom the Software is furnished to do so, subject to the
+ following conditions:
+ .
+ The above copyright notice and this permission notice shall
+ be included in all copies or substantial portions of the
+ Software.
+ .
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT
+ WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+ INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ MERCHANTABILITY, FITNESS FOR A PARTICULAR
+ PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+ SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+ LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ CONNECTION WITH THE SOFTWARE OR THE USE OR
+ OTHER DEALINGS IN THE SOFTWARE.
+
+License: FSFAP
+ Copying and distribution of this file, with or without modification, are
+ permitted in any medium without royalty provided the copyright notice
+ and this notice are preserved. This file is offered as-is, without any
+ warranty.
+
+License: GPL-2
+ This program is free software; you can redistribute it and/or modify it under
+ the terms of the GNU General Public License as published by the Free Software
+ Foundation; either version 2 of the License, or (at your option) any later
+ version.
+ .
+ This program is distributed in the hope that it will be useful, but WITHOUT ANY
+ WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+ A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+ .
+ You should have received a copy of the GNU General Public License along with
+ this program; if not, write to the Free Software Foundation, Inc., 51 Franklin
+ Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+License: GPL-2+
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; version 2 dated June, 1991, or (at
+ your option) any later version.
+ .
+ On Debian systems, the complete text of version 2 of the GNU General
+ Public License can be found in '/usr/share/common-licenses/GPL-2'.
+
+License: GPL-3
+ This package is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, under version 3 of the License.
+ .
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+ .
+ You should have received a copy of the GNU General Public License
+ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ .
+ On Debian systems, the complete text of the GNU General
+ Public License can be found in "/usr/share/common-licenses/GPL-3".
+
+License: GPL-3+
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; version 3 dated June, 2007, or (at
+ your option) any later version.
+ .
+ On Debian systems, the complete text of version 3 of the GNU General
+ Public License can be found in '/usr/share/common-licenses/GPL-3'.
+
+License: LGPL-2.1
+ This program is free software; you can redistribute it and/or modify it
+ under the terms of the GNU Lesser General Public License as published by the
+ Free Software Foundation; version 2.1 of the License.
+ .
+ On Debian systems, the complete text of version 2.1 of the GNU Lesser
+ General Public License can be found in `/usr/share/common-licenses/LGPL-2.1'.
+
+License: LGPL-2.1+
+ This package is free software; you can redistribute it and/or
+ modify it under the terms of the GNU Lesser General Public
+ License as published by the Free Software Foundation; either
+ version 2.1 of the License, or (at your option) any later version.
+ .
+ This package is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ Lesser General Public License for more details.
+ .
+ You should have received a copy of the GNU Lesser General Public License
+ along with this program. If not, see <http://www.gnu.org/licenses/>.
+ .
+ On Debian systems, the complete text of the GNU Lesser General
+ Public License can be found in "/usr/share/common-licenses/LGPL-2.1".

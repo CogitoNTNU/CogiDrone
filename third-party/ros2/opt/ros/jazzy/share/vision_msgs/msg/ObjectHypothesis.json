@@ -1,0 +1,36 @@
+{
+  "type_description_msg": {
+    "type_description": {
+      "type_name": "vision_msgs/msg/ObjectHypothesis",
+      "fields": [
+        {
+          "name": "class_id",
+          "type": {
+            "type_id": 17,
+            "capacity": 0,
+            "string_capacity": 0,
+            "nested_type_name": ""
+          },
+          "default_value": ""
+        },
+        {
+          "name": "score",
+          "type": {
+            "type_id": 11,
+            "capacity": 0,
+            "string_capacity": 0,
+            "nested_type_name": ""
+          },
+          "default_value": ""
+        }
+      ]
+    },
+    "referenced_type_descriptions": []
+  },
+  "type_hashes": [
+    {
+      "type_name": "vision_msgs/msg/ObjectHypothesis",
+      "hash_string": "RIHS01_51da43cec11c01957a64d1e05a24acd18aae7745ec30b74348ad5f6d634f7f90"
+    }
+  ]
+}

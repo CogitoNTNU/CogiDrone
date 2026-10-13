@@ -1081,17 +1081,17 @@ Homepage: http://osrf-pycommon.readthedocs.org/
 Package: python3-pallet-patcher
 Priority: optional
 Section: python
-Installed-Size: 47
+Installed-Size: 50
 Maintainer: unknown <unknown@unknown>
 Architecture: all
-Version: 0.2.1+upstream-1
+Version: 0.3.0+upstream-1
 Depends: python3:any (>= 3.6~), python3-packaging, python3 (>= 3.11) | python3-tomli (>= 1) | python3-toml
-Filename: pool/main/p/python3-pallet-patcher/python3-pallet-patcher_0.2.1+upstream-1_all.deb
-SHA512: 0d38c34d5f8f52c36040cd484d165c21f0b2642ac2745628e3bae9dc082446719ebd0a6e3e5ae0cb5bb798fdafea6d4a3a96336e4ce91f9ba42ee5b66f81233d
-Size: 9848
-SHA256: f9403c161fed7bb7207a8ce4840227d87b5b3fdf2b5dec67063c231053715e41
-SHA1: 774c99efd6c7fda1b3cd4233ac4b401e79d97f2e
-MD5sum: 597d1409289fa3be29ad380d5d058112
+Filename: pool/main/p/python3-pallet-patcher/python3-pallet-patcher_0.3.0+upstream-1_all.deb
+SHA512: 133267e2e4c7b03347ae61959e3dea7cc8cf576063c5cc51e6094c261512b3b3dda7934a1e373e8555755ba9aa38e8fdfd6139df5b9d8808c5a7fb5e9d23b119
+Size: 10592
+SHA256: 0c9e2fecd3afa98193c5f72942e86d27c6556d5f1a0e8387ffd58c31fe7dc14d
+SHA1: 840a5e98ba4e595ce74e1b53d6c1df08a2f632bd
+MD5sum: 4784a9221495684f01154764d814e2d6
 Description: Tools for working with curated collections of Cargo packages
  pallet-patcher
  ==============
@@ -1105,7 +1105,7 @@ Description: Tools for working with curated collections of Cargo packages
  Motivation
  ----------
  .
- Cargo is designed to be highly reliable by ensuring that dependencies are either pulled from a central registry (like crates.io) or explicitly defined by their location (e.g., ``path = "../my-crate"``). While this approach provides great predictability, there are specialized use cases where developers may need more flexibility-specifically, when resolving dependencies from dynamically provided local directories without modifying the original source code.
+ Cargo is designed to be highly reliable by ensuring that dependencies are either pulled from a central registry (like crates.io) or explicitly defined by their location (e.g., ``path = "../my-crate"``). While this approach provides great predictability, there are specialized use cases where developers may need more flexibility—specifically, when resolving dependencies from dynamically provided local directories without modifying the original source code.
  .
  Other build systems and environments often provide mechanisms to search for dependencies across multiple locations:
  .
@@ -57650,7 +57650,7 @@ Size: 290228
 SHA256: a73e1dd379065446c07e7e481deffb295158872b1e8830b98d14d4cfe7ae3708
 SHA1: 25d053ce52fc2a28c27853a70f0eacf477f0571b
 MD5sum: af378c8bf597246a36131d05083b8a43
-Description: Real-time web-based system webview for ROS 2 - CPU, memory, swap, load average, and /rosout log viewer
+Description: Real-time web-based system webview for ROS 2 — CPU, memory, swap, load average, and /rosout log viewer
 
 Package: ros-jazzy-system-webview-dbgsym
 Package-Type: ddeb
@@ -143600,7 +143600,7 @@ Size: 291738
 SHA256: 560c9c5012f5d4ffbd7724224c05825554c4a4be144bd46d71b18423abee0abc
 SHA1: 6563e843ac37d2cf53c4fb475746660f48a1b021
 MD5sum: 6621c5898ece9987533fffe8448252c9
-Description: Real-time web-based system webview for ROS 2 - CPU, memory, swap, load average, and /rosout log viewer
+Description: Real-time web-based system webview for ROS 2 — CPU, memory, swap, load average, and /rosout log viewer
 
 Package: ros-rolling-system-webview-dbgsym
 Package-Type: ddeb

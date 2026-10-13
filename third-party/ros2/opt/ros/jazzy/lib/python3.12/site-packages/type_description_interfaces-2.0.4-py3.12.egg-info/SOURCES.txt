@@ -1,0 +1,15 @@
+setup.py
+type_description_interfaces/__init__.py
+type_description_interfaces.egg-info/PKG-INFO
+type_description_interfaces.egg-info/SOURCES.txt
+type_description_interfaces.egg-info/dependency_links.txt
+type_description_interfaces.egg-info/top_level.txt
+type_description_interfaces/msg/__init__.py
+type_description_interfaces/msg/_field.py
+type_description_interfaces/msg/_field_type.py
+type_description_interfaces/msg/_individual_type_description.py
+type_description_interfaces/msg/_key_value.py
+type_description_interfaces/msg/_type_description.py
+type_description_interfaces/msg/_type_source.py
+type_description_interfaces/srv/__init__.py
+type_description_interfaces/srv/_get_type_description.py

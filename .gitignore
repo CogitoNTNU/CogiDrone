@@ -217,6 +217,7 @@ bower_components
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
+!.vscode/c_cpp_properties.json
 
 # misc
 .sass-cache
@@ -267,13 +268,13 @@ lerna-debug.log
 .DS_Store
 Thumbs.db
 
-# Toolchain config file
+# Toolchain
 # ! NOTE: THIS FILE IS REQUIRED TO BE GIT-IGNORED, ELSE IT WILL CAUSE OVERWRITES OF THE TOOLCHAIN CONFIGURATION FOR EVERYONE ELSE USING WINDOWS !!!!
 toolchain.windows.config
 
 # 3rd party libraries
 # third-party/
-!third-party
+!third-party/**
 
 # ROS 2 / simulation
 ros2_ws/install/
