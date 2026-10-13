@@ -15,8 +15,8 @@ namespace {
         return static_cast<std::size_t>(level);
     }
     
-    constexpr std::array<std::string_view, toIndex(LOGGING_LEVEL::__LEVEL_COUNT)>       // Array of string representations for each logging level
-    LOGGING_LEVEL_STRINGS = { 
+    constexpr std::array<std::string_view, toIndex(LOGGING_LEVEL::__UNIQUE_LEVELS_COUNT)>       
+    LOGGING_LEVEL_STRINGS = {                                                           // Array of string representations for each logging level
         "TRACE", 
         "DEBUG", 
         "INFO", 

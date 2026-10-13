@@ -15,7 +15,7 @@ enum class LOGGING_LEVEL : std::uint8_t {
     ERROR,
     FATAL,
 
-    __LEVEL_COUNT                                                                       // ? Sentinel value for the number of logging levels
+    __UNIQUE_LEVELS_COUNT                                                               // ? Sentinel value for the number of logging levels
 };
 
 void setLoggingLevel(const LOGGING_LEVEL level);

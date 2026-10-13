@@ -68,10 +68,10 @@ void Perception::wire() noexcept {
     m.imageSubscription = m.node->create_subscription<sensor_msgs::msg::Image>(
         "/camera/image", 
         rclcpp::SensorDataQoS(),
-        [this](const sensor_msgs::msg::Image& msg) {                                    // ! This doesn't work. Capturing `this` here causes a dangling pointer 
-            this->onFrame(msg);                                                         // ! due to the fact that perception is movable, and get's moved twice 
-        }                                                                               // ! in `drone.cpp`. Fix: make perception non-movable and owned via unique_ptr
-    );
+        [this](const sensor_msgs::msg::Image& msg) {                                    // ! This ONLY works if the Perception object is non-movable. Since the rvalue
+            this->onFrame(msg);                                                         // ! from the Perception::create() function is moved, capturing `this` here
+        }                                                                               // ! would therefore cause a dangling pointer as the `this` adress would be 
+    );                                                                                  // ! invalid. Fix: make perception non-movable and owned via a unique_ptr
 
     // TODO: Update the publisher to publish fused detections - for this, I'll have to do some research
     m.targetPublisher = m.node->create_publisher<vision_msgs::msg::Detection2DArray>(
@@ -86,6 +86,10 @@ void Perception::onFrame(const sensor_msgs::msg::Image& msg) {
     auto heads = m.headModel.detect(/* toFrame */(msg));
     auto distances = m.depthAnythingModel.distance(/* toFrame */(msg));
 
+    // ? These fused detections are NOT ment to be published yet. FusedDetections should just bundle every
+    // ? models' output together for each frame (each fusedDetection contains all people, all heads, and
+    // ? the depth heatmap image). We then have to calculate the 3D position of each detected person and head
+    // ? using the depth heatmap image, AND THEN publish the final fused detections. 
     auto fusedDetections = /*Model::*/ fuse(/* people, heads, distances */);
 
     // TODO: This publish call SHOULD work seamlessly once the above mentioned TODOs are implemented
