@@ -30,7 +30,7 @@ int main(int argc, const char* argv[]) {
 
     // Move the unique_ptr out of the expected once verified
     std::unique_ptr<Drone> drone = std::move(*result);                                  // Move the unique_ptr out of the expected once verified
-    cogidrone::log(LOGGING_LEVEL::INFO, "Drone object created successfully");
+    cogidrone::log(LOGGING_LEVEL::INFO, "Pointer to Drone object created successfully (ownership transferred to current scope)");
     
     // Start the drone on the main thread, and let it run until the drone is stopped.
     cogidrone::log(LOGGING_LEVEL::INFO, "Starting drone...");
