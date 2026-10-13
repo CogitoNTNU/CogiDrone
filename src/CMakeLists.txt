@@ -1,11 +1,22 @@
-# Each Jazzy package dir is its own include root (headers live at <pkg>/<pkg>/...)
-file(GLOB _ros_include_dirs
-    LIST_DIRECTORIES true
-    ${CMAKE_SOURCE_DIR}/third-party/ros2/opt/ros/jazzy/include/*
-)
+# ? Two ways to get ROS 2:
+# ?  - Cross-compiling (Docker / Windows toolchain): the vendored Jazzy sysroot in third-party/ros2
+# ?  - Native (Jetson, WSL, or colcon via ros2_ws/src/cogidrone_core): the installed /opt/ros/jazzy,
+# ?    found with find_package. Source /opt/ros/jazzy/setup.bash first.
+if(CMAKE_CROSSCOMPILING)
+    # Each Jazzy package dir is its own include root (headers live at <pkg>/<pkg>/...)
+    file(GLOB _ros_include_dirs
+        LIST_DIRECTORIES true
+        ${CMAKE_SOURCE_DIR}/third-party/ros2/opt/ros/jazzy/include/*
+    )
 
-# Glob the lib dir (top of file, next to the include glob)
-file(GLOB _ros_lib_dirs ${CMAKE_SOURCE_DIR}/third-party/ros2/opt/ros/jazzy/lib)
+    # Glob the lib dir (top of file, next to the include glob)
+    file(GLOB _ros_lib_dirs ${CMAKE_SOURCE_DIR}/third-party/ros2/opt/ros/jazzy/lib)
+else()
+    set(_ros_packages rclcpp std_msgs sensor_msgs geometry_msgs nav_msgs vision_msgs)
+    foreach(_pkg IN LISTS _ros_packages)
+        find_package(${_pkg} REQUIRED)
+    endforeach()
+endif()
 
 # * Sources
 add_executable(cogidrone
@@ -36,38 +47,45 @@ add_executable(cogidrone
     logging.cpp
 )
 
-# * Include
-target_include_directories(cogidrone PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${_ros_include_dirs}
-)
+# * Include & link
+target_include_directories(cogidrone PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
-# * Link
-target_link_directories(cogidrone PRIVATE ${_ros_lib_dirs})
-target_link_libraries(cogidrone PRIVATE
-    rclcpp rcl rmw rmw_fastrtps_cpp rmw_implementation rmw_dds_common
-    rmw_fastrtps_shared_cpp rcutils rcpputils
-    rosidl_runtime_c rosidl_typesupport_c rosidl_typesupport_cpp                        # `rosidl_runtime_cpp`: header-only, no .so exists
-    rosidl_typesupport_fastrtps_c rosidl_typesupport_fastrtps_cpp
-    rosidl_typesupport_introspection_c rosidl_typesupport_introspection_cpp
-    rosidl_dynamic_typesupport
-    sensor_msgs__rosidl_typesupport_cpp sensor_msgs__rosidl_typesupport_c
-    std_msgs__rosidl_typesupport_cpp builtin_interfaces__rosidl_typesupport_cpp
-    geometry_msgs__rosidl_typesupport_cpp nav_msgs__rosidl_typesupport_cpp
-    vision_msgs__rosidl_typesupport_cpp
-    libstatistics_collector statistics_msgs__rosidl_typesupport_cpp                     # // `statistics_msgs`: bare msg lib doesn't exist; 
-    rosgraph_msgs__rosidl_typesupport_cpp                                               # //                    typesupport variant covers it
-    tracetools rcl_yaml_param_parser rcl_interfaces__rosidl_typesupport_cpp             
-    ament_index_cpp class_loader fastcdr fastrtps                                       # `console_bridge`: not vendored; runtime dep on the Jetson only    
-)
+if(CMAKE_CROSSCOMPILING)
+    target_include_directories(cogidrone PRIVATE ${_ros_include_dirs})
 
-target_link_options(cogidrone PRIVATE
-    "-Wl,-rpath-link,${CMAKE_SOURCE_DIR}/third-party/ros2/opt/ros/jazzy/lib"
-    "-Wl,-rpath-link,${CMAKE_SOURCE_DIR}/third-party/ros2/usr/lib/aarch64-linux-gnu"
+    # * Link
+    target_link_directories(cogidrone PRIVATE ${_ros_lib_dirs})
+    target_link_libraries(cogidrone PRIVATE
+        rclcpp rcl rmw rmw_fastrtps_cpp rmw_implementation rmw_dds_common
+        rmw_fastrtps_shared_cpp rcutils rcpputils
+        rosidl_runtime_c rosidl_typesupport_c rosidl_typesupport_cpp                        # `rosidl_runtime_cpp`: header-only, no .so exists
+        rosidl_typesupport_fastrtps_c rosidl_typesupport_fastrtps_cpp
+        rosidl_typesupport_introspection_c rosidl_typesupport_introspection_cpp
+        rosidl_dynamic_typesupport
+        sensor_msgs__rosidl_typesupport_cpp sensor_msgs__rosidl_typesupport_c
+        std_msgs__rosidl_typesupport_cpp builtin_interfaces__rosidl_typesupport_cpp
+        geometry_msgs__rosidl_typesupport_cpp nav_msgs__rosidl_typesupport_cpp
+        vision_msgs__rosidl_typesupport_cpp
+        libstatistics_collector statistics_msgs__rosidl_typesupport_cpp                     # // `statistics_msgs`: bare msg lib doesn't exist; 
+        rosgraph_msgs__rosidl_typesupport_cpp                                               # //                    typesupport variant covers it
+        tracetools rcl_yaml_param_parser rcl_interfaces__rosidl_typesupport_cpp             
+        ament_index_cpp class_loader fastcdr fastrtps                                       # `console_bridge`: not vendored; runtime dep on the Jetson only    
+    )
 
-    # ? UNCOMMENT THIS IF WE EVER WANNA BLINDLY LINK TO A LIB WHICH WE KNOW EXISTS ON THE TARGET, BUT WHICH IS NOT PRESENT IN THE CROSS-TOOLCHAIN SYSROOT!
-    # "-Wl,--allow-shlib-undefined"            
-)    
+    target_link_options(cogidrone PRIVATE
+        "-Wl,-rpath-link,${CMAKE_SOURCE_DIR}/third-party/ros2/opt/ros/jazzy/lib"
+        "-Wl,-rpath-link,${CMAKE_SOURCE_DIR}/third-party/ros2/usr/lib/aarch64-linux-gnu"
+
+        # ? UNCOMMENT THIS IF WE EVER WANNA BLINDLY LINK TO A LIB WHICH WE KNOW EXISTS ON THE TARGET, BUT WHICH IS NOT PRESENT IN THE CROSS-TOOLCHAIN SYSROOT!
+        # "-Wl,--allow-shlib-undefined"            
+    )
+else()
+    target_link_libraries(cogidrone PRIVATE
+        rclcpp::rclcpp
+        ${std_msgs_TARGETS} ${sensor_msgs_TARGETS} ${geometry_msgs_TARGETS}
+        ${nav_msgs_TARGETS} ${vision_msgs_TARGETS}
+    )
+endif()
 
 # * Compile
 target_compile_features(cogidrone PRIVATE cxx_std_23)

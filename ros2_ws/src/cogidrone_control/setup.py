@@ -20,6 +20,7 @@ setup(
         "console_scripts": [
             "offboard = cogidrone_control.offboard:main",
             "teleop = cogidrone_control.teleop:main",
+            "cpp_bridge = cogidrone_control.cpp_bridge:main",
         ],
     },
 )

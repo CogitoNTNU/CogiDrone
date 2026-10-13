@@ -12,6 +12,7 @@
   <exec_depend>ros_gz_bridge</exec_depend>
   <exec_depend>cogidrone_perception</exec_depend>
   <exec_depend>cogidrone_control</exec_depend>
+  <exec_depend>cogidrone_core</exec_depend>
 
   <export>
     <build_type>ament_python</build_type>

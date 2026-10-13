@@ -86,9 +86,10 @@ class Px4Node(Node):
     def timestamp_us(self) -> int:
         return self.get_clock().now().nanoseconds // 1000
 
-    def publish_offboard_mode(self):
+    def publish_offboard_mode(self, velocity: bool = False):
         msg = OffboardControlMode()
-        msg.position = True
+        msg.position = not velocity
+        msg.velocity = velocity
         msg.timestamp = self.timestamp_us()
         self.mode_pub.publish(msg)
 
@@ -96,6 +97,19 @@ class Px4Node(Node):
         msg = TrajectorySetpoint()
         msg.position = [float(x), float(y), float(z)]
         msg.yaw = float(yaw)
+        msg.timestamp = self.timestamp_us()
+        self.setpoint_pub.publish(msg)
+
+    def publish_velocity_setpoint(
+        self, vx: float, vy: float, vz: float, yawspeed: float
+    ):
+        """NED velocity (m/s) + yaw rate (rad/s, clockwise). Pair with publish_offboard_mode(velocity=True)."""
+        nan = float("nan")
+        msg = TrajectorySetpoint()
+        msg.position = [nan, nan, nan]
+        msg.velocity = [float(vx), float(vy), float(vz)]
+        msg.yaw = nan
+        msg.yawspeed = float(yawspeed)
         msg.timestamp = self.timestamp_us()
         self.setpoint_pub.publish(msg)
 
