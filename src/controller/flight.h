@@ -7,7 +7,6 @@
 
 namespace Controller {
 
-
 class Flight {
 private:
     // * Ctors & dtor

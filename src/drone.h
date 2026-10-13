@@ -8,6 +8,15 @@
 #include "controller/flight.h"
 #include "logging.h"
 
+
+
+/**
+ * @brief The main class representing the drone. This class is the central point of control for the drone, 
+ * managing its various subsystems. The main idea behind this design is ROS2 composition architecture. It 
+ * allows us to run multiple nodes inside a single process as shared libraries, reducing CPU overhead and 
+ * enabling zero-copy intra-process communication. It also gives us explicit control over the construction, 
+ * initialization, and ownership of the program hierarchy, which is crucial for robust system design. 
+ */
 class Drone {
 private:
     // Members
