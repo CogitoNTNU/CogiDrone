@@ -4,6 +4,7 @@ file(GLOB _ros_include_dirs
     ${CMAKE_SOURCE_DIR}/third-party/ros2/opt/ros/jazzy/include/*
 )
 
+
 # Glob the lib dir (top of file, next to the include glob)
 file(GLOB _ros_lib_dirs ${CMAKE_SOURCE_DIR}/third-party/ros2/opt/ros/jazzy/lib)
 
@@ -19,8 +20,6 @@ add_executable(cogidrone
     perception/models/person.cpp
     perception/models/head.cpp
     perception/models/depth_anything.cpp
-
-    # Estimation
 
     # Representation
 
@@ -66,6 +65,7 @@ target_link_options(cogidrone PRIVATE
     # ? UNCOMMENT THIS IF WE EVER WANNA BLINDLY LINK TO A LIB WHICH WE KNOW EXISTS ON THE TARGET, BUT WHICH IS NOT PRESENT IN THE CROSS-TOOLCHAIN SYSROOT!
     # "-Wl,--allow-shlib-undefined"            
 )    
+
 
 # * Compile
 target_compile_features(cogidrone PRIVATE cxx_std_23)
