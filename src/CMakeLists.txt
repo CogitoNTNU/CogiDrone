@@ -27,10 +27,8 @@ add_executable(cogidrone
     # Navigation
     navigation/navigation.cpp
 
-    # Control
-
-    # Act
-
+    # Controllers
+    controller/flight.cpp
 
     # Helpers
     logging.cpp

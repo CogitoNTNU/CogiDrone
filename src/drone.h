@@ -5,6 +5,7 @@
 
 #include "perception/perception.h"
 #include "navigation/navigation.h"
+#include "controller/flight.h"
 #include "logging.h"
 
 class Drone {
