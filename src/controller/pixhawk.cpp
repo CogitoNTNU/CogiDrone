@@ -72,6 +72,28 @@ void Pixhawk::wire() noexcept {
     );
 }
 
+
+
+// * Callbacks
+void Pixhawk::onLocalPosition(const px4_msgs::msg::VehicleLocalPosition& msg) {
+    std::lock_guard lock(posMutex);
+    lastLocalPos = msg;
+}
+
+void Pixhawk::onStatus(const px4_msgs::msg::VehicleStatus& msg) {
+    // ? Written from the status callback thread, read from the timer thread.
+    // ? Plain bools are fine here: each is independently-written telemetry,
+    // ? read-only for decisions, and a torn/stale read is harmless (next tick
+    // ? re-reads). No compound invariants depend on both being in sync.
+    offboardActive = (msg.nav_state == px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_OFFBOARD);
+    armed = msg.arming_state == px4_msgs::msg::VehicleStatus::ARMING_STATE_ARMED;
+}
+
+void Pixhawk::onSetpointInput(const px4_msgs::msg::TrajectorySetpoint& msg) {
+    std::lock_guard lock(setpointMutex);
+    currentSetpoint = msg;
+}
+
 void Pixhawk::streamTick() {
     std::lock_guard lock(stateMutex);
 
@@ -113,10 +135,15 @@ void Pixhawk::streamTick() {
             }
             break;
 
-        case State::FLYING:                                                             // ? Fallthrough
+        case State::FLYING:                                                             // ? fallthrough
         case State::LANDING:
             publishOffboardMode();                                                      // never stop streaming while flying
             publishSetpoint();
+            
+            if (!armed && offboardActive == false && state == State::LANDING) {         // transition to DISARMED only after PX4 has landed and disarmed itself
+                cogidrone::log(LOGGING_LEVEL::INFO, "Landed and disarmed");
+                state = State::DISARMED;                                                // terminal safe state; timer idles
+            }
             break;
 
         case State::DISARMED:
@@ -124,7 +151,72 @@ void Pixhawk::streamTick() {
     }
 }
 
-void Pixhawk::onSetpointInput(const px4_msgs::msg::TrajectorySetpoint& msg) {
-    std::lock_guard lock(setpointMutex);
-    currentSetpoint = msg;
+
+
+// * Helpers
+void Pixhawk::publishOffboardMode() {
+    px4_msgs::msg::OffboardControlMode mode{};
+    
+    mode.position = true;                                                               // we stream position setpoints
+    mode.velocity = false;
+    mode.acceleration = false;
+    mode.attitude = false;
+    mode.body_rate = false;
+    mode.timestamp = m.node->now().nanoseconds() / 1000;                                // µs, PX4 clock via bridge timesync
+    
+    m.offboardModePub->publish(mode);
+}
+
+void Pixhawk::publishSetpoint() {
+    px4_msgs::msg::TrajectorySetpoint sp; {
+        std::lock_guard lock(setpointMutex);
+        sp = currentSetpoint;                                                           // snapshot under lock
+    }
+
+    sp.timestamp = m.node->now().nanoseconds() / 1000;                                  // stamp AFTER copying: fresh on every stream
+    m.setpointPub->publish(sp);
+}
+
+void Pixhawk::sendCommand(uint16_t command, float param1, float param2) {
+    px4_msgs::msg::VehicleCommand cmd{};
+
+    cmd.command = command;
+    cmd.param1 = param1;
+    cmd.param2 = param2;
+    cmd.target_system = 1;                                                              // Pixhawk's MAVLink system id (default)
+    cmd.target_component = 1;                                                           // flight controller component
+    cmd.source_system = 1;
+    cmd.source_component = 1;
+    cmd.confirmation = false;
+
+    // ? `from_external = true` is load-bearing. Without it, PX4 treats the command as
+    // ? coming from its own internals and may ignore it. This is the single most 
+    // ? common "my arm command does nothing" bug in px4_msgs code
+    cmd.from_external = true;                                                           // ! required: marks the command as offboard/external. 
+
+    cmd.timestamp = m.node->now().nanoseconds() / 1000;
+    
+    m.commandPub->publish(cmd);
+}
+
+[[nodiscard]] bool Pixhawk::positionValid() const {
+    std::lock_guard lock(posMutex);
+    // ? EKF2 has a position reference: xy+z valid (GPS outdoors, VIO later).
+    // ? Without this, PX4 refuses offboard/arming - gating here gives a
+    // ? clean log message instead of a silent command rejection.
+    return lastLocalPos.xy_valid && lastLocalPos.z_valid;
+}
+
+
+
+// * Commands
+void Pixhawk::land() {
+    std::lock_guard lock(stateMutex);
+    if (state != State::FLYING) return;                                                 // nothing to land
+
+    // ? NAV_LAND hands control to PX4's landing controller - it owns the
+    // ? descent, touchdown detection, and disarm. We keep streaming setpoints
+    // ? (harmless; PX4 ignores them in auto-land) until DISARMED.
+    sendCommand(px4_msgs::msg::VehicleCommand::VEHICLE_CMD_NAV_LAND, 0.f, 0.f);
+    state = State::LANDING;
 }

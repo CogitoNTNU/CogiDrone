@@ -95,6 +95,9 @@ private:
     bool offboardActive = false;                                                        // from vehicle_status
     bool armed = false;
 
+    uint8_t streamTicks = 0;                                                            // ticks spent in STREAMING (mode-switch delay)
+
+
     // * Ctors & dtor
     explicit Pixhawk(M&& m) : m(std::move(m)) {}
     void wire() noexcept;                                                               // Wire pubs/subs/timer
@@ -124,4 +127,7 @@ public:
 
     // * Accessors
     [[nodiscard]] inline rclcpp::Node::SharedPtr node() const noexcept { return m.node; }
+
+    // * Commands (thread-safe; called from any executor thread)
+    void land();                                                                        // Command PX4 to land; state machine follows
 };
