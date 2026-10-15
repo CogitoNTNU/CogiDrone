@@ -1,4 +1,4 @@
-# BUILD-TODO — Option 1: native Jetson build with ament + px4_msgs
+# BUILD-TODO - Option 1: native Jetson build with ament + px4_msgs
 
 > Goal: get `px4_msgs` message types compiling into `cogidrone` so we can
 > command the Pixhawk 6C via uXRCE-DDS (offboard hover).
@@ -15,7 +15,7 @@ sudo apt install ros-jazzy-ament-cmake python3-colcon-common-extensions
 
 ```bash
 mkdir -p ~/px4_ws/src && cd ~/px4_ws/src
-git clone https://github.com/PX4/px4_msgs.git -b release/1.15   # ! branch MUST match PX4 firmware version on the Pixhawk
+git clone https://github.com/PX4/px4_msgs.git -b release/1.17   # ! branch MUST match PX4 firmware version on the Pixhawk
 cd ~/px4_ws
 colcon build --packages-select px4_msgs                          # runs rosidl codegen (takes a few min)
 ```
