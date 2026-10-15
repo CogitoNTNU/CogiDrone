@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-cd "$(dirname "$0")"   # third-party/ros2
+cd "$(dirname "$0")"   # vendored/ros2
 
 # list every quoted include in the ROS headers, keep only package-style ones
 grep -rhoE '#include "[a-z0-9_]+/[a-z_]+' opt/ros/jazzy/include | sort -u | \

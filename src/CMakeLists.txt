@@ -1,12 +1,12 @@
 # Each Jazzy package dir is its own include root (headers live at <pkg>/<pkg>/...)
 file(GLOB _ros_include_dirs
     LIST_DIRECTORIES true
-    ${CMAKE_SOURCE_DIR}/third-party/ros2/opt/ros/jazzy/include/*
+    ${CMAKE_SOURCE_DIR}/vendored/ros2/opt/ros/jazzy/include/*
 )
 
 
 # Glob the lib dir (top of file, next to the include glob)
-file(GLOB _ros_lib_dirs ${CMAKE_SOURCE_DIR}/third-party/ros2/opt/ros/jazzy/lib)
+file(GLOB _ros_lib_dirs ${CMAKE_SOURCE_DIR}/vendored/ros2/opt/ros/jazzy/lib)
 
 if(DEFINED ENV{AMENT_PREFIX_PATH})
     find_package(ament_cmake REQUIRED)
@@ -64,8 +64,8 @@ target_link_libraries(cogidrone PRIVATE
 )
 
 target_link_options(cogidrone PRIVATE
-    "-Wl,-rpath-link,${CMAKE_SOURCE_DIR}/third-party/ros2/opt/ros/jazzy/lib"
-    "-Wl,-rpath-link,${CMAKE_SOURCE_DIR}/third-party/ros2/usr/lib/aarch64-linux-gnu"
+    "-Wl,-rpath-link,${CMAKE_SOURCE_DIR}/vendored/ros2/opt/ros/jazzy/lib"
+    "-Wl,-rpath-link,${CMAKE_SOURCE_DIR}/vendored/ros2/usr/lib/aarch64-linux-gnu"
 
     # ? UNCOMMENT THIS IF WE EVER WANNA BLINDLY LINK TO A LIB WHICH WE KNOW EXISTS ON THE TARGET, BUT WHICH IS NOT PRESENT IN THE CROSS-TOOLCHAIN SYSROOT!
     # "-Wl,--allow-shlib-undefined"            

@@ -4,7 +4,7 @@ set -euo pipefail
 # HTTPS bypasses the campus HTTP cache (which served a corrupt deb).
 ROS_BASE="https://packages.ros.org/ros2/ubuntu"
 UB_BASE="https://ports.ubuntu.com/ubuntu-ports"
-DEST="/c/Users/reale/Code/C++/CogiDrone/third-party/ros2"
+DEST="/c/Users/reale/Code/C++/CogiDrone/vendored/ros2"
 CURL="curl.exe"
 K="-k"                                                                                  # packages.ros.org origin presents a *.osuosl.org cert (known mismatch);
                                                                                         # sha256 checks below catch any actual tampering/corruption

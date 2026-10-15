@@ -26,7 +26,7 @@
 //     : specific subtasks tasks. 
 
 
-// NOTE: Minimal linear-algebra types. Eigen is not vendored in third-party/ros2, so the
+// NOTE: Minimal linear-algebra types. Eigen is not vendored in vendored/ros2, so the
 // navigation math is kept dependency-free until Eigen is actually pulled in.
 
 // * Math
