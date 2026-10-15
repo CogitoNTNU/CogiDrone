@@ -90,7 +90,7 @@ private:
     std::mutex setpointMutex;
     
     px4_msgs::msg::VehicleLocalPosition lastLocalPos;                                   // guarded by m_posMutex
-    std::mutex posMutex;
+    mutable std::mutex posMutex;
     
     bool offboardActive = false;                                                        // from vehicle_status
     bool armed = false;
