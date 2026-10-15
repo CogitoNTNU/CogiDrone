@@ -51,7 +51,7 @@ private:
         // Control input (from Navigation)
         rclcpp::Subscription<px4_msgs::msg::TrajectorySetpoint>::SharedPtr setpointInputSub;
 
-        // Heartbeat timer — the offboard stream
+        // Heartbeat timer - the offboard stream
         rclcpp::TimerBase::SharedPtr streamTimer;
     } m;
 

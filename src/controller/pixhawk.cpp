@@ -73,17 +73,17 @@ void Pixhawk::wire() noexcept {
 }
 
 void Pixhawk::streamTick() {
-    std::lock_guard lock(m_stateMutex);
+    std::lock_guard lock(stateMutex);
 
-    switch (m_state) {
+    switch (state) {
         case State::INIT:
-            m_state = State::WAITING_EKF;
+            state = State::WAITING_EKF;
             break;
 
         case State::WAITING_EKF:
             if (positionValid()) {                                                      // EKF has a position reference
-                cogidrone::log(LOGGING_LEVEL::INFO, "EKF position valid — starting offboard stream");
-                m_state = State::STREAMING;
+                cogidrone::log(LOGGING_LEVEL::INFO, "EKF position valid - starting offboard stream");
+                state = State::STREAMING;
             }
             break;
 
@@ -91,25 +91,25 @@ void Pixhawk::streamTick() {
             publishOffboardMode();
             publishSetpoint();
             // After ~1s of streaming (count ticks), request offboard mode
-            if (++m_streamTicks > 10) {
+            if (++streamTicks > 10) {
                 sendCommand(
                     px4_msgs::msg::VehicleCommand::VEHICLE_CMD_DO_SET_MODE,
                     1.f, 
                     /* PX4_CUSTOM_MAIN_MODE_OFFBOARD = */ 6.f
                 );
-                m_state = State::OFFBOARD_REQUEST;
+                state = State::OFFBOARD_REQUEST;
             }
             break;
 
         case State::OFFBOARD_REQUEST:
             publishOffboardMode();                                                      // keep the heartbeat alive!
             publishSetpoint();
-            if (m_offboardActive) {
+            if (offboardActive) {
                 sendCommand(
                     px4_msgs::msg::VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 
                     1.f
                 );
-                m_state = State::FLYING;
+                state = State::FLYING;
             }
             break;
 
@@ -125,6 +125,6 @@ void Pixhawk::streamTick() {
 }
 
 void Pixhawk::onSetpointInput(const px4_msgs::msg::TrajectorySetpoint& msg) {
-    std::lock_guard lock(m_setpointMutex);
-    m_currentSetpoint = msg;
+    std::lock_guard lock(setpointMutex);
+    currentSetpoint = msg;
 }
