@@ -8,6 +8,11 @@ file(GLOB _ros_include_dirs
 # Glob the lib dir (top of file, next to the include glob)
 file(GLOB _ros_lib_dirs ${CMAKE_SOURCE_DIR}/third-party/ros2/opt/ros/jazzy/lib)
 
+if(DEFINED ENV{AMENT_PREFIX_PATH})
+    find_package(ament_cmake REQUIRED)
+    find_package(px4_msgs REQUIRED)
+endif()
+
 # * Sources
 add_executable(cogidrone
     # Application
@@ -66,6 +71,9 @@ target_link_options(cogidrone PRIVATE
     # "-Wl,--allow-shlib-undefined"            
 )    
 
+if(DEFINED ENV{AMENT_PREFIX_PATH})
+    ament_target_dependencies(cogidrone px4_msgs)
+endif()
 
 # * Compile
 target_compile_features(cogidrone PRIVATE cxx_std_23)
@@ -74,4 +82,8 @@ if(MSVC)
     target_compile_options(cogidrone PRIVATE /W4)
 else()
     target_compile_options(cogidrone PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
+if(DEFINED ENV{AMENT_PREFIX_PATH})
+    ament_package()
 endif()
