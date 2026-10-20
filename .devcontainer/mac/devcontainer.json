@@ -1,0 +1,12 @@
+{
+  "name": "CogiDrone dev (macOS)",
+  "dockerComposeFile": ["../../compose.yaml"],
+  "service": "dev",
+  "workspaceFolder": "/workspace",
+  "shutdownAction": "stopCompose",
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-python.python", "ms-vscode.cpptools", "redhat.vscode-yaml"]
+    }
+  }
+}

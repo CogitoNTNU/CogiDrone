@@ -1,0 +1,12 @@
+{
+  "name": "CogiDrone sim (Windows/Linux)",
+  "dockerComposeFile": ["../../compose.yaml"],
+  "service": "sim",
+  "workspaceFolder": "/workspace",
+  "shutdownAction": "stopCompose",
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-python.python", "ms-vscode.cpptools", "redhat.vscode-yaml"]
+    }
+  }
+}

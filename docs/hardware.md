@@ -1,7 +1,8 @@
 # Hardware
 
 There are two machines: the **sim box** for development and the **drone** that flies. The same code
-runs on both (see [jetson.md](jetson.md)).
+runs on both (see [jetson.md](jetson.md)). How the software connects is in
+[architecture.md](architecture.md).
 
 | Machine | Board | Where | Used for |
 |---|---|---|---|

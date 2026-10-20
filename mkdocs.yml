@@ -53,6 +53,19 @@ theme:
 
 nav:
   - Home: index.md
+  - How it connects: architecture.md
+  - Hardware: hardware.md
+  - Jetson: jetson.md
+  - Simulation (Docker): sim.md
+
+markdown_extensions:
+  - admonition
+  - tables
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
       
 plugins:
   - search

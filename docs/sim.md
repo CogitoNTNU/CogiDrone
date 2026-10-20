@@ -17,6 +17,9 @@ v2.4.3, px4_msgs `release/1.17` and YOLO (ultralytics, CPU). All versions are pi
 
 **On a Jetson?** Don't use Docker there. See [jetson.md](jetson.md) for the native install.
 
+**How do the pieces connect?** See [architecture.md](architecture.md): machines, programs,
+topics and frames on one page.
+
 ## 1. Install (once)
 
 **Windows**
@@ -51,6 +54,20 @@ Prefer VS Code? Run `./scripts/sim.sh build` once, then *Dev Containers: Reopen 
 Container* and pick **CogiDrone sim** (Windows/Linux) or **CogiDrone dev** (macOS).
 
 ## 3. Fly (Windows / Linux)
+
+There are two launch files. Both start the same simulator; they differ in who flies the drone.
+
+**The C++ core** (`src/`, the main path):
+
+```bash
+ros2 launch cogidrone_bringup sim_cpp.launch.py
+ros2 launch cogidrone_bringup sim_cpp.launch.py headless:=true yolo:=true
+```
+
+After about 20 s the C++ `Pixhawk` node arms, takes off to 2.5 m and hands over to `Navigation`,
+which hovers and spins slowly to search. `yolo:=true` feeds YOLO's detections to Navigation.
+
+**The Python reference controller:**
 
 ```bash
 ros2 launch cogidrone_bringup sim.launch.py
@@ -113,6 +130,9 @@ ros2 topic echo /cogidrone/detections
 
 ## How it fits together
 
+The full picture (machines, both controllers, every topic, ENU vs NED) is in
+[architecture.md](architecture.md). The Python path in short:
+
 ```
 Gazebo (cogidrone_x500 + D435i-like camera)
    │ camera ──► ros_gz_bridge ──► /camera/camera/color/image_raw ──► detector (YOLO)
@@ -120,13 +140,16 @@ Gazebo (cogidrone_x500 + D435i-like camera)
 PX4 SITL ◄── XRCE-DDS agent (UDP 8888) ◄── /fmu/in/* ◄──────────── offboard (control)
 ```
 
+With `sim_cpp.launch.py`, `offboard` is replaced by the C++ `cogidrone` process.
+
 | Where | What |
 |---|---|
 | `sim/models/cogidrone_x500/` | Drone: PX4's x500 (our frame) + a camera matching the D435i |
 | `sim/worlds/cogidrone.sdf` | World: NTNU Trondheim coordinates, two people as YOLO targets |
 | `ros2_ws/src/cogidrone_bringup/` | `sim.launch.py` and the Gazebo→ROS bridge config |
 | `ros2_ws/src/cogidrone_perception/` | `detector`: image → YOLO → `vision_msgs/Detection2DArray` |
-| `ros2_ws/src/cogidrone_control/` | `offboard`: arm, take off, yaw toward target (PX4 offboard mode) |
+| `ros2_ws/src/cogidrone_control/` | `offboard`: arm, take off, yaw toward target (PX4 offboard mode). `teleop`: keyboard |
+| `ros2_ws/src/cogidrone_core/` | Builds the C++ core in `src/` so `sim_cpp.launch.py` can start it |
 
 The camera topics use the same names as `realsense-ros`, so on the real drone you
 swap the bridge for the RealSense driver and the nodes stay the same. One difference:

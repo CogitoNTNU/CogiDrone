@@ -10,7 +10,8 @@ Docker, and the sim Jetson should match it.
 | Flight computer | Orin Nano Super 8 GB | `drone` | Everything except the simulator (no Gazebo, no PX4 SITL) |
 
 Both run **JetPack 7.2.1** (L4T r39.2, Ubuntu 24.04), so the same scripts and versions work on both.
-For the drone's parts and wiring, see [hardware.md](hardware.md).
+For the drone's parts and wiring, see [hardware.md](hardware.md). For how all the programs and
+topics connect, see [architecture.md](architecture.md).
 
 ## Quick start: run the sim (sim Jetson, already installed)
 
@@ -20,18 +21,28 @@ For the drone's parts and wiring, see [hardware.md](hardware.md).
    ```bash
    cb
    ```
-3. **Start the sim:**
+3. **Start the sim, flown by the C++ core** (`src/`, the main path):
    ```bash
-   ros2 launch cogidrone_bringup sim.launch.py
+   ros2 launch cogidrone_bringup sim_cpp.launch.py
    ```
-   Gazebo opens with the drone. After ~10-20 s (GPS fix) it arms, takes off to 3 m and turns toward
-   the person in view. Add `headless:=true` for no Gazebo window, or `autonomy:=false` to start only
-   the sim (PX4 + Gazebo + bridge) and run your own nodes.
+   Gazebo opens with the drone. After ~10-20 s (GPS fix) the `Pixhawk` node arms, takes off to
+   2.5 m and hands over to `Navigation`, which hovers and spins slowly to search. Options:
+   `headless:=true` (no Gazebo window), `altitude:=1.5`, `yolo:=true` (feed YOLO detections to
+   Navigation), `auto_start:=false` (stay in IDLE after takeoff). Land it with
+   `ros2 topic pub --once /manual_override std_msgs/msg/String "{data: LAND}"`.
+
+   **Or the Python reference controller**, which yaws toward the person YOLO sees:
+   ```bash
+   ros2 launch cogidrone_bringup sim.launch.py                    # takes off to 3 m
+   ros2 launch cogidrone_bringup sim.launch.py autonomy:=false    # sim only: fly it yourself
+   ```
+   Never run both launches, or the Python `offboard`/`teleop` next to the C++ core: two programs
+   sending setpoints to PX4 fight each other.
 4. **Watch / fly it** (each in its own terminal, optional):
    ```bash
    qgc                                                                # QGroundControl, connects by itself
-   ros2 run rqt_image_view rqt_image_view /cogidrone/detections/image  # camera with YOLO boxes
-   ros2 run cogidrone_control teleop                                   # keyboard flying (use autonomy:=false)
+   ros2 run rqt_image_view rqt_image_view /cogidrone/detections/image  # camera with YOLO boxes (needs the detector)
+   ros2 run cogidrone_control teleop                                   # keyboard flying (only with sim.launch.py autonomy:=false)
    ```
 5. **Stop:** `Ctrl-C` in the launch terminal stops PX4, Gazebo, the agent and the nodes.
    Only one sim can run at a time: a second `ros2 launch` refuses to start and tells you which
@@ -108,21 +119,20 @@ scripts/jetson/smoke-test.sh sim      # or: drone
 ```
 
 Checks CUDA, torch on the GPU, TensorRT, YOLO on the GPU, cuVSLAM, ROS + px4_msgs, the `ros2_ws`
-build, the XRCE agent and the C++ build. With `sim` it then starts the full sim headless and
-waits for PX4 topics, the camera, YOLO detections and a takeoff to ~3 m. Logs go to
-`/tmp/cogidrone-smoke.*`.
-
-> The **C++ core build (`src/`) fails at link time on purpose for now**: `main.cpp` and
-> `perception/perception.cpp` are not listed in `src/CMakeLists.txt`. Everything else should pass.
+build, the XRCE agent and the C++ build. With `sim` it then starts the full sim headless (the
+Python reference controller) and waits for PX4 topics, the camera, YOLO detections and a takeoff
+to ~3 m. Logs go to `/tmp/cogidrone-smoke.*`.
 
 ## 3. Fly in the sim (sim Jetson)
 
 Same commands as in [sim.md](sim.md), just without `./scripts/sim.sh shell`. Pick the takeoff
-height with `altitude:=` (default 3 m):
+height with `altitude:=` (default 2.5 m for the C++ core, 3 m for the Python controller):
 
 ```bash
-cb                                                    # build our ROS 2 packages
-ros2 launch cogidrone_bringup sim.launch.py           # Gazebo window + PX4 + YOLO + offboard
+cb                                                    # build our ROS 2 packages (incl. the C++ core)
+ros2 launch cogidrone_bringup sim_cpp.launch.py       # C++ core flies: Gazebo + PX4 + cogidrone
+ros2 launch cogidrone_bringup sim_cpp.launch.py headless:=true yolo:=true
+ros2 launch cogidrone_bringup sim.launch.py           # Python reference: Gazebo + PX4 + YOLO + offboard
 ros2 launch cogidrone_bringup sim.launch.py headless:=true autonomy:=false
 ros2 launch cogidrone_bringup sim.launch.py altitude:=1.0       # take off to 1 m instead of 3 m
 ros2 run cogidrone_control teleop                     # keyboard flying (second shell)
@@ -211,8 +221,11 @@ Sources: [cuVSLAM paper](https://arxiv.org/html/2506.04359v2),
 - **The `drone` role is untested** on the Orin Nano Super. The full CUDA toolkit (with Nsight) is
   heavy for its disk, so the package list may need trimming.
 - **`nvgetty` is disabled on the sim Jetson** too, where it isn't needed.
-- **The C++ core (`src/`) doesn't link**: `main.cpp` and `perception/perception.cpp` are missing
-  from `src/CMakeLists.txt`.
+- **The C++ Perception models are stubs**, so the C++ core never follows anyone yet. With
+  `yolo:=true` Navigation gets YOLO's boxes, but not a 3D position.
+- **A launch started from a background job ignores Ctrl-C/SIGINT** (bash sets SIGINT to ignored
+  for background jobs, and children inherit it). Stop Gazebo, PX4, the agent and `cogidrone` by
+  name, or the next launch refuses to start. Running it in a normal terminal is fine.
 
 ## Fixed along the way
 
