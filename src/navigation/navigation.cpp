@@ -1,5 +1,7 @@
 #include "navigation.h"
 
+#include <algorithm>
+
 
 namespace {
 constexpr float kPi = 3.14159265358979323846f;
@@ -353,11 +355,11 @@ void Navigation::followBehavior() {
 
 void Navigation::searchBehavior() {
     // ? Simple search: hover and rotate slowly
-    publishVelocity(Vec3{}, 0.3f);
+    publishVelocity(altitudeHold(), 0.3f);
 }
 
 void Navigation::hoverBehavior() {
-    publishVelocity(Vec3{}, 0.0f);
+    publishVelocity(altitudeHold(), 0.0f);
 }
 
 
@@ -373,6 +375,13 @@ Vec3 Navigation::followTarget() const {
     Vec3 target = m.personWorldPosition - personDirection * m.params.targetFollowDistance;
     target.z = m.params.targetHeight;
     return target;
+}
+
+Vec3 Navigation::altitudeHold() const {
+    // ? A zero velocity command does not hold altitude: errors integrate and the drone
+    // ? slowly sinks or climbs. Close the loop on height, leave x/y at zero.
+    const float vz = (m.params.targetHeight - m.drone.position.z) * m.params.positionPGain;
+    return Vec3{0.0f, 0.0f, std::clamp(vz, -m.params.maxFollowSpeed, m.params.maxFollowSpeed)};
 }
 
 Vec3 Navigation::velocityTowards(const Vec3& target) const {

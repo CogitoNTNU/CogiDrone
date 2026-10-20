@@ -170,6 +170,7 @@ private:
 
     // * Navigation math
     [[nodiscard]] Vec3 followTarget() const;                                            // Target position behind the person
+    [[nodiscard]] Vec3 altitudeHold() const;                                            // P-controller on height only (hover/search)
     [[nodiscard]] Vec3 velocityTowards(const Vec3& target) const;                       // P-controller velocity command
     [[nodiscard]] float desiredYawTowards(const Vec3& target) const;                    // Yaw to face the target
     [[nodiscard]] Vec3 cameraToWorld(const Vec3& camera) const;                         // Camera frame -> world frame
