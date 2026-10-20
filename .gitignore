@@ -264,3 +264,8 @@ toolchain.windows.config
 
 # 3rd party libraries
 !vendored/**
+
+# ROS 2 / simulation
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/

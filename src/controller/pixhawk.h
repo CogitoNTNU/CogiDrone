@@ -1,11 +1,15 @@
 #pragma once
 
 #include <expected>
-#include <atomic>
 #include <memory>
 #include <mutex>
+#include <optional>
+#include <string>
 
 #include "rclcpp/rclcpp.hpp"
+#include "geometry_msgs/msg/twist_stamped.hpp"
+#include "nav_msgs/msg/odometry.hpp"
+#include "std_msgs/msg/string.hpp"
 #include "px4_msgs/msg/offboard_control_mode.hpp"
 #include "px4_msgs/msg/trajectory_setpoint.hpp"
 #include "px4_msgs/msg/vehicle_command.hpp"
@@ -15,22 +19,47 @@
 #include "logging.h"
 
 
+// ? Frames: PX4 works in local NED (x north, y east, z down). The rest of the drone (Navigation,
+// ? Estimation) works in ENU (x east, y north, z up), like every other ROS package. The Pixhawk
+// ? class is the ONLY place that knows about NED - it converts in both directions.
+
+
+// ? These are runtime-tunable ROS parameters, loaded in create() (same pattern as NavigationParams)
+struct PixhawkParams {
+    // Topics
+    // ? PX4 >= 1.16 appends `_v<MESSAGE_VERSION>` to versioned topics. Both are v1 in our px4_msgs.
+    // ? A wrong name fails silently (no data, no error), so they are parameters.
+    std::string statusTopic         = "/fmu/out/vehicle_status_v1";
+    std::string localPositionTopic  = "/fmu/out/vehicle_local_position_v1";
+
+    // Flight
+    float targetHeight              = 2.5f;                                             // meters above takeoff point (same name as Navigation's)
+    float takeoffTolerance          = 0.3f;                                             // meters: "at altitude" when this close
+    float commandTimeout            = 0.5f;                                             // seconds: hold position if Navigation goes quiet
+    bool autoStart                  = true;                                             // send START_MISSION to Navigation after takeoff
+};
+
+
 // * Flight Controller class
 /**
- * @brief The Pixhawk class represents the Pixhawk flight controller.
- * This class is responsible for communicating with the Pixhawk flight controller 
- * and managing its state; e.g.: Pixhawk.arm();
+ * @brief The Pixhawk class represents the Pixhawk flight controller (PX4, real or SITL).
+ * It is the only link between the drone and PX4 (over uXRCE-DDS), and does three things:
+ *   1. Feedback:  PX4 local position (NED)    -> /estimation/vio_odometry (nav_msgs/Odometry, ENU)
+ *   2. Control:   /navigation/velocity_setpoint (TwistStamped, ENU) -> PX4 offboard velocity (NED)
+ *   3. Lifecycle: offboard + arm, takeoff to `target_height`, hand over to Navigation, land
+ *
+ * @note Navigation does not take off or land by itself, so the Pixhawk does it:
+ *   WAITING_EKF -> STREAMING -> TAKEOFF -> FLYING -> LANDING -> DISARMED
  */
 class Pixhawk {
 private:
     // * State machine
     enum class State {
-        INIT,                                                                           // ? Created, not streaming yet
-        WAITING_EKF,                                                                    // ? Subscribed, waiting for valid local position
-        STREAMING,                                                                      // ? Publishing setpoints, not yet in offboard
-        OFFBOARD_REQUEST,                                                               // ? Mode switch sent, awaiting ack
-        FLYING,                                                                         // ? Armed + offboard active
-        LANDING,                                                                        // ? Land commanded
+        WAITING_EKF,                                                                    // ? Subscribed, waiting for a valid local position
+        STREAMING,                                                                      // ? Streaming a hold setpoint; requesting offboard + arm until PX4 accepts
+        TAKEOFF,                                                                        // ? Armed + offboard, climbing to `targetHeight`
+        FLYING,                                                                         // ? Following Navigation's velocity (or holding if it is quiet)
+        LANDING,                                                                        // ? Land commanded, PX4 lands on its own
         DISARMED                                                                        // ? Terminal safe state
     };
 
@@ -48,55 +77,48 @@ private:
         rclcpp::Subscription<px4_msgs::msg::VehicleLocalPosition>::SharedPtr localPosSub;
         rclcpp::Subscription<px4_msgs::msg::VehicleStatus>::SharedPtr statusSub;
 
-        // Control input (from Navigation)
-        rclcpp::Subscription<px4_msgs::msg::TrajectorySetpoint>::SharedPtr setpointInputSub;
+        // Control input (from Navigation, intra-process)
+        rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr velocityInputSub;
+        rclcpp::Subscription<std_msgs::msg::String>::SharedPtr missionStatusSub;
+
+        // Outputs to the rest of the drone
+        rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odometryPub;              // ? Until Estimation exists, PX4's EKF is our state estimate
+        rclcpp::Publisher<std_msgs::msg::String>::SharedPtr manualOverridePub;          // ? START_MISSION after takeoff
 
         // Heartbeat timer - the offboard stream
         rclcpp::TimerBase::SharedPtr streamTimer;
+
+        // Parameters
+        PixhawkParams params;                                                           // ? Not const: loaded from the parameter server
     } m;
 
-    // * Runtime state (written by callbacks/timer on different executor threads)
+    // * Runtime state (written by callbacks/timer, read by streamTick)
     // ? These members are categorically different from the assembly struct `M`:
     // ? `M` holds the wiring - handles created once during construction that
     // ? define what the object IS MADE OF (node, publishers, subscriptions,
     // ? timer). These members instead hold what the object EXPERIENCES - the
-    // ? evolving condition of the drone:
-    // ?     - `state`            changes on every streamTick()
-    // ?     - `currentSetpoint`  changes every time Navigation publishes
-    // ?     - `lastLocalPos`     changes at PX4's feedback rate
-    // ?     - `offboardActive` / `armed` flip as PX4 reports status
-    // ? 
-    // ? None of these have a meaningful "assembled" value - they are
-    // ? initialized to safe defaults (INIT, false, zeroed setpoint) and then
-    // ? mutated continuously for the object's whole life by different
-    // ? executor threads. Keeping them out of `M` matters because:
-    // ?     1. Readability: aggregate-init of `M` in create() reads as "here
-    // ?        are the parts"; mixing in runtime defaults would be noise.
-    // ?     2. Synchronization: each mutex is grouped with the state it guards,
-    // ?        making the thread-safety story visible at a glance instead of
-    // ?        scattered between publishers.
-    // ?     3. The factory guarantee: create() exists to ensure no partially
-    // ?        constructed object escapes - a guarantee about the PARTS (models
-    // ?        loaded, node created, wiring done). Runtime state cannot be
-    // ?        "partially constructed" in that sense; it starts at safe
-    // ?        defaults by definition, so it has no place in the assembly.
-    // ?     4. Change isolation: re-wiring topics or swapping models touches
-    // ?        `M`; adding a new piece of mutable state (e.g. a battery flag)
-    // ?        touches this block. Two different change reasons -> two sections.
-    State state = State::INIT;
+    // ? evolving condition of the drone. They start at safe defaults and are
+    // ? mutated for the object's whole life, so they have no place in the assembly.
+    // ?
+    // ? Every callback and the timer belong to this node's default callback group,
+    // ? which is MutuallyExclusive: even on the MultiThreadedExecutor they never run
+    // ? at the same time, so this state needs no lock between THEM. The one exception
+    // ? is `state`: land() is public and may be called from another node's thread,
+    // ? so `state` is guarded by `stateMutex`. If a callback is ever moved to another
+    // ? (Reentrant) callback group, the rest needs a mutex too.
+    State state = State::WAITING_EKF;                                                   // guarded by stateMutex
     std::mutex stateMutex;
+    int stateTicks = 0;                                                                 // streamTick()s since entering `state`
 
-    px4_msgs::msg::TrajectorySetpoint currentSetpoint;                                  // guarded by m_setpointMutex
-    std::mutex setpointMutex;
-    
-    px4_msgs::msg::VehicleLocalPosition lastLocalPos;                                   // guarded by m_posMutex
-    mutable std::mutex posMutex;
-    
-    bool offboardActive = false;                                                        // from vehicle_status
-    bool armed = false;
+    std::optional<px4_msgs::msg::VehicleLocalPosition> lastLocalPos;                    // ? nullopt until PX4 sends the first one
+    std::optional<px4_msgs::msg::VehicleStatus> lastStatus;
 
-    uint8_t streamTicks = 0;                                                            // ticks spent in STREAMING (mode-switch delay)
+    std::optional<geometry_msgs::msg::TwistStamped> lastVelocity;                       // From Navigation (ENU)
+    rclcpp::Time lastVelocityTime;
+    std::string missionStatus;                                                          // From Navigation, empty until the first status
 
+    struct Hold { float x, y, z, yaw; };                                                // NED position + heading to hold
+    std::optional<Hold> hold;                                                           // ? nullopt while following Navigation's velocity
 
     // * Ctors & dtor
     explicit Pixhawk(M&& m) : m(std::move(m)) {}
@@ -105,14 +127,27 @@ private:
     // * Callbacks
     void onLocalPosition(const px4_msgs::msg::VehicleLocalPosition& msg);
     void onStatus(const px4_msgs::msg::VehicleStatus& msg);
-    void onSetpointInput(const px4_msgs::msg::TrajectorySetpoint& msg);                 // From Navigation
+    void onVelocityInput(const geometry_msgs::msg::TwistStamped& msg);                  // From Navigation
+    void onMissionStatus(const std_msgs::msg::String& msg);                             // From Navigation
     void streamTick();                                                                  // 10 Hz: the offboard heartbeat + state machine step
 
+    // * State machine (callers hold stateMutex)
+    void transitionTo(State next);
+    void beginLanding();                                                                // Send NAV_LAND and enter LANDING
+    [[nodiscard]] static const char* toString(State state) noexcept;
+
     // * Helpers
-    void publishOffboardMode();
-    void publishSetpoint();
-    void sendCommand(uint16_t command, float param1 = 0.f, float param2 = 0.f);
+    void holdHere(std::optional<float> z = std::nullopt);                               // Hold the current position (optionally at another height)
+    void streamHold();                                                                  // Offboard heartbeat + position setpoint
+    void streamVelocity();                                                              // Offboard heartbeat + Navigation's velocity
+    void publishOffboardMode(bool velocity);
+    void publishOdometry(const px4_msgs::msg::VehicleLocalPosition& pos);
+    void sendCommand(uint32_t command, float param1 = 0.f, float param2 = 0.f);
+    [[nodiscard]] uint64_t timestampUs() const;                                         // PX4 timestamps are microseconds
     [[nodiscard]] bool positionValid() const;
+    [[nodiscard]] bool armed() const;
+    [[nodiscard]] bool armedInOffboard() const;
+    [[nodiscard]] bool navigationIsFresh() const;
 
 public:
     // * Ctors & dtor

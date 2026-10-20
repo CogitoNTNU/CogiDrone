@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  CogiDrone: PX4's stock x500 (same frame as our Holybro X500 V2) plus a front camera
+  shaped like the Intel RealSense D435i (RGB 69 deg HFOV, depth 87 deg HFOV, 640x480).
+  Topics are bridged to the same ROS 2 names realsense-ros uses, see
+  ros2_ws/src/cogidrone_bringup/config/gz_bridge.yaml.
+  Note: real D435i depth is 16UC1 (mm), the sim publishes 32FC1 (m).
+-->
+<sdf version="1.9">
+  <model name="cogidrone_x500">
+    <include merge="true">
+      <uri>model://x500</uri>
+    </include>
+
+    <link name="camera_link">
+      <pose>0.12 0 0.242 0 0 0</pose>
+      <inertial>
+        <mass>0.072</mass>
+        <inertia>
+          <ixx>1e-05</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>1e-05</iyy><iyz>0</iyz>
+          <izz>1e-05</izz>
+        </inertia>
+      </inertial>
+      <visual name="camera_visual">
+        <geometry>
+          <box><size>0.025 0.09 0.025</size></box>
+        </geometry>
+        <material>
+          <ambient>0.2 0.2 0.2 1</ambient>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+
+      <sensor name="color" type="camera">
+        <pose>0 0.0175 0 0 0 0</pose>
+        <always_on>true</always_on>
+        <!-- Real D435i does 30 Hz; 15 keeps CPU-only rendering real-time on laptops. -->
+        <update_rate>15</update_rate>
+        <visualize>false</visualize>
+        <topic>/cogidrone/camera/color/image</topic>
+        <camera>
+          <camera_info_topic>/cogidrone/camera/color/camera_info</camera_info_topic>
+          <horizontal_fov>1.2043</horizontal_fov>
+          <image>
+            <width>640</width>
+            <height>480</height>
+            <format>R8G8B8</format>
+          </image>
+          <clip>
+            <near>0.1</near>
+            <far>100</far>
+          </clip>
+        </camera>
+      </sensor>
+
+      <sensor name="depth" type="depth_camera">
+        <always_on>true</always_on>
+        <update_rate>15</update_rate>
+        <visualize>false</visualize>
+        <topic>/cogidrone/camera/depth/image</topic>
+        <camera>
+          <camera_info_topic>/cogidrone/camera/depth/camera_info</camera_info_topic>
+          <horizontal_fov>1.5184</horizontal_fov>
+          <image>
+            <width>640</width>
+            <height>480</height>
+            <format>R_FLOAT32</format>
+          </image>
+          <clip>
+            <near>0.2</near>
+            <far>10</far>
+          </clip>
+        </camera>
+      </sensor>
+    </link>
+
+    <joint name="camera_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>camera_link</child>
+    </joint>
+  </model>
+</sdf>

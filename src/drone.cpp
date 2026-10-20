@@ -47,6 +47,18 @@ Drone::initiate(int argc, const char* argv[]) {
     }
     cogidrone::log(LOGGING_LEVEL::INFO, "Navigation subsystem created successfully");
 
+    // 5. Pixhawk (flight controller)
+    std::optional<std::unique_ptr<Pixhawk>> pixhawk; {
+        auto result = Pixhawk::create();
+
+        if (!result) {
+            return std::unexpected(result.error());
+        }
+
+        pixhawk = std::move(*result);
+    }
+    cogidrone::log(LOGGING_LEVEL::INFO, "Pixhawk controller created successfully");
+
 
     // * 3. Assemble
     // ? We wrap the raw pointer and let a unique_ptr take ownership to prevent leaks 
@@ -57,7 +69,8 @@ Drone::initiate(int argc, const char* argv[]) {
             .perception = std::move(*perception),                                       // ? object shouldn't be copyable nor movable, so
             .estimation = nullptr,                                                      // ? we can't return a Drone object by value 
             .representation = nullptr,
-            .navigation = std::move(*navigation),                            
+            .navigation = std::move(*navigation),
+            .pixhawk = std::move(*pixhawk),
             
         })                                                                                  
     );
@@ -72,6 +85,7 @@ void Drone::start() {
     
     executor.add_node(m.perception->node());
     executor.add_node(m.navigation->node());
+    executor.add_node(m.pixhawk->node());
     
     cogidrone::log(LOGGING_LEVEL::INFO, "Nodes added successfully, spinning executor...");
     

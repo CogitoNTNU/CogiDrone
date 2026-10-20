@@ -25,6 +25,7 @@ private:
         nullptr_t estimation;                                                           // TODO: Implement the Estimation subsystem
         nullptr_t representation;                                                       // TODO: Implement the Representation subsystem
         std::unique_ptr<Navigation> navigation;
+        std::unique_ptr<Pixhawk> pixhawk;                                               // ? Controller: the link to PX4 (real Pixhawk or SITL)
     } m;
 
     // * Ctors & dtor
