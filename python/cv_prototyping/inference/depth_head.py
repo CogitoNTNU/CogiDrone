@@ -1,5 +1,8 @@
 """Sanntids objektdeteksjon og dybdeestimering med YOLO og Depth Anything V2."""
 
+import sys
+from pathlib import Path
+
 import cv2
 import numpy as np
 import torch
@@ -8,6 +11,10 @@ from transformers import pipeline
 from ultralytics import YOLO
 
 from camera import open_webcam, close_webcam, COCO_CLASS_NAMES
+
+# Gjør targeter/-mappen importerbar (ligger ved siden av inference/)
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+from targeter.target_closest import ClosestTargeter, Detection, is_too_close
 
 MODEL_WEIGHTS = "weights/yolo26n.pt" #"models/yolo26n.pt"
 HEAD_MODEL_WEIGHTS = "models/medium.pt"  # Your head detection model
@@ -54,6 +61,8 @@ def main() -> None:
     )
     print("Modeller klare!")
 
+    targeter = ClosestTargeter()
+
     frame_count = 0
     cached_depth_map = None
     depth_interval = 2  # run depth model per x frame
@@ -79,6 +88,7 @@ def main() -> None:
             raw_depth = np.array(depth_output["depth"])
             cached_depth_map = cv2.resize(raw_depth, (w, h))
 
+        detections = []  # Alle personer i denne framen, sendes til targeteren
         for r in results:
             for box in r.boxes:
                 x1, y1, x2, y2 = map(int, box.xyxy[0])
@@ -128,6 +138,10 @@ def main() -> None:
                             # Draw head bounding box in RED
                             cv2.rectangle(img, (global_hx1, global_hy1), (global_hx2, global_hy2), (0, 0, 255), 2)
 
+                    # Hodeavstand er mest pålitelig, kropp brukes som fallback
+                    distance = head_dist if head_dist is not None else geom_dist
+                    detections.append(Detection((x1, y1, x2, y2), confidence, distance))
+
                 # Relative depth from Depth Anything V2
                 crop_depth = cached_depth_map[y1:y2, x1:x2]
                 rel_depth = float(np.median(crop_depth)) if crop_depth.size > 0 else 0.0
@@ -171,6 +185,19 @@ def main() -> None:
                     img, label, (x1, max(y1 - 10, 20)),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 0), 2
                 )
+
+        # Velg og marker target: gul boks, rød hvis for nær
+        target = targeter.update(detections)
+        if target is not None:
+            tx1, ty1, tx2, ty2 = target.bbox
+            too_close = is_too_close(target)
+            color = (0, 0, 255) if too_close else (0, 255, 255)
+            text = "TARGET - FOR NAER" if too_close else f"TARGET {target.distance:.1f}m"
+            cv2.rectangle(img, (tx1, ty1), (tx2, ty2), color, 5)
+            cv2.putText(
+                img, text, (tx1, max(ty1 - 35, 20)),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2
+            )
 
         # Kryss i bildets midte
         cv2.drawMarker(img, (w // 2, h // 2), (0, 255, 255), cv2.MARKER_CROSS, 30, 2)
