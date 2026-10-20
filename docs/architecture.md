@@ -51,38 +51,40 @@ two programs sending setpoints to PX4 fight each other.
 ## 3. What runs in the sim
 
 ```mermaid
-flowchart LR
-    subgraph SIMU["Simulator (sim.launch.py)"]
+flowchart TB
+    subgraph SIMU["Simulator (started by both launch files)"]
+        direction LR
         GZ["Gazebo Harmonic<br/>world + x500 + camera"]
         PX4["PX4 SITL<br/>autopilot + EKF2"]
         AG["XRCE-DDS agent<br/>UDP 8888"]
         BR["ros_gz_bridge"]
+        GZ <-- "sensors, motors" --> PX4
+        PX4 <-- uORB --> AG
+        GZ -- camera --> BR
     end
 
+    QGC["QGroundControl<br/>(optional)"]
+    YOLO["detector<br/>(Python YOLO, optional)"]
+
     subgraph CORE["cogidrone process (C++)"]
+        direction LR
         PER["Perception"]
         NAV["Navigation"]
         PIX["Pixhawk"]
+        PER -. "/perception/detections<br/>(nothing yet)" .-> NAV
+        NAV -- "velocity_setpoint<br/>mission_status" --> PIX
+        PIX -- "vio_odometry<br/>START_MISSION" --> NAV
     end
 
-    YOLO["detector<br/>(Python YOLO, optional)"]
-    QGC["QGroundControl<br/>(optional)"]
-
-    GZ <-- "gz transport<br/>sensors, motors" --> PX4
-    PX4 <-- uORB --> AG
-    AG <-- "/fmu/in/*, /fmu/out/*" --> PIX
-    GZ --> BR
-    BR -- "/camera/camera/color/image_raw" --> PER
-    BR -- "/camera/camera/color/image_raw" --> YOLO
-    YOLO -. "/cogidrone/detections<br/>(yolo:=true)" .-> NAV
-    PER -. "/perception/detections<br/>(nothing yet)" .-> NAV
-    PIX -- "/estimation/vio_odometry" --> NAV
-    NAV -- "/navigation/velocity_setpoint<br/>/navigation/mission_status" --> PIX
-    PIX -- "/manual_override<br/>START_MISSION" --> NAV
     PX4 -- "MAVLink UDP 14550" --> QGC
+    AG <-- "/fmu/in/*<br/>/fmu/out/*" --> PIX
+    BR -- "color/image_raw" --> PER
+    BR -- "color/image_raw" --> YOLO
+    YOLO -. "/cogidrone/detections<br/>(yolo:=true)" .-> NAV
 ```
 
-Dashed arrows are planned or optional. Today the C++ Perception loads stub models and publishes
+Labels are shortened; the full topic names are in [section 4](#4-topics). Dashed arrows are
+planned or optional. Today the C++ Perception loads stub models and publishes
 nothing, so without `yolo:=true` Navigation stays in `SEARCHING` (hover and spin slowly).
 
 ### Inside the `cogidrone` process
