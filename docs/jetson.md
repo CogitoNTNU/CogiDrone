@@ -10,6 +10,7 @@ Docker, and the sim Jetson should match it.
 | Flight computer | Orin Nano Super 8 GB | `drone` | Everything except the simulator (no Gazebo, no PX4 SITL) |
 
 Both run **JetPack 7.2.1** (L4T r39.2, Ubuntu 24.04), so the same scripts and versions work on both.
+For the drone's parts and wiring, see [hardware.md](hardware.md).
 
 ## Quick start: run the sim (sim Jetson, already installed)
 
