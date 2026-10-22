@@ -121,9 +121,9 @@ private:
         // ? expects px4_msgs::msg::TrajectorySetpoint (NED frame, µs timestamp).
         // ? This publisher IS the navigation->control interface.
         rclcpp::Publisher<px4_msgs::msg::TrajectorySetpoint>::SharedPtr setpointPublisher;
+        rclcpp::Publisher<std_msgs::msg::String>::SharedPtr flightCommandPublisher;     // Flight commands
 
-        // Mission status (introspection only - not consumed by any subsystem)
-        rclcpp::Publisher<std_msgs::msg::String>::SharedPtr missionStatusPublisher;
+        rclcpp::Publisher<std_msgs::msg::String>::SharedPtr missionStatusPublisher;     // Mission status (introspection only - not consumed by any subsystem)
 
         // Timer
         rclcpp::TimerBase::SharedPtr controlTimer;
@@ -137,13 +137,17 @@ private:
     // ? MADE OF (wiring, created once in create()/wire()); this block is what the
     // ? object EXPERIENCES - mutable state initialized to safe defaults and
     // ? mutated for the object's whole life by different executor threads.
-    MissionState state = MissionState::IDLE;
-    std::mutex stateMutex;
-
     PersonDetection person;                                                             // guarded by personMutex
     mutable std::mutex personMutex;                                                     // ? mutable: locked from const detectionIsValid()
 
-    rclcpp::Time stateEntryTime{};                                                      // guarded by stateMutex (only tick writes)
+    // ? `state` and `stateEntryTime` are owned exclusively by the timer thread
+    // ? (onControlTick -> evaluateTransitions/transitionTo). No lock needed.
+    // ? When the manual-override channel lands, its callback must NOT mutate
+    // ? state directly - it should post a request (atomic flag / queue) that
+    // ? the timer thread consumes, preserving single-threaded ownership.
+    MissionState state = MissionState::IDLE;
+    rclcpp::Time stateEntryTime{};                                                      
+
     rclcpp::Time lastDetectionTime{};   
 
     // * Default ctor
@@ -155,8 +159,9 @@ private:
     void onControlTick();                                                               // Main control loop, runs at params.controlFrequency
 
     // * State machine
-    void updateStateMachine();
+    [[nodiscard]] std::optional<MissionState> evaluateTransitions();                    // Returns the next state if a transition is due
     void transitionTo(MissionState next);
+    void onEnter(MissionState entered);   
     [[nodiscard]] static std::string toString(MissionState state) noexcept;
 
     // * Behaviors
@@ -181,6 +186,7 @@ private:
 
     // * Publishing
     void publishSetpoint(const Vec3& positionNed, float yaw);                           // The ONLY path to the flight controller
+    void publishFlightCommand(const std::string& command);
     void publishStatus();
 
     // * Helpers

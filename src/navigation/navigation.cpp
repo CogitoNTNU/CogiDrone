@@ -1,5 +1,6 @@
 #include "navigation.h"
 
+#include <optional>
 #include <string>
 
 namespace {
@@ -80,6 +81,7 @@ std::expected<std::unique_ptr<Navigation>, cogidrone::Error> Navigation::create(
             .node = std::move(node),
             .detectionSubscription = nullptr,                                           // ? will be wired later
             .setpointPublisher = nullptr,                                               // ? will be wired later
+            .flightCommandPublisher = nullptr,                                          // ? will be wired later
             .missionStatusPublisher = nullptr,                                          // ? will be wired later
             .controlTimer = nullptr,                                                    // ? will be wired later
             .params = std::move(params)
@@ -117,6 +119,11 @@ void Navigation::wire() noexcept {
     // * Publishers
     m.setpointPublisher = m.node->create_publisher<px4_msgs::msg::TrajectorySetpoint>(
         "/navigation/setpoint",
+        rclcpp::QoS(10)
+    );
+
+    m.flightCommandPublisher = m.node->create_publisher<std_msgs::msg::String>(
+        "/navigation/flight_command",
         rclcpp::QoS(10)
     );
 
@@ -173,8 +180,10 @@ void Navigation::onDetections(const vision_msgs::msg::Detection2DArray& msg) {
 }
 
 void Navigation::onControlTick() {
-    // * Update the state machine, then execute the behavior of the current state
-    updateStateMachine();
+    // * Evaluate the state machine, and transition if requested
+    if (auto next = evaluateTransitions()) {
+        transitionTo(*next);
+    }
 
     // ? Behaviors that don't exist yet fall back to hover - the safe default.
     // ? Every state ends in exactly one publishSetpoint() call per tick.
@@ -197,8 +206,8 @@ void Navigation::onControlTick() {
 
         case MissionState::LANDING:
             // ? LANDING is owned by Pixhawk (its land() hands control to PX4's
-            //     : landing controller). Navigation keeps streaming its last
-            //     : setpoint - PX4 ignores it in auto-land. No new commands here.
+            // ? landing controller). Navigation keeps streaming its last
+            // ? setpoint - PX4 ignores it in auto-land. No new commands here.
             break;
     }
 
@@ -208,9 +217,10 @@ void Navigation::onControlTick() {
 
 
 // * State machine
-void Navigation::updateStateMachine() {
-    std::lock_guard lock(stateMutex);
-
+[[nodiscard]] std::optional<MissionState> Navigation::evaluateTransitions() {
+    // ? No lock: `state`/`stateEntryTime` are timer-thread-owned. The only
+    // ? cross-thread data read here is `person`/`lastDetectionTime`, guarded
+    // ? inside detectionIsValid()/personIsLost() by personMutex.
     MissionState next = state;
 
     switch (state) {
@@ -220,24 +230,27 @@ void Navigation::updateStateMachine() {
             break;
 
         case MissionState::SEARCHING:
-            if (detectionIsValid()) next = MissionState::PERSON_DETECTED;
+            if (detectionIsValid()) 
+                next = MissionState::PERSON_DETECTED;
             break;
 
         case MissionState::PERSON_DETECTED:
             // ? Require stable tracking for trackConfirmTime before committing to follow
             if ((m.node->now() - stateEntryTime).seconds() > m.params.trackConfirmTime) {
                 next = detectionIsValid() ? MissionState::FOLLOWING
-                                         : MissionState::SEARCHING;
+                                          : MissionState::SEARCHING;
             }
             break;
 
         case MissionState::FOLLOWING:
-            if (personIsLost()) next = MissionState::PERSON_LOST;
+            if (personIsLost()) 
+                next = MissionState::PERSON_LOST;
             // TODO: OBSTACLE_AVOIDANCE transition - blocked on Representation
             break;
 
         case MissionState::PERSON_LOST:
-            if (detectionIsValid()) next = MissionState::PERSON_DETECTED;
+            if (detectionIsValid()) 
+                next = MissionState::PERSON_DETECTED;
             // TODO: timeout -> RETURNING (return-home strategy is a design choice)
             break;
 
@@ -245,7 +258,9 @@ void Navigation::updateStateMachine() {
             break;                                                                      // LANDING/EMERGENCY are exited via explicit commands only
     }
 
-    if (next != state) transitionTo(next);
+    //// if (next != state) transitionTo(next);
+    if (next == state) return std::nullopt;
+    return next;
 }
 
 void Navigation::transitionTo(MissionState next) {
@@ -254,6 +269,19 @@ void Navigation::transitionTo(MissionState next) {
 
     state = next;
     stateEntryTime = m.node->now();
+
+    onEnter(next);                                                                      // entry actions live here
+}
+
+void Navigation::onEnter(MissionState entered) {
+    // ? Edge-triggered outputs: exactly once per transition, never per tick.
+    switch (entered) {
+        case MissionState::LANDING:
+            publishFlightCommand("LAND");                                               // TODO: Use custom message enum type to ensure safety. See "src/controller/FLIGHT_COMMAND_MSG.md" for implementation details.
+            break;
+        default:
+            break;                                                                      // no entry action
+    }
 }
 
 std::string Navigation::toString(MissionState state) noexcept {
@@ -360,6 +388,13 @@ void Navigation::publishSetpoint(const Vec3& positionNed, float yaw) {
     sp->timestamp = m.node->now().nanoseconds() / 1000;                                  // µs, stamped at publish: always fresh for Pixhawk's stream
 
     m.setpointPublisher->publish(std::move(sp));
+}
+
+// navigation.cpp
+void Navigation::publishFlightCommand(const std::string& command) {
+    auto msg = std::make_unique<std_msgs::msg::String>();
+    msg->data = command;
+    m.flightCommandPublisher->publish(std::move(msg));
 }
 
 void Navigation::publishStatus() {

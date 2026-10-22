@@ -16,13 +16,14 @@ std::expected<std::unique_ptr<Pixhawk>, cogidrone::Error> Pixhawk::create() {
     auto p = std::unique_ptr<Pixhawk>(
         new Pixhawk(M{                                                                  // ? Transfer ownership into unique_ptr as ctor is private
             .node = std::move(node),
-            .offboardModePublisher = nullptr,                                           // ? will be wired later
-            .setpointPublisher = nullptr,                                               // ? will be wired later
-            .commandPublisher = nullptr,                                                // ? will be wired later
-            .localPositionSubscription = nullptr,                                       // ? will be wired later
-            .statusSubscription = nullptr,                                              // ? will be wired later
-            .setpointInputSubscription = nullptr,                                       // ? will be wired later
-            .streamTimer = nullptr                                                      // ? will be wired later
+            .offboardModePublisher = nullptr,                                           // ? will be wired in `Pixhawk::wire()`
+            .setpointPublisher = nullptr,                                               // ? will be wired in `Pixhawk::wire()`
+            .vehicleCommandPublisher = nullptr,                                                // ? will be wired in `Pixhawk::wire()`
+            .localPositionSubscription = nullptr,                                       // ? will be wired in `Pixhawk::wire()`
+            .statusSubscription = nullptr,                                              // ? will be wired in `Pixhawk::wire()`
+            .setpointInputSubscription = nullptr,                                       // ? will be wired in `Pixhawk::wire()`
+            .navigationCommandSubscription  = nullptr,                                  // ? will be wired in `Pixhawk::wire()`
+            .streamTimer = nullptr                                                      // ? will be wired in `Pixhawk::wire()`
         })
     );
     cogidrone::log(LOGGING_LEVEL::INFO, "Pixhawk object partially constructed");
@@ -38,7 +39,7 @@ void Pixhawk::wire() noexcept {
     // PX4 namespace: the bridge exposes uORB topics under /fmu/in/
     m.offboardModePublisher = m.node->create_publisher<px4_msgs::msg::OffboardControlMode>("/fmu/in/offboard_control_mode", 10);
     m.setpointPublisher = m.node->create_publisher<px4_msgs::msg::TrajectorySetpoint>("/fmu/in/trajectory_setpoint", 10);
-    m.commandPublisher = m.node->create_publisher<px4_msgs::msg::VehicleCommand>("/fmu/in/vehicle_command", 10);
+    m.vehicleCommandPublisher = m.node->create_publisher<px4_msgs::msg::VehicleCommand>("/fmu/in/vehicle_command", 10);
 
     // * Subscriptions
     // PX4 namespace: the bridge exposes uORB topics under /fmu/out/
@@ -63,6 +64,14 @@ void Pixhawk::wire() noexcept {
         rclcpp::QoS(10),
         [this](const px4_msgs::msg::TrajectorySetpoint& msg) { 
             this->onSetpointInput(msg); 
+        }
+    );
+
+    m.navigationCommandSubscription  = m.node->create_subscription<std_msgs::msg::String>(
+        "/navigation/flight_command", 
+        rclcpp::QoS(10),
+        [this](const std_msgs::msg::String& msg) { 
+            this->onNavigationCommand(msg);
         }
     );
 
@@ -96,6 +105,16 @@ void Pixhawk::onStatus(const px4_msgs::msg::VehicleStatus& msg) {
 void Pixhawk::onSetpointInput(const px4_msgs::msg::TrajectorySetpoint& msg) {
     std::lock_guard lock(setpointMutex);
     currentSetpoint = msg;
+}
+
+void Pixhawk::onNavigationCommand(const std_msgs::msg::String& msg) {
+    cogidrone::log(LOGGING_LEVEL::INFO, "Flight command: " + msg.data);
+
+    if (msg.data == "LAND") {
+        land();
+    }
+    // TODO: "START", "EMERGENCY", "RETURN" - each needs a corresponding
+    //     : Pixhawk action, which is a design decision (arm? mode switch?).
 }
 
 void Pixhawk::streamTick() {
@@ -200,7 +219,7 @@ void Pixhawk::sendCommand(uint16_t command, float param1, float param2) {
 
     cmd.timestamp = m.node->now().nanoseconds() / 1000;
     
-    m.commandPublisher->publish(cmd);
+    m.vehicleCommandPublisher->publish(cmd);
 }
 
 [[nodiscard]] bool Pixhawk::isPositionValid() const {

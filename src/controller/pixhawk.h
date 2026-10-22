@@ -6,6 +6,7 @@
 #include <mutex>
 
 #include "rclcpp/rclcpp.hpp"
+#include "std_msgs/msg/string.hpp"
 #include "px4_msgs/msg/offboard_control_mode.hpp"
 #include "px4_msgs/msg/trajectory_setpoint.hpp"
 #include "px4_msgs/msg/vehicle_command.hpp"
@@ -43,7 +44,7 @@ private:
         // Publishers (to PX4 via uXRCE-DDS bridge)
         rclcpp::Publisher<px4_msgs::msg::OffboardControlMode>::SharedPtr offboardModePublisher;
         rclcpp::Publisher<px4_msgs::msg::TrajectorySetpoint>::SharedPtr setpointPublisher;
-        rclcpp::Publisher<px4_msgs::msg::VehicleCommand>::SharedPtr commandPublisher;
+        rclcpp::Publisher<px4_msgs::msg::VehicleCommand>::SharedPtr vehicleCommandPublisher;
 
         // Subscriptions (PX4 feedback)
         rclcpp::Subscription<px4_msgs::msg::VehicleLocalPosition>::SharedPtr localPositionSubscription;
@@ -51,6 +52,7 @@ private:
 
         // Control input (from Navigation)
         rclcpp::Subscription<px4_msgs::msg::TrajectorySetpoint>::SharedPtr setpointInputSubscription;
+        rclcpp::Subscription<std_msgs::msg::String>::SharedPtr navigationCommandSubscription ;
 
         // Heartbeat timer - the offboard stream
         rclcpp::TimerBase::SharedPtr streamTimer;
@@ -107,6 +109,7 @@ private:
     void onLocalPosition(const px4_msgs::msg::VehicleLocalPosition& msg);
     void onStatus(const px4_msgs::msg::VehicleStatus& msg);
     void onSetpointInput(const px4_msgs::msg::TrajectorySetpoint& msg);                 // From Navigation
+    void onNavigationCommand(const std_msgs::msg::String& msg);                         // From Navigation
     void streamTick();                                                                  // 10 Hz: the offboard heartbeat + state machine step
 
     // * Helpers
