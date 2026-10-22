@@ -15,9 +15,9 @@ sudo apt install ros-jazzy-ament-cmake python3-colcon-common-extensions
 
 ```bash
 mkdir -p ~/px4_ws/src && cd ~/px4_ws/src
-git clone https://github.com/PX4/px4_msgs.git -b release/1.17   # ! branch MUST match PX4 firmware version on the Pixhawk
+git clone https://github.com/PX4/px4_msgs.git -b release/1.17     # ! branch MUST match PX4 firmware version on the Pixhawk
 cd ~/px4_ws
-colcon build --packages-select px4_msgs                          # runs rosidl codegen (takes a few min)
+colcon build --packages-select px4_msgs                           # runs rosidl codegen (takes a few min)
 ```
 
 Verify: `ls ~/px4_ws/install/px4_msgs/include/px4_msgs/px4_msgs/msg/` shows generated headers (`trajectory_setpoint.hpp` etc.).
