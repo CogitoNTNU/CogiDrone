@@ -217,6 +217,8 @@ void Navigation::onControlTick() {
 
 
 // * State machine
+// TODO: I feel like we can do this without allocating a next-state, and then comparing. Instead
+//     : we could just return early on a transition, and return nullopt if no transition is taken. 
 [[nodiscard]] std::optional<MissionState> Navigation::evaluateTransitions() {
     // ? No lock: `state`/`stateEntryTime` are timer-thread-owned. The only
     // ? cross-thread data read here is `person`/`lastDetectionTime`, guarded
