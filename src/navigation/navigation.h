@@ -3,16 +3,16 @@
 #include <chrono>
 #include <cmath>
 #include <expected>
+#include <memory>
+#include <mutex>
 #include <string>
 
 #include "rclcpp/rclcpp.hpp"
-#include "geometry_msgs/msg/twist_stamped.hpp"
-#include "nav_msgs/msg/odometry.hpp"
-#include "std_msgs/msg/string.hpp"
 #include "vision_msgs/msg/detection2_d_array.hpp"
+#include "std_msgs/msg/string.hpp"
+#include "px4_msgs/msg/trajectory_setpoint.hpp"
 
 #include "logging.h"
-
 
 // TODO: WE NEED TO REFACTOR THIS ENTIRE FILE, ALONG WITH `navigation.cpp`!
 //     : This current implementation was converted by zai/GLM-5.3 from the original Claude generated
@@ -54,38 +54,33 @@ struct Quat {
 
 
 // * Mission states
+// ? The full mission lifecycle. States whose behaviors depend on subsystems
+// ? that don't exist yet (drone state source, obstacle map, fused detections)
+// ? are declared but their behaviors are stubs - see onControlTick().
 enum class MissionState {
-    IDLE,                                                                               // Waiting for commands
+    IDLE,                                                                               // Waiting for mission start
     SEARCHING,                                                                          // Looking for person
-    PERSON_DETECTED,                                                                    // Person found, preparing to follow
+    PERSON_DETECTED,                                                                    // Person found, confirming track
     FOLLOWING,                                                                          // Actively following person
     PERSON_LOST,                                                                        // Lost sight of person, hovering/searching
-    OBSTACLE_AVOIDANCE,                                                                 // Emergency obstacle avoidance mode
-    RETURNING,                                                                          // Returning to starting position
-    LANDING,                                                                            // Landing sequence
-    EMERGENCY                                                                           // Emergency/failsafe mode
+    OBSTACLE_AVOIDANCE,                                                                 // TODO: requires Representation
+    RETURNING,                                                                          // TODO: requires drone state + home reference
+    LANDING,                                                                            // Handed to Pixhawk::land()
+    EMERGENCY                                                                           // Hold position, await operator
 };
 
 
 // * Data types
 struct PersonDetection {
-    Vec3 position;                                                                      // Position in camera frame
+    Vec3 position;                                                                      // TODO: camera-frame position - requires fused detections (depth + intrinsics) from Perception
     float confidence = 0.0f;                                                            // Detection confidence [0-1]
     rclcpp::Time timestamp{};
     bool valid = false;
 };
 
-struct DroneState {
-    Vec3 position;                                                                      // Position in world frame
-    Vec3 velocity;                                                                      // Velocity in world frame
-    Quat orientation;                                                                   // Orientation quaternion
-    float yaw = 0.0f;                                                                   // Yaw angle in radians
-    rclcpp::Time timestamp{};
-};
 
-
-// ? These are runtime-tunable ROS parameters, not compile-time constants. `create()` 
-// ? overwrites them from the parameter server (YAML / `ros2 param set`), so therefore
+// ? Runtime-tunable ROS parameters, not compile-time constants. `create()`
+// ? overwrites them from the parameter server (YAML / `ros2 param set`), so
 // ? they must stay plain, mutable, per-instance members.
 struct NavigationParams {
     // Following
@@ -94,23 +89,16 @@ struct NavigationParams {
     float maxFollowSpeed            = 3.0f;                                             // m/s
     float minFollowDistance         = 2.0f;                                             // safety minimum
     float maxFollowDistance         = 10.0f;                                            // lose tracking beyond this
-  
-    // Safety limits   
-    float minAltitude               = 0.5f;                                             // meters
-    float maxAltitude               = 10.0f;                                            // meters
-    float safetyDistance            = 1.0f;                                             // meters from obstacles
 
     // Detection
     float detectionTimeout          = 2.0f;                                             // seconds
     float minDetectionConfidence    = 0.7f;
+    float trackConfirmTime          = 1.0f;                                             // seconds of stable track before committing to FOLLOWING
 
-    // Control gains
-    float positionPGain             = 1.0f;
-    float yawPGain                  = 2.0f;
-
-    // Update rates
+    // Control
     float controlFrequency          = 30.0f;                                            // Hz
 };
+
 
 // ? If we ever need to reference the default nagivation parameters, we can use this
 // ? constant - which is a copy constructed at compile time. This could be useful for
@@ -125,37 +113,45 @@ private:
         // ROS node
         rclcpp::Node::SharedPtr node;
 
-        // Subscriptions and publishers
-        rclcpp::Subscription<vision_msgs::msg::Detection2DArray>::SharedPtr detectionSubscription;
-        rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odometrySubscription;
-        rclcpp::Subscription<std_msgs::msg::String>::SharedPtr manualOverrideSubscription;
-        rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr velocityPublisher;
+        // Subscriptions
+        rclcpp::Subscription<vision_msgs::msg::Detection2DArray>::SharedPtr detectionSubscription;   // Fused detections from Perception
+
+        // Publishers
+        // ? Contract with Pixhawk: it subscribes to /navigation/setpoint and
+        // ? expects px4_msgs::msg::TrajectorySetpoint (NED frame, µs timestamp).
+        // ? This publisher IS the navigation->control interface.
+        rclcpp::Publisher<px4_msgs::msg::TrajectorySetpoint>::SharedPtr setpointPublisher;
+
+        // Mission status (introspection only - not consumed by any subsystem)
         rclcpp::Publisher<std_msgs::msg::String>::SharedPtr missionStatusPublisher;
 
         // Timer
         rclcpp::TimerBase::SharedPtr controlTimer;
 
-        // State
+        // Parameters
         NavigationParams params;                                                        // ? Not const: loaded from the parameter server, may be retuned live
-        MissionState state = MissionState::IDLE;
-        PersonDetection person;
-        DroneState drone;
-        Vec3 personWorldPosition;                                                       // Estimated person position in world frame
-        Vec3 personWorldVelocity;                                                       // Estimated person velocity
-        rclcpp::Time lastDetectionTime;
-        rclcpp::Time stateEntryTime;
-        Vec3 homePosition;
-        bool homePositionSet = false;
     } m;
+
+    // * Runtime state (written by callbacks/timer on different executor threads)
+    // ? Outside `M` for the same reason as in Pixhawk: `M` is what the object is
+    // ? MADE OF (wiring, created once in create()/wire()); this block is what the
+    // ? object EXPERIENCES - mutable state initialized to safe defaults and
+    // ? mutated for the object's whole life by different executor threads.
+    MissionState state = MissionState::IDLE;
+    std::mutex stateMutex;
+
+    PersonDetection person;                                                             // guarded by personMutex
+    mutable std::mutex personMutex;                                                     // ? mutable: locked from const detectionIsValid()
+
+    rclcpp::Time stateEntryTime{};                                                      // guarded by stateMutex (only tick writes)
+    rclcpp::Time lastDetectionTime{};   
 
     // * Default ctor
     explicit Navigation(M&& m) : m(std::move(m)) {}                                     // No default ctor exposed
     void wire() noexcept;                                                               // Wire the node's subscriptions and publishers to the member methods
 
     // * Callbacks
-    void onDetections(const vision_msgs::msg::Detection2DArray& msg);                   // Fused detections from perception
-    void onOdometry(const nav_msgs::msg::Odometry& msg);                                // VIO odometry from estimation
-    void onManualOverride(const std_msgs::msg::String& msg);                            // Manual override commands
+    void onDetections(const vision_msgs::msg::Detection2DArray& msg);                   // Fused detections from Perception
     void onControlTick();                                                               // Main control loop, runs at params.controlFrequency
 
     // * State machine
@@ -164,24 +160,34 @@ private:
     [[nodiscard]] static std::string toString(MissionState state) noexcept;
 
     // * Behaviors
-    void followBehavior();
-    void searchBehavior();
-    void hoverBehavior();
+    // ? A behavior's job: decide the next position setpoint and hand it to
+    // ? publishSetpoint(). PX4 owns velocity/attitude control - Navigation
+    // ? never commands velocities or motor-level anything.
+    void hoverBehavior();                                                               // Implemented: hold position setpoint
+    // TODO: followBehavior() - target selection behind the person. Blocked on:
+    //     1. Person world position (needs fused detections w/ depth from Perception)
+    //     2. Drone state source (estimation scrapped; PX4 local position vs Pixhawk republish - undecided)
+    //// void followBehavior();
+    
+    // TODO: searchBehavior() - search pattern is a design choice (orbit? lawn-mower? hold+rotate?)
+    //// void searchBehavior();
+    // TODO: obstacle avoidance - blocked on Representation producing an obstacle map
 
     // * Navigation math
-    [[nodiscard]] Vec3 followTarget() const;                                            // Target position behind the person
-    [[nodiscard]] Vec3 velocityTowards(const Vec3& target) const;                       // P-controller velocity command
-    [[nodiscard]] float desiredYawTowards(const Vec3& target) const;                    // Yaw to face the target
-    [[nodiscard]] Vec3 cameraToWorld(const Vec3& camera) const;                         // Camera frame -> world frame
+    // // [[nodiscard]] Vec3 followTarget() const;                                            // Target position behind the person
+    // // [[nodiscard]] Vec3 velocityTowards(const Vec3& target) const;                       // P-controller velocity command
+    // // [[nodiscard]] float desiredYawTowards(const Vec3& target) const;                    // Yaw to face the target
+    // // [[nodiscard]] Vec3 cameraToWorld(const Vec3& camera) const;                         // Camera frame -> world frame
 
-    // * Safety
-    [[nodiscard]] bool commandIsSafe(const Vec3& velocity) const;
+    // * Publishing
+    void publishSetpoint(const Vec3& positionNed, float yaw);                           // The ONLY path to the flight controller
+    void publishStatus();
+
+    // * Helpers
+    // // [[nodiscard]] bool commandIsSafe(const Vec3& velocity) const;
     [[nodiscard]] bool detectionIsValid() const;
     [[nodiscard]] bool personIsLost() const;
 
-    // * Publishing
-    void publishVelocity(const Vec3& velocity, float yawRate);
-    void publishStatus();
 
 public:
     // * Ctors & dtor
@@ -189,9 +195,8 @@ public:
 
     ~Navigation();
 
-    Navigation(Navigation&&) noexcept = delete;                                         // non-movable, causes dangling [this] pointers in subscription callbacks
-    Navigation& operator=(Navigation&&) noexcept = delete;
-
+    Navigation(Navigation&&) noexcept = delete;                                         // ? non-movable, otherwise it causes dangling
+    Navigation& operator=(Navigation&&) noexcept = delete;                              // ? [this] pointers in subscription callbacks
     Navigation(const Navigation&) = delete;                                             // non-copyable (one node, one drone)
     Navigation& operator=(const Navigation&) = delete;
 

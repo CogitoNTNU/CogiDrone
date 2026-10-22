@@ -35,7 +35,7 @@ Drone::initiate(int argc, const char* argv[]) {
     }
     cogidrone::log(LOGGING_LEVEL::INFO, "Perception subsystem created successfully");
 
-    // 4. Navigation
+    // 3. Navigation
     std::optional<std::unique_ptr<Navigation>> navigation; {
         auto result = Navigation::create();
     
@@ -47,17 +47,29 @@ Drone::initiate(int argc, const char* argv[]) {
     }
     cogidrone::log(LOGGING_LEVEL::INFO, "Navigation subsystem created successfully");
 
+    // * 3. Flight Controller
+    std::optional<std::unique_ptr<Pixhawk>> flightController; {
+        auto result = Pixhawk::create();
+    
+        if (!result) {
+            return std::unexpected(result.error());
+        }
 
-    // * 3. Assemble
+        flightController = std::move(*result);
+    }
+    cogidrone::log(LOGGING_LEVEL::INFO, "Flight Controller initialized successfully");
+
+
+    // * 4. Assemble
     // ? We wrap the raw pointer and let a unique_ptr take ownership to prevent leaks 
     // ? caused by not deleting the Drone object. Note that the wrapping is simply  
     // ? here because make_unique<Drone> is unavailable as the constructor is private
     return std::unique_ptr<Drone>(
         new Drone(M{                                                                    // ? We must return a Drone pointer, as the Drone 
             .perception = std::move(*perception),                                       // ? object shouldn't be copyable nor movable, so
-            .estimation = nullptr,                                                      // ? we can't return a Drone object by value 
-            .representation = nullptr,
+            .representation = nullptr,                                                  // ? we can't return a Drone object by value 
             .navigation = std::move(*navigation),                            
+            .flightController = std::move(*flightController)
             
         })                                                                                  
     );

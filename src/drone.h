@@ -22,9 +22,9 @@ private:
     // Members
     struct M {                                                                          // Assembly struct
         std::unique_ptr<Perception> perception;
-        nullptr_t estimation;                                                           // TODO: Implement the Estimation subsystem
         nullptr_t representation;                                                       // TODO: Implement the Representation subsystem
         std::unique_ptr<Navigation> navigation;
+        std::unique_ptr<Pixhawk> flightController;
     } m;
 
     // * Ctors & dtor

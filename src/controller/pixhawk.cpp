@@ -16,12 +16,12 @@ std::expected<std::unique_ptr<Pixhawk>, cogidrone::Error> Pixhawk::create() {
     auto p = std::unique_ptr<Pixhawk>(
         new Pixhawk(M{                                                                  // ? Transfer ownership into unique_ptr as ctor is private
             .node = std::move(node),
-            .offboardModePub = nullptr,                                                 // ? will be wired later
-            .setpointPub = nullptr,                                                     // ? will be wired later
-            .commandPub = nullptr,                                                      // ? will be wired later
-            .localPosSub = nullptr,                                                     // ? will be wired later
-            .statusSub = nullptr,                                                       // ? will be wired later
-            .setpointInputSub = nullptr,                                                // ? will be wired later
+            .offboardModePublisher = nullptr,                                           // ? will be wired later
+            .setpointPublisher = nullptr,                                               // ? will be wired later
+            .commandPublisher = nullptr,                                                // ? will be wired later
+            .localPositionSubscription = nullptr,                                       // ? will be wired later
+            .statusSubscription = nullptr,                                              // ? will be wired later
+            .setpointInputSubscription = nullptr,                                       // ? will be wired later
             .streamTimer = nullptr                                                      // ? will be wired later
         })
     );
@@ -34,19 +34,22 @@ std::expected<std::unique_ptr<Pixhawk>, cogidrone::Error> Pixhawk::create() {
 }
 
 void Pixhawk::wire() noexcept {
-    // PX4 namespace: the bridge exposes uORB topics under /fmu/{in,out}
-    m.offboardModePub = m.node->create_publisher<px4_msgs::msg::OffboardControlMode>("/fmu/in/offboard_control_mode", 10);
-    m.setpointPub = m.node->create_publisher<px4_msgs::msg::TrajectorySetpoint>("/fmu/in/trajectory_setpoint", 10);
-    m.commandPub = m.node->create_publisher<px4_msgs::msg::VehicleCommand>("/fmu/in/vehicle_command", 10);
+    // * Publishers
+    // PX4 namespace: the bridge exposes uORB topics under /fmu/in/
+    m.offboardModePublisher = m.node->create_publisher<px4_msgs::msg::OffboardControlMode>("/fmu/in/offboard_control_mode", 10);
+    m.setpointPublisher = m.node->create_publisher<px4_msgs::msg::TrajectorySetpoint>("/fmu/in/trajectory_setpoint", 10);
+    m.commandPublisher = m.node->create_publisher<px4_msgs::msg::VehicleCommand>("/fmu/in/vehicle_command", 10);
 
-    m.localPosSub = m.node->create_subscription<px4_msgs::msg::VehicleLocalPosition>(
+    // * Subscriptions
+    // PX4 namespace: the bridge exposes uORB topics under /fmu/out/
+    m.localPositionSubscription = m.node->create_subscription<px4_msgs::msg::VehicleLocalPosition>(
         "/fmu/out/vehicle_local_position", 
         rclcpp::QoS(10).best_effort(),
         [this](const px4_msgs::msg::VehicleLocalPosition& msg) { 
             this->onLocalPosition(msg); 
         }
     );
-    m.statusSub = m.node->create_subscription<px4_msgs::msg::VehicleStatus>(
+    m.statusSubscription = m.node->create_subscription<px4_msgs::msg::VehicleStatus>(
         "/fmu/out/vehicle_status", 
         rclcpp::QoS(10).best_effort(),
         [this](const px4_msgs::msg::VehicleStatus& msg) { 
@@ -55,13 +58,14 @@ void Pixhawk::wire() noexcept {
     );
 
     // Control input from Navigation (intra-process, zero-copy)
-    m.setpointInputSub = m.node->create_subscription<px4_msgs::msg::TrajectorySetpoint>(
+    m.setpointInputSubscription = m.node->create_subscription<px4_msgs::msg::TrajectorySetpoint>(
         "/navigation/setpoint", 
         rclcpp::QoS(10),
         [this](const px4_msgs::msg::TrajectorySetpoint& msg) { 
             this->onSetpointInput(msg); 
         }
     );
+
 
     // 10 Hz heartbeat - drives the stream AND the state machine
     m.streamTimer = m.node->create_wall_timer(
@@ -103,7 +107,7 @@ void Pixhawk::streamTick() {
             break;
 
         case State::WAITING_EKF:
-            if (positionValid()) {                                                      // EKF has a position reference
+            if (isPositionValid()) {                                                    // EKF has a position reference
                 cogidrone::log(LOGGING_LEVEL::INFO, "EKF position valid - starting offboard stream");
                 state = State::STREAMING;
             }
@@ -164,7 +168,7 @@ void Pixhawk::publishOffboardMode() {
     mode.body_rate = false;
     mode.timestamp = m.node->now().nanoseconds() / 1000;                                // µs, PX4 clock via bridge timesync
     
-    m.offboardModePub->publish(mode);
+    m.offboardModePublisher->publish(mode);
 }
 
 void Pixhawk::publishSetpoint() {
@@ -174,7 +178,7 @@ void Pixhawk::publishSetpoint() {
     }
 
     sp.timestamp = m.node->now().nanoseconds() / 1000;                                  // stamp AFTER copying: fresh on every stream
-    m.setpointPub->publish(sp);
+    m.setpointPublisher->publish(sp);
 }
 
 void Pixhawk::sendCommand(uint16_t command, float param1, float param2) {
@@ -196,10 +200,10 @@ void Pixhawk::sendCommand(uint16_t command, float param1, float param2) {
 
     cmd.timestamp = m.node->now().nanoseconds() / 1000;
     
-    m.commandPub->publish(cmd);
+    m.commandPublisher->publish(cmd);
 }
 
-[[nodiscard]] bool Pixhawk::positionValid() const {
+[[nodiscard]] bool Pixhawk::isPositionValid() const {
     std::lock_guard lock(posMutex);
     // ? EKF2 has a position reference: xy+z valid (GPS outdoors, VIO later).
     // ? Without this, PX4 refuses offboard/arming - gating here gives a

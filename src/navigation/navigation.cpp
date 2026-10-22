@@ -1,5 +1,6 @@
 #include "navigation.h"
 
+#include <string>
 
 namespace {
 constexpr float kPi = 3.14159265358979323846f;
@@ -45,45 +46,43 @@ Navigation::~Navigation() = default;
 
 std::expected<std::unique_ptr<Navigation>, cogidrone::Error> Navigation::create() {
     // * ROS2
-    // Node
     auto node = std::make_shared<rclcpp::Node>(
         "navigation",
         rclcpp::NodeOptions().use_intra_process_comms(true)
     );
     cogidrone::log(LOGGING_LEVEL::INFO, "ROS2 IPC node created successfully");
 
-
     // * Parameters (non-failable: defaults live in NavigationParams)
     NavigationParams params;
     node->declare_parameter("target_follow_distance", params.targetFollowDistance);
     node->declare_parameter("target_height", params.targetHeight);
     node->declare_parameter("max_follow_speed", params.maxFollowSpeed);
-    node->declare_parameter("control_frequency", params.controlFrequency);
+    node->declare_parameter("min_follow_distance", params.minFollowDistance);
+    node->declare_parameter("max_follow_distance", params.maxFollowDistance);
     node->declare_parameter("detection_timeout", params.detectionTimeout);
     node->declare_parameter("min_detection_confidence", params.minDetectionConfidence);
+    node->declare_parameter("track_confirm_time", params.trackConfirmTime);
+    node->declare_parameter("control_frequency", params.controlFrequency);
     node->get_parameter("target_follow_distance", params.targetFollowDistance);
     node->get_parameter("target_height", params.targetHeight);
     node->get_parameter("max_follow_speed", params.maxFollowSpeed);
-    node->get_parameter("control_frequency", params.controlFrequency);
+    node->get_parameter("min_follow_distance", params.minFollowDistance);
+    node->get_parameter("max_follow_distance", params.maxFollowDistance);
     node->get_parameter("detection_timeout", params.detectionTimeout);
     node->get_parameter("min_detection_confidence", params.minDetectionConfidence);
+    node->get_parameter("track_confirm_time", params.trackConfirmTime);
+    node->get_parameter("control_frequency", params.controlFrequency);
     cogidrone::log(LOGGING_LEVEL::INFO, "Navigation parameters initialized successfully");
 
     // * Partial assembly
     auto n = std::unique_ptr<Navigation>(
         new Navigation(M{                                                               // ? Transfer ownership into unique_ptr as ctor is private
-            // ROS2
             .node = std::move(node),
             .detectionSubscription = nullptr,                                           // ? will be wired later
-            .odometrySubscription = nullptr,                                            // ? will be wired later
-            .manualOverrideSubscription = nullptr,                                      // ? will be wired later
-            .velocityPublisher = nullptr,                                               // ? will be wired later
+            .setpointPublisher = nullptr,                                               // ? will be wired later
             .missionStatusPublisher = nullptr,                                          // ? will be wired later
             .controlTimer = nullptr,                                                    // ? will be wired later
-
-            // State
             .params = std::move(params)
-            // ? remaining members default-initialize; timestamps are set in wire()
         })
     );
     cogidrone::log(LOGGING_LEVEL::INFO, "Navigation object partially constructed");
@@ -106,25 +105,18 @@ void Navigation::wire() noexcept {
         }
     );
 
-    m.odometrySubscription = m.node->create_subscription<nav_msgs::msg::Odometry>(
-        "/estimation/vio_odometry",
-        rclcpp::QoS(10),
-        [this](const nav_msgs::msg::Odometry& msg) {
-            this->onOdometry(msg);
-        }
-    );
+    // TODO: Manual override channel - the mechanism (string commands? joy topic?
+    //     : direct Drone-level call?) is a design decision, not yet made.
 
-    m.manualOverrideSubscription = m.node->create_subscription<std_msgs::msg::String>(
-        "/manual_override",
-        rclcpp::QoS(10),
-        [this](const std_msgs::msg::String& msg) {
-            this->onManualOverride(msg);
-        }
-    );
+    // TODO: Drone state (position/velocity/orientation) - the source is undecided.
+    //     : Estimation is scrapped; candidates are subscribing to
+    //     : /fmu/out/vehicle_local_position directly, or Pixhawk republishing its
+    //     : lastLocalPos on a navigation-owned topic. Until decided, Navigation
+    //     : has NO drone state and only issues absolute home-relative setpoints.
 
     // * Publishers
-    m.velocityPublisher = m.node->create_publisher<geometry_msgs::msg::TwistStamped>(
-        "/navigation/velocity_setpoint",
+    m.setpointPublisher = m.node->create_publisher<px4_msgs::msg::TrajectorySetpoint>(
+        "/navigation/setpoint",
         rclcpp::QoS(10)
     );
 
@@ -143,8 +135,8 @@ void Navigation::wire() noexcept {
     );
 
     // * Timestamps
-    m.lastDetectionTime = m.node->now();
-    m.stateEntryTime = m.node->now();
+    stateEntryTime = m.node->now();
+    lastDetectionTime = m.node->now();
 }
 
 
@@ -160,105 +152,53 @@ void Navigation::onDetections(const vision_msgs::msg::Detection2DArray& msg) {
         }
     }
 
+    std::lock_guard lock(personMutex);
+
     if (!best) {                                                                        // ? no usable detection in this frame
-        m.person.valid = false;
+        person.valid = false;
         return;
     }
 
-    m.person.confidence = best->results.front().hypothesis.score;
-    m.person.timestamp = m.node->now();
-    m.person.valid = true;
+    person.confidence = best->results.front().hypothesis.score;
+    person.timestamp = m.node->now();
+    person.valid = true;
+    lastDetectionTime = m.node->now();
 
-    // TODO: Extract the 3D camera-frame position from the fused detection. This requires
-    // the depth estimate (DepthAnything) and the camera intrinsics, which perception will
-    // provide once the fused detection message is finalized. Until then, position stays zero.
-    // m.person.position = ...
-
-    // * Transform to world frame
-    m.personWorldPosition = cameraToWorld(m.person.position);
-    m.lastDetectionTime = m.node->now();
-}
-
-void Navigation::onOdometry(const nav_msgs::msg::Odometry& msg) {
-    // * Position
-    m.drone.position = Vec3{
-        static_cast<float>(msg.pose.pose.position.x),
-        static_cast<float>(msg.pose.pose.position.y),
-        static_cast<float>(msg.pose.pose.position.z)
-    };
-
-    // * Velocity
-    m.drone.velocity = Vec3{
-        static_cast<float>(msg.twist.twist.linear.x),
-        static_cast<float>(msg.twist.twist.linear.y),
-        static_cast<float>(msg.twist.twist.linear.z)
-    };
-
-    // * Orientation
-    m.drone.orientation = Quat{
-        static_cast<float>(msg.pose.pose.orientation.w),
-        static_cast<float>(msg.pose.pose.orientation.x),
-        static_cast<float>(msg.pose.pose.orientation.y),
-        static_cast<float>(msg.pose.pose.orientation.z)
-    };
-    m.drone.yaw = yawOf(m.drone.orientation);
-    m.drone.timestamp = m.node->now();
-
-    // * Home position is wherever we first get a position fix
-    if (!m.homePositionSet) {
-        m.homePosition = m.drone.position;
-        m.homePositionSet = true;
-    }
-}
-
-void Navigation::onManualOverride(const std_msgs::msg::String& msg) {
-    RCLCPP_WARN(m.node->get_logger(), "Manual override received: %s", msg.data.c_str());
-
-    // ? String commands keep the override channel usable from a terminal (`ros2 topic pub`)
-    if (msg.data == "EMERGENCY_STOP")      transitionTo(MissionState::EMERGENCY);
-    else if (msg.data == "START_MISSION")  transitionTo(MissionState::SEARCHING);
-    else if (msg.data == "RETURN_HOME")    transitionTo(MissionState::RETURNING);
-    else if (msg.data == "LAND")           transitionTo(MissionState::LANDING);
+    // TODO: Extract the 3D camera-frame position from the fused detection. This
+    //     : requires the depth estimate (DepthAnything) and camera intrinsics,
+    //     : which Perception will provide once Model::FusedDetections is
+    //     : finalized. Until then, person.position stays zero and is NOT used
+    //     : by any behavior.
+    // person.position = ...
 }
 
 void Navigation::onControlTick() {
     // * Update the state machine, then execute the behavior of the current state
     updateStateMachine();
 
-    switch (m.state) {
+    // ? Behaviors that don't exist yet fall back to hover - the safe default.
+    // ? Every state ends in exactly one publishSetpoint() call per tick.
+    switch (state) {
         case MissionState::IDLE:
-            break;                                                                      // Waiting for mission start
-
         case MissionState::SEARCHING:
-        case MissionState::PERSON_LOST:
-            searchBehavior();
-            break;
-
         case MissionState::PERSON_DETECTED:
-            // Transition to FOLLOWING happens in the state machine
+        case MissionState::PERSON_LOST:
+        case MissionState::OBSTACLE_AVOIDANCE:                                          // TODO: behavior blocked on Representation
+        case MissionState::RETURNING:                                                   // TODO: behavior blocked on drone state source
+        case MissionState::EMERGENCY:
             hoverBehavior();
             break;
 
         case MissionState::FOLLOWING:
-            followBehavior();
-            break;
-
-        case MissionState::OBSTACLE_AVOIDANCE:
-            // TODO: Implement obstacle avoidance
-            hoverBehavior();
-            break;
-
-        case MissionState::RETURNING:
-            // TODO: Implement return to home
+            // TODO: followBehavior() - blocked on fused detections (person world
+            //     : position) and drone state. Hover until then.
             hoverBehavior();
             break;
 
         case MissionState::LANDING:
-            // TODO: Implement landing
-            break;
-
-        case MissionState::EMERGENCY:
-            publishVelocity(Vec3{}, 0.0f);                                              // Emergency stop
+            // ? LANDING is owned by Pixhawk (its land() hands control to PX4's
+            //     : landing controller). Navigation keeps streaming its last
+            //     : setpoint - PX4 ignores it in auto-land. No new commands here.
             break;
     }
 
@@ -269,19 +209,23 @@ void Navigation::onControlTick() {
 
 // * State machine
 void Navigation::updateStateMachine() {
-    MissionState next = m.state;
+    std::lock_guard lock(stateMutex);
 
-    switch (m.state) {
+    MissionState next = state;
+
+    switch (state) {
         case MissionState::IDLE:
-            break;                                                                      // ? start command arrives via onManualOverride
+            // TODO: mission start trigger - tied to the manual override design
+            //     : decision. Until then Navigation stays in IDLE (hovering).
+            break;
 
         case MissionState::SEARCHING:
             if (detectionIsValid()) next = MissionState::PERSON_DETECTED;
             break;
 
         case MissionState::PERSON_DETECTED:
-            // ? Require stable tracking for 1s before committing to follow
-            if ((m.node->now() - m.stateEntryTime).seconds() > 1.0) {
+            // ? Require stable tracking for trackConfirmTime before committing to follow
+            if ((m.node->now() - stateEntryTime).seconds() > m.params.trackConfirmTime) {
                 next = detectionIsValid() ? MissionState::FOLLOWING
                                          : MissionState::SEARCHING;
             }
@@ -289,27 +233,27 @@ void Navigation::updateStateMachine() {
 
         case MissionState::FOLLOWING:
             if (personIsLost()) next = MissionState::PERSON_LOST;
-            // TODO: Transition to OBSTACLE_AVOIDANCE based on representation data
+            // TODO: OBSTACLE_AVOIDANCE transition - blocked on Representation
             break;
 
         case MissionState::PERSON_LOST:
             if (detectionIsValid()) next = MissionState::PERSON_DETECTED;
-            // TODO: Timeout -> RETURNING
+            // TODO: timeout -> RETURNING (return-home strategy is a design choice)
             break;
 
         default:
-            break;
+            break;                                                                      // LANDING/EMERGENCY are exited via explicit commands only
     }
 
-    if (next != m.state) transitionTo(next);
+    if (next != state) transitionTo(next);
 }
 
 void Navigation::transitionTo(MissionState next) {
     RCLCPP_INFO(m.node->get_logger(), "State transition: %s -> %s",
-        toString(m.state).c_str(), toString(next).c_str());
+        toString(state).c_str(), toString(next).c_str());
 
-    m.state = next;
-    m.stateEntryTime = m.node->now();
+    state = next;
+    stateEntryTime = m.node->now();
 }
 
 std::string Navigation::toString(MissionState state) noexcept {
@@ -329,122 +273,131 @@ std::string Navigation::toString(MissionState state) noexcept {
 
 
 // * Behaviors
-void Navigation::followBehavior() {
-    if (!detectionIsValid()) return;
-
-    // * Target: a point behind the person at the follow distance
-    const Vec3 target = followTarget();
-
-    // * Velocity towards the target (P-controller, clamped)
-    Vec3 velocity = velocityTowards(target);
-
-    // * Yaw to face the person
-    const float yawError = desiredYawTowards(m.personWorldPosition) - m.drone.yaw;
-    float yawRate = m.params.yawPGain * normalizeAngle(yawError);
-
-    // * Safety
-    if (!commandIsSafe(velocity)) {
-        velocity = Vec3{};
-        yawRate = 0.0f;
-    }
-
-    publishVelocity(velocity, yawRate);
-}
-
-void Navigation::searchBehavior() {
-    // ? Simple search: hover and rotate slowly
-    publishVelocity(Vec3{}, 0.3f);
-}
-
 void Navigation::hoverBehavior() {
-    publishVelocity(Vec3{}, 0.0f);
+    // ? Hold a fixed home-relative hover setpoint.
+    // ? LIMITATION: without a drone state source we cannot "hold current
+    //     : position" - we command the origin at targetHeight and rely on PX4's
+    //     : position controller to fly there and stay. Revisit once the drone
+    //     : state source is decided.
+    publishSetpoint(Vec3{0.0f, 0.0f, -m.params.targetHeight}, 0.0f);                    // NED: negative z = up
 }
+
+//// void Navigation::followBehavior() {
+////     if (!detectionIsValid()) return;
+//// 
+////     // * Target: a point behind the person at the follow distance
+////     const Vec3 target = followTarget();
+//// 
+////     // * Velocity towards the target (P-controller, clamped)
+////     Vec3 velocity = velocityTowards(target);
+//// 
+////     // * Yaw to face the person
+////     const float yawError = desiredYawTowards(m.personWorldPosition) - m.drone.yaw;
+////     float yawRate = m.params.yawPGain * normalizeAngle(yawError);
+//// 
+////     // * Safety
+////     if (!commandIsSafe(velocity)) {
+////         velocity = Vec3{};
+////         yawRate = 0.0f;
+////     }
+//// 
+////     publishVelocity(velocity, yawRate);
+//// }
+//// 
+//// void Navigation::searchBehavior() {
+////     // ? Simple search: hover and rotate slowly
+////     publishVelocity(Vec3{}, 0.3f);
+//// }
+
 
 
 // * Navigation math
-Vec3 Navigation::followTarget() const {
-    // * Direction of motion - fall back to the current drone-to-person line if the person is stationary
-    Vec3 personDirection = m.personWorldVelocity.normalized();
-    if (m.personWorldVelocity.norm() < 0.1f) {
-        personDirection = (m.drone.position - m.personWorldPosition).normalized();
-    }
+//// Vec3 Navigation::followTarget() const {
+////     // * Direction of motion - fall back to the current drone-to-person line if the person is stationary
+////     Vec3 personDirection = m.personWorldVelocity.normalized();
+////     if (m.personWorldVelocity.norm() < 0.1f) {
+////         personDirection = (m.drone.position - m.personWorldPosition).normalized();
+////     }
+//// 
+////     // * A point behind the person at the follow distance, at the target height
+////     Vec3 target = m.personWorldPosition - personDirection * m.params.targetFollowDistance;
+////     target.z = m.params.targetHeight;
+////     return target;
+//// }
+//// 
+//// Vec3 Navigation::velocityTowards(const Vec3& target) const {
+////     // * P-controller
+////     Vec3 velocity = (target - m.drone.position) * m.params.positionPGain;
+//// 
+////     // * Clamp to max follow speed
+////     const float speed = velocity.norm();
+////     if (speed > m.params.maxFollowSpeed) {
+////         velocity = velocity * (m.params.maxFollowSpeed / speed);
+////     }
+////     return velocity;
+//// }
+//// 
+//// float Navigation::desiredYawTowards(const Vec3& target) const {
+////     const Vec3 toTarget = target - m.drone.position;
+////     return std::atan2(toTarget.y, toTarget.x);
+//// }
+//// 
+//// Vec3 Navigation::cameraToWorld(const Vec3& camera) const {
+////     // TODO: Apply the static camera mount extrinsic (camera -> body) once the rig is fixed;
+////     // for now the camera is assumed coincident with the body frame
+////     const Vec3 body = camera;
+//// 
+////     // * Body -> world: rotate by the drone orientation, then translate by the drone position
+////     return m.drone.position + rotate(m.drone.orientation, body);
+//// }
 
-    // * A point behind the person at the follow distance, at the target height
-    Vec3 target = m.personWorldPosition - personDirection * m.params.targetFollowDistance;
-    target.z = m.params.targetHeight;
-    return target;
+
+// * Publishing
+void Navigation::publishSetpoint(const Vec3& positionNed, float yaw) {
+    auto sp = std::make_unique<px4_msgs::msg::TrajectorySetpoint>();                    // ? unique_ptr publish: zero-copy intra-process
+    sp->position = {positionNed.x, positionNed.y, positionNed.z};
+    sp->yaw = yaw;
+    sp->timestamp = m.node->now().nanoseconds() / 1000;                                  // µs, stamped at publish: always fresh for Pixhawk's stream
+
+    m.setpointPublisher->publish(std::move(sp));
 }
 
-Vec3 Navigation::velocityTowards(const Vec3& target) const {
-    // * P-controller
-    Vec3 velocity = (target - m.drone.position) * m.params.positionPGain;
+void Navigation::publishStatus() {
+    auto msg = std::make_unique<std_msgs::msg::String>();                               // ? unique_ptr publish: zero-copy intra-process
+    msg->data = toString(state);
 
-    // * Clamp to max follow speed
-    const float speed = velocity.norm();
-    if (speed > m.params.maxFollowSpeed) {
-        velocity = velocity * (m.params.maxFollowSpeed / speed);
-    }
-    return velocity;
-}
-
-float Navigation::desiredYawTowards(const Vec3& target) const {
-    const Vec3 toTarget = target - m.drone.position;
-    return std::atan2(toTarget.y, toTarget.x);
-}
-
-Vec3 Navigation::cameraToWorld(const Vec3& camera) const {
-    // TODO: Apply the static camera mount extrinsic (camera -> body) once the rig is fixed;
-    // for now the camera is assumed coincident with the body frame
-    const Vec3 body = camera;
-
-    // * Body -> world: rotate by the drone orientation, then translate by the drone position
-    return m.drone.position + rotate(m.drone.orientation, body);
+    m.missionStatusPublisher->publish(std::move(msg));
 }
 
 
-// * Safety
-bool Navigation::commandIsSafe(const Vec3& velocity) const {
-    if (m.drone.position.z < m.params.minAltitude)  return false;                       // ? too low
-    if (m.drone.position.z > m.params.maxAltitude)  return false;                       // ? too high
-    if (velocity.norm() > m.params.maxFollowSpeed)  return false;                       // ? too fast
-    // TODO: Obstacle distance checks against the representation layer
-    return true;
-}
+// * Helpers
+//// bool Navigation::commandIsSafe(const Vec3& velocity) const {
+////     if (m.drone.position.z < m.params.minAltitude)  return false;                       // ? too low
+////     if (m.drone.position.z > m.params.maxAltitude)  return false;                       // ? too high
+////     if (velocity.norm() > m.params.maxFollowSpeed)  return false;                       // ? too fast
+////     // TODO: Obstacle distance checks against the representation layer
+////     return true;
+//// }
 
 bool Navigation::detectionIsValid() const {
-    if (!m.person.valid) return false;
-    if (m.person.confidence < m.params.minDetectionConfidence) return false;
+    std::lock_guard lock(personMutex);
 
-    const double sinceDetection = (m.node->now() - m.lastDetectionTime).seconds();
+    if (!person.valid) return false;
+    if (person.confidence < m.params.minDetectionConfidence) return false;
+
+    const double sinceDetection = (m.node->now() - lastDetectionTime).seconds();
     if (sinceDetection > m.params.detectionTimeout) return false;
 
-    const float distance = (m.personWorldPosition - m.drone.position).norm();
-    if (distance < m.params.minFollowDistance || distance > m.params.maxFollowDistance) return false;
+    // TODO: Distance bounds check (min/maxFollowDistance) requires the person's
+    //     : world position, which requires drone state + fused detections.
+    // TODO: Obstacle proximity check - blocked on Representation.
+    //// const float distance = (m.personWorldPosition - m.drone.position).norm();
+    //// if (distance < m.params.minFollowDistance || distance > m.params.maxFollowDistance) return false;
 
     return true;
 }
 
 bool Navigation::personIsLost() const {
-    return (m.node->now() - m.lastDetectionTime).seconds() > m.params.detectionTimeout;
-}
-
-
-// * Publishing
-void Navigation::publishVelocity(const Vec3& velocity, float yawRate) {
-    auto msg = std::make_unique<geometry_msgs::msg::TwistStamped>();                    // ? unique_ptr publish: zero-copy intra-process
-    msg->header.stamp = m.node->now();
-    msg->header.frame_id = "base_link";
-    msg->twist.linear.x = velocity.x;
-    msg->twist.linear.y = velocity.y;
-    msg->twist.linear.z = velocity.z;
-    msg->twist.angular.z = yawRate;
-
-    m.velocityPublisher->publish(std::move(msg));
-}
-
-void Navigation::publishStatus() {
-    auto msg = std::make_unique<std_msgs::msg::String>();
-    msg->data = toString(m.state);
-
-    m.missionStatusPublisher->publish(std::move(msg));
+    std::lock_guard lock(personMutex);
+    return (m.node->now() - lastDetectionTime).seconds() > m.params.detectionTimeout;
 }

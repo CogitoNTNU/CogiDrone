@@ -24,6 +24,7 @@
 class Pixhawk {
 private:
     // * State machine
+    // ? The Pixhawk class maintains a state machine to manage the drone's flight state.
     enum class State {
         INIT,                                                                           // ? Created, not streaming yet
         WAITING_EKF,                                                                    // ? Subscribed, waiting for valid local position
@@ -40,16 +41,16 @@ private:
         rclcpp::Node::SharedPtr node;
 
         // Publishers (to PX4 via uXRCE-DDS bridge)
-        rclcpp::Publisher<px4_msgs::msg::OffboardControlMode>::SharedPtr offboardModePub;
-        rclcpp::Publisher<px4_msgs::msg::TrajectorySetpoint>::SharedPtr setpointPub;
-        rclcpp::Publisher<px4_msgs::msg::VehicleCommand>::SharedPtr commandPub;
+        rclcpp::Publisher<px4_msgs::msg::OffboardControlMode>::SharedPtr offboardModePublisher;
+        rclcpp::Publisher<px4_msgs::msg::TrajectorySetpoint>::SharedPtr setpointPublisher;
+        rclcpp::Publisher<px4_msgs::msg::VehicleCommand>::SharedPtr commandPublisher;
 
         // Subscriptions (PX4 feedback)
-        rclcpp::Subscription<px4_msgs::msg::VehicleLocalPosition>::SharedPtr localPosSub;
-        rclcpp::Subscription<px4_msgs::msg::VehicleStatus>::SharedPtr statusSub;
+        rclcpp::Subscription<px4_msgs::msg::VehicleLocalPosition>::SharedPtr localPositionSubscription;
+        rclcpp::Subscription<px4_msgs::msg::VehicleStatus>::SharedPtr statusSubscription;
 
         // Control input (from Navigation)
-        rclcpp::Subscription<px4_msgs::msg::TrajectorySetpoint>::SharedPtr setpointInputSub;
+        rclcpp::Subscription<px4_msgs::msg::TrajectorySetpoint>::SharedPtr setpointInputSubscription;
 
         // Heartbeat timer - the offboard stream
         rclcpp::TimerBase::SharedPtr streamTimer;
@@ -112,7 +113,7 @@ private:
     void publishOffboardMode();
     void publishSetpoint();
     void sendCommand(uint16_t command, float param1 = 0.f, float param2 = 0.f);
-    [[nodiscard]] bool positionValid() const;
+    [[nodiscard]] bool isPositionValid() const;
 
 public:
     // * Ctors & dtor
