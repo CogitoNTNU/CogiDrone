@@ -6,16 +6,18 @@ trekant mellom kameraet og punktet på bakken under personen:
 
         kamera
           |\\
-        a | \\ c   a = kameraets høyde over bakken (kjent)
-          |  \\     b = horisontal avstand langs bakken
-          |___\\    c = siktlinjen kamera -> føttene
-        bakken  føttene
+        a | \\ c   a = kameraets høyde over målpunktet (kjent)
+          |  \\     b = horisontal avstand til målpunktet
+          |___\\    c = siktlinjen kamera -> målpunktet
+               punkt
 
-  - Vinkelen α under horisonten = kamera-pitch + atan((y2 - cy) / fy), der y2 er
-    bunnen av bounding-boksen (føttene).
+  - Målpunktet er midten av bounding-boksen, som antas å ligge TARGET_POINT_HEIGHT_M
+    over bakken. a = kamerahøyde - TARGET_POINT_HEIGHT_M.
+  - Vinkelen α under horisonten = kamera-pitch + atan((cy_box - cy) / fy).
   - c = a / sin(α)  og  b = a / tan(α), som oppfyller a² + b² = c².
 
-Antakelser: flatt terreng, kjent høyde over bakken (AGL) og kjent pitch.
+Antakelser: flatt terreng, kjent høyde over bakken (AGL), kjent pitch og at hele
+personen er synlig (ellers flytter boksmidten seg og estimatet blir feil).
 Taster: w/s = pitch +/- 0.5°, e/d = høyde +/- 5 cm, q = avslutt.
 """
 
@@ -42,6 +44,7 @@ PERSON_CONF_THRESHOLD = 0.10
 OTHER_CONF_THRESHOLD = 0.25
 
 AVERAGE_HUMAN_HEIGHT_M = 1.70  # Kun fallback når trekantmetoden ikke er pålitelig
+TARGET_POINT_HEIGHT_M = AVERAGE_HUMAN_HEIGHT_M / 2  # Boksmidten antas å ligge midt på kroppen
 
 # Under denne vinkelen (grader under horisonten) gir én pikselfeil stor avstandsfeil
 MIN_DEPRESSION_DEG = 2.0
@@ -53,22 +56,24 @@ TEST_CAMERA_PITCH_DEG = 10.0  # Positiv = kamera vinklet nedover
 
 @dataclass
 class TriangleEstimate:
-    ground_dist_m: float    # b: horisontal avstand langs bakken
-    slant_dist_m: float     # c: siktlinje kamera -> føttene
+    ground_dist_m: float    # b: horisontal avstand til målpunktet
+    slant_dist_m: float     # c: siktlinje kamera -> målpunktet
     depression_deg: float   # α: vinkel under horisonten
 
 
-def estimate_distance(foot_v: float, height_m: float, pitch_deg: float, fy: float, cy: float) -> TriangleEstimate | None:
-    """Beregn avstand til et bakkepunkt i bildelinje foot_v med a² + b² = c².
+def estimate_distance(point_v: float, height_m: float, pitch_deg: float, fy: float, cy: float) -> TriangleEstimate | None:
+    """Beregn avstand til et punkt i bildelinje point_v med a² + b² = c².
 
-    Returnerer None hvis siktlinjen peker over horisonten (treffer aldri bakken).
+    Punktet antas å ligge TARGET_POINT_HEIGHT_M over bakken.
+    Returnerer None hvis siktlinjen peker over horisonten, eller punktet ligger
+    i samme høyde som eller over kameraet.
     """
-    pixel_angle = math.atan((foot_v - cy) / fy)    # vinkel under optisk akse
+    pixel_angle = math.atan((point_v - cy) / fy)   # vinkel under optisk akse
     alpha = math.radians(pitch_deg) + pixel_angle  # vinkel under horisonten
-    if alpha <= 1e-6:
+    a = height_m - TARGET_POINT_HEIGHT_M           # loddrett fall fra kamera til punktet
+    if alpha <= 1e-6 or a <= 1e-6:
         return None
 
-    a = height_m
     c = a / math.sin(alpha)
     b = math.sqrt(max(c * c - a * a, 0.0))
     return TriangleEstimate(b, c, math.degrees(alpha))
@@ -150,10 +155,11 @@ def main() -> None:
                 body_dist = 0.0
 
                 if cls_name == "person":
-                    # Trekantberegning fra bunnen av boksen (føttene)
-                    est = estimate_distance(float(y2), height_m, pitch_deg, focal_length, h / 2.0)
-                    feet_cut = y2 >= h - 2  # Føttene er utenfor bildet, boksbunnen er ikke bakkepunktet
-                    triangle_ok = est is not None and not feet_cut and est.depression_deg >= MIN_DEPRESSION_DEG
+                    # Trekantberegning fra midten av boksen
+                    est = estimate_distance((y1 + y2) / 2.0, height_m, pitch_deg, focal_length, h / 2.0)
+                    # Er personen kuttet av bildekanten (topp eller bunn), er boksmidten ikke midt på kroppen
+                    body_cut = y1 <= 1 or y2 >= h - 2
+                    triangle_ok = est is not None and not body_cut and est.depression_deg >= MIN_DEPRESSION_DEG
 
                     # Kroppshøyde brukes kun som fallback når trekanten ikke er pålitelig
                     bbox_h = max(y2 - y1, 1)
@@ -183,7 +189,7 @@ def main() -> None:
 
                 # Format text label dynamically
                 if cls_name == "person":
-                    cv2.circle(img, ((x1 + x2) // 2, y2), 4, (0, 255, 0), -1)
+                    cv2.circle(img, (box_cx, box_cy), 4, (0, 255, 0), -1)
                     if triangle_ok:
                         label = f"Person | Slant c: {est.slant_dist_m:.1f}m | Ground b: {est.ground_dist_m:.1f}m"
                     else:
