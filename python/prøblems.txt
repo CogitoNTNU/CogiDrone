@@ -1,0 +1,12 @@
+distance estimation for body is whack:
+- Inaccurate at longer distances due to (maybe) height differences from pre-set value
+	- Leads to compounding differences at further distances
+
+distance estimation for head is strong, but weak:
+- Very good, but max distance is approx. 15m
+	- Can't reliably detect heads further away, even in controlled and perfect environments
+
+distance estimation via triangulation (cringe):
+- Needs height of camera (needs perhaps also height of where the person is? / "ground level" at the height of the person)
+- Needs angle of camera
+- Use trigonometry

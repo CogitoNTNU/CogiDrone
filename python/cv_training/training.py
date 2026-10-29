@@ -21,7 +21,7 @@ def main():
     run = wandb.init(
         project="CogiDroneTraining",
         entity="muh-muwaffaq-cogito",
-        name="yolo26n_ntut",
+        name="yolo26n_seach-and-rescue",
         job_type="train",
         reinit=True
     )
@@ -31,11 +31,11 @@ def main():
 
     # 4. Train model
     results = model.train(
-        data="./python/dataset/final_dataset2/data.yaml",
+        data="./python/dataset/sr_yolo_filtered/data.yaml",
         epochs=100,
         imgsz=640,
         project="CogiDroneTraining",
-        name="yolo26n_ntut",
+        name="yolo26n_seach-and-rescue",
         device=device,
         lr0=0.01, #learning rate
         plots=True  # Ensures loss and metric plots are generated for W&B upload
