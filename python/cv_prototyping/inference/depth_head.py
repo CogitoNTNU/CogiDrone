@@ -16,9 +16,9 @@ from camera import open_webcam, close_webcam, COCO_CLASS_NAMES
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from targeter.target_closest import ClosestTargeter, Detection, is_too_close
 
-MODEL_WEIGHTS = "weights/yolo26n.pt" #"models/yolo26n.pt"
-HEAD_MODEL_WEIGHTS = "models/medium.pt"  # Your head detection model
-PERSON_CONF_THRESHOLD = 0.10
+MODEL_WEIGHTS = "models/best.pt" #"models/yolo26n.pt" #"models/yolo11n.pt" 
+HEAD_MODEL_WEIGHTS = "models/medium.pt"
+PERSON_CONF_THRESHOLD = 0.30 #0.10
 OTHER_CONF_THRESHOLD = 0.25
 
 AVERAGE_HUMAN_HEIGHT_M = 1.70
@@ -43,7 +43,7 @@ def offset_in_meters(dx, dy, distance, focal_length):
 
 
 def main() -> None:
-    cap = open_webcam(width=640, height=480, camera_index=1)
+    cap = open_webcam(width=640, height=480, camera_index=0)
     
     # Load both models once before the live loop
     model = YOLO(MODEL_WEIGHTS)
