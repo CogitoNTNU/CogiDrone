@@ -32,9 +32,9 @@ def main():
         data="./python/dataset/sr_final/data.yaml",
         epochs=150,             # Full convergence run
         imgsz=1280,             # Handles your 1080p drone shots perfectly
-        batch=16,               # IDUN GPUs (A100/H100/V100) can handle much larger batches at 1280px
+        batch=4,               # IDUN GPUs (A100/H100/V100) can handle much larger batches at 1280px
         cache=True,             # Loads dataset into system RAM to eliminate disk I/O bottlenecks
-        workers=8,              # Multi-worker data loading
+        workers=4,              # Multi-worker data loading
         multi_scale=True,       # Crucial for mixing 640px (S&R 1) and 1080p (S&R 2) data
         mosaic=1.0,             
         mixup=0.15,             
