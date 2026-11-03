@@ -100,6 +100,36 @@ ros2 run cogidrone_control teleop                                   # second she
 ros2 run rqt_image_view rqt_image_view /camera/camera/color/image_raw   # drone camera
 ```
 
+**Flight test mode (one window).** For a flight test you don't need the Gazebo editor window:
+run Gazebo headless and look at the drone camera with the YOLO boxes in one window.
+
+```bash
+# The C++ core (or the Python controller) flying, YOLO boxes in one OpenCV window:
+ros2 launch cogidrone_bringup sim_cpp.launch.py headless:=true yolo:=true view:=true
+ros2 launch cogidrone_bringup sim.launch.py headless:=true view:=true
+
+# The search test (scripts/search_test): sim without a controller, the script opens the window
+ros2 launch cogidrone_bringup sim.launch.py world:=bymarka_dense_s headless:=true autonomy:=false cam_pitch:=20
+python3 scripts/search_test/search_test.py --world bymarka_dense_s --dem --cam-pitch 20 --alt 15 --speed 3 \
+    --conf 0.4 --route="-12,-42;20,-48;22,20;-5,30;-28,28;-5,10" --area=-80,-60,70,90
+```
+
+The search test window shows the boxes with their confidence and a status line: state, height,
+speed, pings, camera rate and resolution, real-time factor and YOLO fps. The same picture is
+published on `/search_test/image` (and the detector's on `/cogidrone/detections/image`), so a
+remote machine can watch it in `rqt_image_view`. More routes: `scripts/search_test/README.md`.
+
+Measured end-to-end on the AGX Orin running the `bymarka_dense_s` demo above, headless, one window:
+
+| World | RAM in use | Camera | Real-time factor | Demo result (1.3 min flight) |
+|---|---|---|---|---|
+| `bymarka_dense_s` (150 m) | 10 GB (gz server ~6 GB RSS) | 29.0 Hz avg (min 26.1) | 0.98 avg (min 0.89) | 4/9 people found, 0.5-4.4 m error, ~30 false pings at `--conf 0.4` |
+
+Gazebo itself (no flying, idle) was at real-time factor ~1.0 and used ~9 GB total RAM; YOLO running
+in its own thread added ~1 GB and kept up at ~18 fps on top of the 29 Hz camera. `bymarka_dense_s`
+had its first camera frames within a few seconds of the bridge coming up, and PX4 was armed and
+climbing about 8 s after that; the whole launch-to-flying sequence took under 2 minutes.
+
 **Low-spec PC (8 GB RAM).** Add `headless:=true`. The Gazebo 3D view is the heaviest
 part; the drone camera window above still works.
 
@@ -136,6 +166,8 @@ sky and 30 km of real landscape around it. GPS in the sim matches the real place
 | World | Area | What it is for |
 |---|---|---|
 | `world:=bymarka_dense` | 600 x 600 m search area | As close to the real forest as we can make it: the canopy is filled in to real stand density (600-1200 trees/ha), young trees, bilberry, heather, rocks and logs on the ground. Use this one for detection and search tests. |
+| `world:=bymarka_dense_q` | 300 x 300 m (1/4) | The same forest at the same density, but only this square around the launch spot is detailed (bog, trails, forest, the lake shore); the rest of the forest is still there as cheap impostor trees, so the horizon looks the same. 13 people. |
+| `world:=bymarka_dense_s` | 150 x 150 m (1/16) | The interesting chunk: open bog and the launch clearing between two trails, the dense spruce edge to the west, the lake shore to the east, some rock. 9 people (4 walking or waving). Loads in ~40 s and runs at real time with the 720p camera: use it for flight tests. |
 | `world:=bymarka` | 2 x 2 km | Bigger area with the trees the laser data resolves (sparser than reality). For long flights and navigation. |
 
 ```bash
@@ -148,8 +180,13 @@ ros2 launch cogidrone_bringup sim_cpp.launch.py world:=bymarka_dense
   P=~/cogidrone_deps/simtools-venv/bin/python   # numpy, scipy, Pillow
   $P sim/tools/people/make_people.py                    # 36 differently dressed people (needs the Fuel people once)
   $P sim/tools/bymarka/make_world.py --forest --props   # shared terrain + the big world
-  $P sim/tools/bymarka/make_dense.py                    # the dense world
+  $P sim/tools/bymarka/make_dense.py                    # the dense world + the two crops
+  $P sim/tools/bymarka/make_dense.py --crops-only       # only the crops (40 s, needs make_world.py once)
   ```
+- The crops use the same trees, props and people (same seeds) as `bymarka_dense`, plus a few
+  extra people inside the crop. Outside the crop the trees are 8-triangle impostors without
+  collision, so stay inside the square. The world origin (the drone spawn) is the launch clearing
+  in every world. Crop boxes and extra people: `CROPS` in `sim/tools/bymarka/make_dense.py`.
 - Measured on the AGX Orin (61 GB) with PX4 + the C++ core flying and the Gazebo window open:
 
   | | Drone camera after | Real-time factor | Camera | Gazebo server + window | RAM in use (desktop ~14 GB) |
@@ -222,13 +259,13 @@ sim depth is `32FC1` in metres, while the real D435i gives `16UC1` in millimetre
 
 ### Sim camera vs the real D435i
 
-The sim camera copies the D435i as `realsense-ros` runs it by default (color 640x480, depth
-848x480). The often quoted 69° color FOV is for 16:9 (1280x720); 640x480 is a 4:3 crop of that
-sensor, so it sees only 55°.
+The sim camera copies the D435i's 1280x720 color mode (the sharpest at 30 Hz; `realsense-ros`
+defaults to 640x480, `cam_res:=480p`) and its default 848x480 depth. The often quoted 69° color FOV
+is for 16:9 (1280x720); 640x480 is a 4:3 crop of the same sensor, so it sees only 55°.
 
 | | Real D435i | Sim (`sim/models/cogidrone_x500/model.sdf`) |
 |---|---|---|
-| Color | 640x480 @ 30 Hz, fx ≈ fy ≈ 612 px, cx 320, cy 240 → HFOV 55.2° x VFOV 42.8° | Same intrinsics (`camera_info` K: fx = fy = 612.1), **15 Hz** |
+| Color | 1280x720 @ 30 Hz, fx ≈ fy ≈ 918 px, cx 640, cy 360 → HFOV 69.8° x VFOV 42.8° (640x480: fx 612, 55.2° x 42.8°) | Same intrinsics (`camera_info` K: fx = fy = 918.2; 480p: 612.1), 30 Hz asked, **~27 Hz delivered** (below), 4x MSAA, sees to 3 km |
 | Color shutter, distortion | Rolling shutter, Brown-Conrady ≈ 0 | Global shutter, no distortion |
 | Depth | 848x480, 87° x 58° (datasheet: 86 x 57 ±3°) | 848x480, 87° x 56.5° (square pixels) |
 | Depth range | Min-Z 0.31 m, ideal 0.3–3 m, useful to ~10 m | Clipped to 0.31–10 m (`-inf` = too close, `inf` = too far) |
@@ -238,20 +275,36 @@ sensor, so it sees only 55°.
 | IMU | BMI055: accel 62.5/250 Hz, gyro 200/400 Hz | Not simulated (PX4's IMU only) |
 | Mount | Front of the X500 V2, level for now | `camera_link` 0.12 m forward, 0.242 m over the model origin (2 mm over `base_link`), pitch 0 |
 
-15 Hz instead of 30: rendering is the expensive part, and 15 Hz keeps laptops and the dense
-Bymarka world on the Jetson near real time. Depth is only rendered while someone subscribes,
-which is why `gz_bridge.yaml` leaves it commented out.
+Measured on the AGX Orin (`bymarka_dense_s`, headless; frames reaching a ROS subscriber):
 
-**Changing the mount.** No need to edit the SDF; the launch files take the camera pose:
+| Color mode | Rate | Notes |
+|---|---|---|
+| 720p, 30 Hz, 4x MSAA (default) | 27 Hz flying with YOLO, 30 Hz from Gazebo | real-time factor ~0.9 while flying with YOLO |
+| 720p, no MSAA (`cam_aa:=0`) | +5 % | jagged branches; 8x MSAA costs the same as 4x |
+| 480p, 30 Hz (`cam_res:=480p`) | 28 Hz | |
+
+- Subscribe to the image with **reliable** QoS (depth 1). With best effort ~1/3 of the 720p frames
+  never arrive (21 instead of 30 Hz): a 2.7 MB image is ~40 UDP fragments and one lost fragment
+  drops the frame. `detector` and `search_test` do this. The C++ perception still uses
+  `SensorDataQoS` (best effort).
+- The far clip went from 100 m to 3 km (the far shore and the hills are in the picture now);
+  that costs ~3 % frame rate.
+- Without a GPU (laptops, Docker on CPU) use `cam_res:=480p cam_fps:=15`.
+- Depth is only rendered while someone subscribes, which is why `gz_bridge.yaml` leaves it
+  commented out (`search_test` bridges it itself).
+
+**Changing the mount or mode.** No need to edit the SDF; the launch files take them:
 
 ```bash
 ros2 launch cogidrone_bringup sim_cpp.launch.py cam_pitch:=30            # tilted 30° down
 ros2 launch cogidrone_bringup sim_cpp.launch.py cam_x:=0.15 cam_z:=0.20  # moved
+ros2 launch cogidrone_bringup sim_cpp.launch.py cam_res:=480p cam_fps:=15 cam_aa:=0   # lighter
 ```
 
 With non-default values the launch writes a copy of the model to
-`~/.cache/cogidrone/models/cogidrone_x500/` and PX4 spawns that one. Neither props nor arms are
-in view at pitch 0 or 20° (checked in the sim).
+`~/.cache/cogidrone/models/cogidrone_x500/` and PX4 spawns that one. At 720p (70° wide) the tip of
+the front-right propeller shows in the top-right corner at pitch 0; at 20° down it is out of view
+(checked in the sim). The 480p crop sees no props at either pitch.
 
 Sources: [Intel RealSense D400 Series datasheet, rev 009](https://www.realsenseai.com/wp-content/uploads/2020/06/Intel-RealSense-D400-Series-Datasheet-June-2020.pdf)
 (FOV, Min-Z, depth accuracy, dimensions, IMU) and published `realsense-ros` calibrations of

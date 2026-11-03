@@ -54,7 +54,7 @@ log = mw.log
 # trails; west is a dense spruce stand on a ridge, east the shore of Kobberdammen. Stock YOLO finds
 # the animated people (walking, waving) far more often than the static ones, so each crop has some.
 CROPS = {
-    "q": ((-150.0, -130.0, 150.0, 170.0), 50.0,
+    "q": ((-150.0, -130.0, 150.0, 170.0), 25.0,
           [("open", "standing"), ("forest", "standing"), ("shore", "sitting"), ("open", "waving")]),
     "s": ((-80.0, -60.0, 70.0, 90.0), 25.0,
           [("open", "standing"), ("forest", "lying"), ("shore", "sitting"), ("forest", "standing"),
