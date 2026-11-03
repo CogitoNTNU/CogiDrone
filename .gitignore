@@ -278,4 +278,3 @@ ros2_ws/log/
 rosbags/
 *.mcap
 *.db3
-*.pt
