@@ -2,7 +2,7 @@
 
 What we bought to put the Jetson on the drone, what we dropped and why, and what is still open.
 Wiring and mounting: [wiring-plan.html](wiring-plan.html) ([published page](https://claude.ai/artifact/RdgNP78C67CBJgxnPv8qJ5)).
-Built from [hardware.md](hardware.md). Status as of 2026-11-04.
+Built from [hardware.md](hardware.md). Sources and reasoning: [hardware-research-notes.md](hardware-research-notes.md). Status as of 2026-11-04.
 
 The drone already flies (frame, Pixhawk, radios, Pocket, flight pack and charger are done). This
 list only covers the Jetson: power, storage and mounting.

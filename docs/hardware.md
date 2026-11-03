@@ -31,6 +31,9 @@ ssh <user>@<sim-jetson-host>
 
 ## Drone: parts
 
+What we ordered for the Jetson build is in [shopping-list.md](shopping-list.md); the sources and
+reasoning behind it are in [hardware-research-notes.md](hardware-research-notes.md).
+
 | Part | Model | Role |
 |---|---|---|
 | Frame kit | Holybro X500 V2 dev kit | Frame, power distribution board (PDB), 4× BLHeli_S 20 A ESC, 4× 2216 KV920 motors, props |
