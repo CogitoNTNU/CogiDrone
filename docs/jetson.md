@@ -65,7 +65,7 @@ which one fails.
 | PyTorch / torchvision | 2.14.1 / 0.29.1 (`cu132`) | Official aarch64 CUDA wheels from download.pytorch.org. Not pinned yet, so you get the newest |
 | YOLO | ultralytics 8.4, `yolo11n.pt` | Runs on the GPU (`cuda:0`) |
 | cuVSLAM | v17.0.0 | Built from source for Orin (`sm_87`); NVIDIA has no prebuilt for Orin + JetPack 7 |
-| QGroundControl | v5.1.4 (aarch64 AppImage) | Ground station. Sim role. Start with `qgc` |
+| QGroundControl | v5.1.5 (aarch64 AppImage) | Ground station. Sim role. Start with `qgc` |
 | RTAB-Map | 0.23.7 (apt) | CPU VIO + 3D mapping, fallback for cuVSLAM |
 
 The versions are pinned at the top of `scripts/jetson/install-user.sh` and must agree with

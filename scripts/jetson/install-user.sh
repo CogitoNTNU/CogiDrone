@@ -16,7 +16,7 @@ CUVSLAM_VERSION=v17.0.0
 TORCH_INDEX=https://download.pytorch.org/whl/cu132   # official aarch64 CUDA 13.2 wheels, run on JetPack 7.2
 YOLO_MODEL=yolo11n.pt
 CUDA_ARCH=87                       # Orin (AGX / NX / Nano). Thor would be 110.
-QGC_VERSION=v5.1.4                 # ground station, aarch64 AppImage (sim role)
+QGC_VERSION=v5.1.5                 # ground station, aarch64 AppImage (sim role)
 
 ROLE="${1:-}"
 case "$ROLE" in
