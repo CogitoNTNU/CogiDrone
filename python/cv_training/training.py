@@ -28,7 +28,7 @@ def main():
         imgsz=1280,
         batch=4, 
         workers=4,
-        multi_scale=True,
+        multi_scale=False,
         mosaic=1.0,             
         mixup=0.15,             
         project="CogiDroneTraining",
