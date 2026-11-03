@@ -10,9 +10,19 @@ crowns, and the ground clutter (bilberry, ferns, rocks, logs) is denser.
 
     python3 sim/tools/bymarka/make_world.py      # once: terrain, lakes, backdrop (shared)
     python3 sim/tools/bymarka/make_dense.py      # forest + props + people -> worlds/bymarka_dense.sdf
+    python3 sim/tools/bymarka/make_dense.py --crops-only   # just the smaller crop worlds (below)
 
-Writes (generated, git-ignored): sim/models/bymarka_dense_forest/, sim/models/bymarka_dense_props/,
-sim/worlds/bymarka_dense.sdf, sim/worlds/bymarka_dense_people.yaml.
+Crop worlds (CROPS): the same trees, props and people (same seeds), but only a square of the search
+area gets the detailed forest and ground clutter. Every tree outside it is still there, as a cheap
+far-tier impostor (8 triangles, no collision), so the horizon is the same forest, not a cliff edge.
+Each crop adds a few people so a flight always passes several. The world origin (= drone spawn) stays
+at the launch clearing, which every crop contains.
+
+  bymarka_dense_q  300 x 300 m (1/4 of the dense area)
+  bymarka_dense_s  150 x 150 m (1/16): trail through bog and forest, forest edge, lake shore
+
+Writes (generated, git-ignored): sim/models/<world>_{forest,far,props}/, sim/worlds/<world>.sdf,
+sim/worlds/<world>_people.yaml for bymarka_dense and every crop.
 """
 
 import argparse
@@ -37,6 +47,19 @@ from forest_builder import build_forest  # noqa: E402
 NAME = "bymarka_dense"
 CORE = mw.CORE
 log = mw.log
+
+# Crop worlds: suffix -> box (x0, y0, x1, y1) in world metres (east, north of the launch spot),
+# forest chunk size, and the extra people as (zone, state) on top of the dense world's own people
+# inside the box. Chosen from a map of the area: the launch clearing sits on open bog between two
+# trails; west is a dense spruce stand on a ridge, east the shore of Kobberdammen. Stock YOLO finds
+# the animated people (walking, waving) far more often than the static ones, so each crop has some.
+CROPS = {
+    "q": ((-150.0, -130.0, 150.0, 170.0), 50.0,
+          [("open", "standing"), ("forest", "standing"), ("shore", "sitting"), ("open", "waving")]),
+    "s": ((-80.0, -60.0, 70.0, 90.0), 25.0,
+          [("open", "standing"), ("forest", "lying"), ("shore", "sitting"), ("forest", "standing"),
+           ("rock", "sitting"), ("open", "walking"), ("open", "waving")]),
+}
 
 
 def window(origin, half):
@@ -158,6 +181,106 @@ def instances(base, extra, near_half):
     return out
 
 
+def in_box(x, y, box, margin=0.0):
+    x0, y0, x1, y1 = box
+    return (x0 - margin <= x) & (x <= x1 + margin) & (y0 - margin <= y) & (y <= y1 + margin)
+
+
+def extra_people(m, origin, box, plan, taken, start_id, seed):
+    """People for the (zone, state) plan inside the box, >= 25 m from anyone in `taken` and from
+    the launch spot. Same output format as make_world.place_people. Zones without room fall back
+    to open ground."""
+    rng = np.random.default_rng(seed)
+    ox, oy, oz = origin
+    paths = np.maximum(m["osm"]["path"], m["osm"]["track"])
+    shore = mw.ndimage.binary_dilation(m["water"], iterations=4) & ~m["water"]
+    zones = {
+        "forest": (m["canopy"] > 0.6) & ~m["water"],
+        "path": paths > 0.5,
+        "shore": shore,
+        "rock": (m["rough"] > 0.4) & (m["canopy"] < 0.4) & ~m["water"],
+        "open": (m["canopy"] < 0.3) & ~m["water"] & (m["osm"]["wetland"] < 0.5),
+    }
+    x0, y0, x1, y1 = box
+    c0, c1 = int(x0 + ox - CORE[0]), int(x1 + ox - CORE[0])
+    r0, r1 = int(CORE[3] - (y1 + oy)), int(CORE[3] - (y0 + oy))
+    people, actors, taken = [], [], list(taken) + [(0.0, 0.0)]
+    for k, (zone, state) in enumerate(plan):
+        pick = None
+        for z in (zone, "open"):
+            rr, cc = np.nonzero(zones[z][r0 + 8:r1 - 8, c0 + 8:c1 - 8])  # 8 m inside the box edge
+            for _ in range(400 if len(rr) else 0):
+                i = rng.integers(len(rr))
+                x = float(CORE[0] + cc[i] + c0 + 8 + 0.5 - ox)
+                y = float(CORE[3] - (rr[i] + r0 + 8) - 0.5 - oy)
+                if all(math.hypot(x - a, y - b) > 25 for a, b in taken):
+                    pick = (x, y, rr[i] + r0 + 8, cc[i] + c0 + 8, z)
+                    break
+            if pick:
+                break
+        if pick is None:
+            log(f"no room for an extra {zone}/{state} person")
+            continue
+        x, y, R, C, z = pick
+        taken.append((x, y))
+        yaw = float(rng.uniform(-math.pi, math.pi))
+        p = {"id": f"person_{start_id + k:02d}", "zone": z, "state": state, "x": round(x, 2), "y": round(y, 2),
+             "z": round(float(m["dtm"][R, C]) - oz, 2)}
+        if state in ("walking", "waving"):
+            p["model"] = "actor"
+            if state == "walking":
+                length = float(rng.uniform(8, 14))
+                xe, ye = x + length * math.cos(yaw), y + length * math.sin(yaw)
+                ce = int(np.clip(xe + ox - CORE[0], 0, 1999)); re_ = int(np.clip(CORE[3] - (ye + oy), 0, 1999))
+                p["path"] = [[round(x, 2), round(y, 2)], [round(xe, 2), round(ye, 2)]]
+                p["z1"] = round(float(m["dtm"][re_, ce]) - oz, 2)
+            actors.append((p, yaw))
+        else:
+            variants = mw.local_people(state)
+            if state == "sitting" or not variants:
+                p["model"] = "rescue_randy_sitting" if state == "sitting" else "standing_person"
+            else:
+                p["model"] = variants[rng.integers(len(variants))]
+            if state == "lying":
+                p["face"], p["injured"] = "up", True
+            people.append((p, yaw))
+        p["yaw"] = round(yaw, 2)
+    return people, actors
+
+
+def build_crop(suffix, masks, origin, inst, props, people, actors, props_chunk=50.0):
+    """One crop world: detailed trees + props inside the box, impostors outside, people inside."""
+    box, chunk, plan = CROPS[suffix]
+    name = f"{NAME}_{suffix}"
+    t0 = mw.time.time()
+    near = [dict(d, tier="near") for d in inst if in_box(d["x"], d["y"], box)]
+    far = [dict(d, tier="far") for d in inst if not in_box(d["x"], d["y"], box)]
+    w, h = box[2] - box[0], box[3] - box[1]
+    log(f"{name}: {w:.0f} x {h:.0f} m, {len(near)} detailed trees ({len(near) / (w * h / 1e4):.0f}/ha), "
+        f"{len(far)} impostors outside")
+    for sfx, trees, ch in (("forest", near, chunk), ("far", far, 250.0)):
+        out = os.path.join(mw.MODELS, f"{name}_{sfx}")
+        shutil.rmtree(out, ignore_errors=True)
+        build_forest(trees, mw.MODELS, f"{name}_{sfx}", chunk_size=ch, collision="mesh")
+    if props is not None:
+        sel = [p for p in props if in_box(p["x"], p["y"], box, margin=5.0)]
+        out = os.path.join(mw.MODELS, f"{name}_props")
+        shutil.rmtree(out, ignore_errors=True)
+        build_props(sel, out, f"{name}_props", chunk_size=min(props_chunk, chunk * 2))
+    keep_p = [(p, yaw) for p, yaw in people if in_box(p["x"], p["y"], box)]
+    keep_a = [(p, yaw) for p, yaw in actors if in_box(p["x"], p["y"], box)]
+    taken = [(p["x"], p["y"]) for p, _ in keep_p + keep_a]
+    start = 1 + max(int(p["id"].split("_")[1]) for p, _ in people + actors)
+    xp, xa = extra_people(masks, origin, box, plan, taken, start, seed=100 + ord(suffix))
+    keep_p += xp
+    keep_a += xa
+    mw.write_people_yaml(keep_p, keep_a, 5, name=name)
+    log(f"{name}: {len(keep_p) + len(keep_a)} people ({len(xp) + len(xa)} added for this crop)")
+    mw.write_world(origin, [f"{name}_forest", f"{name}_far", f"{name}_props"],
+                   mw.people_sdf(keep_p, keep_a), name=name)
+    log(f"wrote worlds/{name}.sdf in {mw.time.time() - t0:.0f} s")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--half", type=float, default=300.0, help="search area is +-half m around the launch spot")
@@ -167,7 +290,13 @@ def main():
                     help="spacing multiplier for the cheap canopy fill outside the search area (0 = none)")
     ap.add_argument("--chunk", type=float, default=50.0)
     ap.add_argument("--skip-props", action="store_true", help="keep the props built last time")
+    ap.add_argument("--crops", default=",".join(CROPS), help="crop worlds to build (default %(default)s, '' = none)")
+    ap.add_argument("--crops-only", action="store_true", help="build only the crop worlds, keep bymarka_dense")
     args = ap.parse_args()
+    crops = [c for c in args.crops.split(",") if c]
+    for c in crops:
+        if c not in CROPS:
+            sys.exit(f"unknown crop {c}: {', '.join(CROPS)}")
 
     for need in ("bymarka_terrain", "bymarka_water", "bymarka_backdrop"):
         if not os.path.exists(os.path.join(mw.MODELS, need, "model.sdf")):
@@ -186,28 +315,35 @@ def main():
         f"({n_near / (2 * args.half / 100) ** 2:.0f}/ha incl. open ground)")
     # Two models: detailed trees in small chunks (Gazebo culls per visual, so small chunks cull
     # well), the far impostors in big chunks (fewer draw calls).
-    for suffix, tier, chunk in (("forest", "near", args.chunk), ("far", "far", 250.0)):
-        out = os.path.join(mw.MODELS, f"{NAME}_{suffix}")
-        shutil.rmtree(out, ignore_errors=True)
-        build_forest([d for d in inst if d["tier"] == tier], mw.MODELS, f"{NAME}_{suffix}", chunk_size=chunk,
-                     collision="mesh")
+    if not args.crops_only:
+        for suffix, tier, chunk in (("forest", "near", args.chunk), ("far", "far", 250.0)):
+            out = os.path.join(mw.MODELS, f"{NAME}_{suffix}")
+            shutil.rmtree(out, ignore_errors=True)
+            build_forest([d for d in inst if d["tier"] == tier], mw.MODELS, f"{NAME}_{suffix}", chunk_size=chunk,
+                         collision="mesh")
 
     trees = {k: np.concatenate([base[k], extra[k]]) for k in ("x", "y", "z", "height")}
+    props = None
     if not args.skip_props:
         props = mw.prop_instances(masks, origin, trees, density=args.props_density, half=args.half + 20)
         kinds = {}
         for p in props:
             kinds[p["kind"]] = kinds.get(p["kind"], 0) + 1
         log(f"{len(props)} props: {kinds}")
-        out = os.path.join(mw.MODELS, f"{NAME}_props")
-        shutil.rmtree(out, ignore_errors=True)
-        build_props(props, out, f"{NAME}_props", chunk_size=args.chunk)
+        if not args.crops_only:
+            out = os.path.join(mw.MODELS, f"{NAME}_props")
+            shutil.rmtree(out, ignore_errors=True)
+            build_props(props, out, f"{NAME}_props", chunk_size=args.chunk)
 
     people, actors = mw.place_people(masks, origin, trees, n=args.people, half=args.half)
-    mw.write_people_yaml(people, actors, 5, name=NAME)
-    log(f"{len(people) + len(actors)} people ({len(actors)} animated)")
-    mw.write_world(origin, [f"{NAME}_forest", f"{NAME}_far", f"{NAME}_props"], mw.people_sdf(people, actors), name=NAME)
-    log(f"wrote worlds/{NAME}.sdf")
+    if not args.crops_only:
+        mw.write_people_yaml(people, actors, 5, name=NAME)
+        log(f"{len(people) + len(actors)} people ({len(actors)} animated)")
+        mw.write_world(origin, [f"{NAME}_forest", f"{NAME}_far", f"{NAME}_props"], mw.people_sdf(people, actors),
+                       name=NAME)
+        log(f"wrote worlds/{NAME}.sdf")
+    for c in crops:
+        build_crop(c, masks, origin, inst, props, people, actors, props_chunk=args.chunk)
 
 
 if __name__ == "__main__":

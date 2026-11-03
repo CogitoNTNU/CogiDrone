@@ -295,5 +295,6 @@ sim/models/person_*/
 sim/models/people.json
 sim/worlds/bymarka.sdf
 sim/worlds/bymarka_dense.sdf
+sim/worlds/bymarka_dense_*.sdf
 sim/worlds/bymarka_trees.npz
 **/__pycache__/
