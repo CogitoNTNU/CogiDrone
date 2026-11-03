@@ -49,8 +49,16 @@ done
 """
 
 
+def _repo_sim_dir():
+    """The repo's sim/ folder. PX4's worlds folder links to our cogidrone.sdf (Dockerfile,
+    scripts/jetson/install-user.sh), so follow that link instead of guessing where the repo is."""
+    link = os.path.join(PX4_DIR, "Tools/simulation/gz/worlds/cogidrone.sdf")
+    return os.path.dirname(os.path.dirname(os.path.realpath(link)))
+
+
 def _gz_env():
-    """What PX4's build/px4_sitl_default/rootfs/gz_env.sh would set, plus Harmonic's `gz` config."""
+    """What PX4's build/px4_sitl_default/rootfs/gz_env.sh would set, plus Harmonic's `gz` config,
+    plus our own models (sim/models)."""
     gz = os.path.join(PX4_DIR, "Tools/simulation/gz")
 
     def append(var, *paths):
@@ -60,7 +68,10 @@ def _gz_env():
         # ROS ships its own `gz` without the simulator; point it at Gazebo Harmonic's config.
         "GZ_CONFIG_PATH": append("GZ_CONFIG_PATH", "/usr/share/gz"),
         "GZ_SIM_RESOURCE_PATH": append(
-            "GZ_SIM_RESOURCE_PATH", os.path.join(gz, "models"), os.path.join(gz, "worlds")
+            "GZ_SIM_RESOURCE_PATH",
+            os.path.join(gz, "models"),
+            os.path.join(gz, "worlds"),
+            os.path.join(_repo_sim_dir(), "models"),
         ),
         "GZ_SIM_SYSTEM_PLUGIN_PATH": append(
             "GZ_SIM_SYSTEM_PLUGIN_PATH",
@@ -69,7 +80,15 @@ def _gz_env():
         "GZ_SIM_SERVER_CONFIG_PATH": os.path.join(
             PX4_DIR, "src/modules/simulation/gz_bridge/server.config"
         ),
+        **_sky_env(),
     }
+
+
+def _sky_env():
+    """Photographic sky (sim/tools/sky): Harmonic ignores <sky><cubemap_uri>, so the sky texture
+    is swapped through a copy of gz-rendering's media folder. Only if it has been built."""
+    media = os.path.expanduser("~/cogidrone_deps/simassets-cache/sky/media_root")
+    return {"GZ_RENDERING_RESOURCE_PATH": media} if os.path.isdir(media) else {}
 
 
 def _already_running():
@@ -98,6 +117,10 @@ def _px4(context):
             + "\n".join(running)
         )
     world = LaunchConfiguration("world").perform(context)
+    # Worlds in the repo (sim/worlds) first, then PX4's own (default, baylands, ...).
+    world_file = os.path.join(_repo_sim_dir(), "worlds", world + ".sdf")
+    if not os.path.exists(world_file):
+        world_file = os.path.join(PX4_DIR, "Tools/simulation/gz/worlds", world + ".sdf")
     gz_env = _gz_env()
     env = {
         **gz_env,
@@ -112,8 +135,7 @@ def _px4(context):
     }
     gz_server = ExecuteProcess(
         cmd=[
-            "gz", "sim", "--verbose=1", "-r", "-s",
-            os.path.join(PX4_DIR, "Tools/simulation/gz/worlds", world + ".sdf"),
+            "gz", "sim", "--verbose=1", "-r", "-s", world_file,
         ],
         additional_env=gz_env,
         output="screen",
@@ -161,7 +183,12 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "altitude", default_value="3.0", description="Takeoff height in m"
             ),
-            DeclareLaunchArgument("world", default_value="cogidrone"),
+            DeclareLaunchArgument(
+                "world",
+                default_value="cogidrone",
+                description="cogidrone (small test) or sar (600 m search-and-rescue map), "
+                "or any world in sim/worlds or PX4's worlds folder",
+            ),
             DeclareLaunchArgument("model", default_value="cogidrone_x500"),
             ExecuteProcess(cmd=["xrce-agent"], output="screen"),
             OpaqueFunction(function=_px4),

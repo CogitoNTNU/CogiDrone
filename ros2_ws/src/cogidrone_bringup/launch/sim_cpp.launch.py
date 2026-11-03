@@ -2,6 +2,7 @@
 
     ros2 launch cogidrone_bringup sim_cpp.launch.py
     ros2 launch cogidrone_bringup sim_cpp.launch.py headless:=true yolo:=true
+    ros2 launch cogidrone_bringup sim_cpp.launch.py world:=sar   # the big search-and-rescue map
 
 Starts sim.launch.py (Gazebo + PX4 SITL + XRCE agent + camera bridge, without the Python
 autonomy) and the C++ `cogidrone` process (perception + navigation + pixhawk nodes). The
@@ -49,6 +50,9 @@ def generate_launch_description():
                 description="Send START_MISSION to Navigation after takeoff",
             ),
             DeclareLaunchArgument(
+                "world", default_value="cogidrone", description="cogidrone or sar (see sim.launch.py)"
+            ),
+            DeclareLaunchArgument(
                 "yolo",
                 default_value="false",
                 description="Feed the Python YOLO detections to Navigation",
@@ -57,6 +61,7 @@ def generate_launch_description():
                 PythonLaunchDescriptionSource(sim_launch),
                 launch_arguments={
                     "headless": LaunchConfiguration("headless"),
+                    "world": LaunchConfiguration("world"),
                     "autonomy": "false",
                 }.items(),
             ),
