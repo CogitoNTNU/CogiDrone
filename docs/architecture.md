@@ -180,6 +180,8 @@ Only the bottom layer changes. The topic names are the same, so the code above i
 | `ros2_ws/src/cogidrone_perception/` | Python YOLO `detector` |
 | `ros2_ws/src/cogidrone_control/` | Python `offboard` controller and keyboard `teleop` (reference / manual flying) |
 | `sim/` | Gazebo worlds (`worlds/cogidrone.sdf`: two people; `worlds/sar.sdf`: 600 m search-and-rescue map from `tools/make_sar_world.py`) and drone model (`models/cogidrone_x500`) |
+| `python/cv_prototyping/` | Stand-alone perception prototypes (webcam/image scripts, not ROS nodes): person/head detection, pose, segmentation, distance estimation (`inference/`) and target choosing (`targeter/`) |
+| `python/cv_training/` | YOLO training on NTNU's IDUN cluster (`training.py`, run with `run_yolo.sh`, logs to wandb) and dataset filtering. Dataset links: `python/dataset_lenker.txt`, IDUN notes: `idun.txt` |
 | `scripts/jetson/` | Native install scripts, `env.sh` (sourced by `~/.bashrc`), smoke test, `qgc` launcher |
 | `docker/sim/`, `compose.yaml`, `scripts/sim.sh` | The Docker sim for laptops (see [sim.md](sim.md)) |
 | `docker/Dockerfile`, `build.sh`, `build.bat` | Cross-compiling `src/` for the Jetson from another machine |
