@@ -19,7 +19,8 @@ from ultralytics import YOLO
 
 
 
-DEFAULT_MODEL = "models/yolo26n.pt"
+
+DEFAULT_MODEL = "models/best.pt" #"models/yolo26n.pt"
 DEFAULT_CONFIDENCE = 0.25
 SPLITS = ("test", "train", "valid")
 IMAGE_EXTENSIONS = frozenset({".bmp", ".jpeg", ".jpg", ".png", ".tif", ".tiff", ".webp"})
@@ -40,7 +41,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--source-dir",
         type=Path,
-        default=repository_python / "dataset" / "search-and-rescue-2",
+        default=repository_python / "dataset" / "sr_final",
         help="Search-and-Rescue dataset directory.",
     )
     parser.add_argument(
@@ -98,7 +99,7 @@ def filter_images(
         processed += 1
         prediction_kwargs = {
             "source": str(image_path),
-            "classes": [0],
+            "classes": [0,1,2,3,4,5],
             "conf": confidence,
             "verbose": False,
         }
