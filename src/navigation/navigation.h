@@ -1,18 +1,20 @@
 #pragma once
 
-#include <chrono>
-#include <cmath>
 #include <expected>
+#include <optional>
 #include <memory>
-#include <mutex>
 #include <string>
+#include <cmath>
+#include <mutex>
 
 #include "rclcpp/rclcpp.hpp"
 #include "vision_msgs/msg/detection2_d_array.hpp"
 #include "std_msgs/msg/string.hpp"
 #include "px4_msgs/msg/trajectory_setpoint.hpp"
+#include "std_msgs/msg/u_int8.hpp"
 
 #include "logging.h"
+#include "controller/flight_commands.h"
 
 // TODO: WE NEED TO REFACTOR THIS ENTIRE FILE, ALONG WITH `navigation.cpp`!
 //     : This current implementation was converted by zai/GLM-5.3 from the original Claude generated
@@ -29,6 +31,7 @@
 // NOTE: Minimal linear-algebra types. Eigen is not vendored in vendored/ros2, so the
 // navigation math is kept dependency-free until Eigen is actually pulled in.
 
+// /* // ! RESTORE ONCE WE IMPLEMENT MATH:
 // * Math
 struct Vec3 {
     float x = 0.0f;
@@ -51,7 +54,7 @@ struct Quat {
 
 [[nodiscard]] Vec3 rotate(const Quat& q, const Vec3& v) noexcept;                       // v' = q * v * q^-1
 [[nodiscard]] float yawOf(const Quat& q) noexcept;                                      // ZYX yaw extraction
-
+// */
 
 // * Mission states
 // ? The full mission lifecycle. States whose behaviors depend on subsystems
@@ -100,6 +103,7 @@ struct NavigationParams {
 };
 
 
+// ! APPEARENTLY FALSE COMMENT:
 // ? If we ever need to reference the default nagivation parameters, we can use this
 // ? constant - which is a copy constructed at compile time. This could be useful for
 // ? resetting the parameters to their defaults, or for comparing the current parameters
@@ -121,14 +125,27 @@ private:
         // ? expects px4_msgs::msg::TrajectorySetpoint (NED frame, µs timestamp).
         // ? This publisher IS the navigation->control interface.
         rclcpp::Publisher<px4_msgs::msg::TrajectorySetpoint>::SharedPtr setpointPublisher;
-        rclcpp::Publisher<std_msgs::msg::String>::SharedPtr flightCommandPublisher;     // Flight commands
+        rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr flightCommandPublisher;      // Flight commands
 
         rclcpp::Publisher<std_msgs::msg::String>::SharedPtr missionStatusPublisher;     // Mission status (introspection only - not consumed by any subsystem)
 
         // Timer
+        // ? Navigation polls because it's a controller, and controllers are clocked by 
+        // ? definition - it must publish setpoints when nothing changed, and it must
+        // ? notice when nothing arrived. Perception reacts because it's a transformer 
+        // ? - no input, no work. The timer isn't a busy-wait; it's the control clock, 
+        // ? and the executor sleeps between ticks. Therefore, since the camera/detector 
+        // ? runs at whatever rate it runs - 10-60 Hz, which is jittery and sometimes 
+        // ? drops frames - the control can't depend on it. Control must run at a steady 
+        // ? rate. Decoupling the two is the entire point of a control loop: we sample 
+        // ? inputs asynchronously, then act on a fixed schedule. If Navigation ran on 
+        // ? detection callbacks, its control rate would inherit the detector's jitter.
         rclcpp::TimerBase::SharedPtr controlTimer;
-
+        
         // Parameters
+        // ? Loaded once in create() from the parameter server (defaults from
+        // ? NavigationParams). No YAML file; override at runtime with
+        // ? `ros2 param set /navigation <name> <value>`.
         NavigationParams params;                                                        // ? Not const: loaded from the parameter server, may be retuned live
     } m;
 
@@ -146,9 +163,7 @@ private:
     // ? state directly - it should post a request (atomic flag / queue) that
     // ? the timer thread consumes, preserving single-threaded ownership.
     MissionState state = MissionState::IDLE;
-    rclcpp::Time stateEntryTime{};                                                      
-
-    rclcpp::Time lastDetectionTime{};   
+    rclcpp::Time stateEntryTime{};
 
     // * Default ctor
     explicit Navigation(M&& m) : m(std::move(m)) {}                                     // No default ctor exposed
@@ -186,7 +201,7 @@ private:
 
     // * Publishing
     void publishSetpoint(const Vec3& positionNed, float yaw);                           // The ONLY path to the flight controller
-    void publishFlightCommand(const std::string& command);
+    void publishFlightCommand(cogidrone::FlightCommand command);
     void publishStatus();
 
     // * Helpers

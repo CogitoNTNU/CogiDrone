@@ -1,8 +1,10 @@
 #include "navigation.h"
 
-#include <optional>
+#include <chrono>
 #include <string>
 
+
+// /* // | UNSURE IF BULLSHIT
 namespace {
 constexpr float kPi = 3.14159265358979323846f;
 
@@ -40,40 +42,41 @@ float yawOf(const Quat& q) noexcept {
     return std::atan2(2.0f * (q.w * q.z + q.x * q.y),
                       1.0f - 2.0f * (q.y * q.y + q.z * q.z));
 }
-
+// */
 
 // * Ctors & dtor
 Navigation::~Navigation() = default;
 
 std::expected<std::unique_ptr<Navigation>, cogidrone::Error> Navigation::create() {
+    using namespace std::literals::string_view_literals;                                // ? for "sv" suffix
+
     // * ROS2
     auto node = std::make_shared<rclcpp::Node>(
         "navigation",
         rclcpp::NodeOptions().use_intra_process_comms(true)
     );
-    cogidrone::log(LOGGING_LEVEL::INFO, "ROS2 IPC node created successfully");
-
+    cogidrone::log(LOGGING_LEVEL::INFO, "ROS2 IPC node created successfully"sv);
+    
     // * Parameters (non-failable: defaults live in NavigationParams)
     NavigationParams params;
-    node->declare_parameter("target_follow_distance", params.targetFollowDistance);
-    node->declare_parameter("target_height", params.targetHeight);
-    node->declare_parameter("max_follow_speed", params.maxFollowSpeed);
-    node->declare_parameter("min_follow_distance", params.minFollowDistance);
-    node->declare_parameter("max_follow_distance", params.maxFollowDistance);
-    node->declare_parameter("detection_timeout", params.detectionTimeout);
-    node->declare_parameter("min_detection_confidence", params.minDetectionConfidence);
-    node->declare_parameter("track_confirm_time", params.trackConfirmTime);
-    node->declare_parameter("control_frequency", params.controlFrequency);
-    node->get_parameter("target_follow_distance", params.targetFollowDistance);
-    node->get_parameter("target_height", params.targetHeight);
-    node->get_parameter("max_follow_speed", params.maxFollowSpeed);
-    node->get_parameter("min_follow_distance", params.minFollowDistance);
-    node->get_parameter("max_follow_distance", params.maxFollowDistance);
-    node->get_parameter("detection_timeout", params.detectionTimeout);
-    node->get_parameter("min_detection_confidence", params.minDetectionConfidence);
-    node->get_parameter("track_confirm_time", params.trackConfirmTime);
-    node->get_parameter("control_frequency", params.controlFrequency);
-    cogidrone::log(LOGGING_LEVEL::INFO, "Navigation parameters initialized successfully");
+    params.targetFollowDistance   = node->declare_parameter("target_follow_distance", params.targetFollowDistance);
+    params.targetHeight           = node->declare_parameter("target_height", params.targetHeight);
+    params.maxFollowSpeed         = node->declare_parameter("max_follow_speed", params.maxFollowSpeed);
+    params.minFollowDistance      = node->declare_parameter("min_follow_distance", params.minFollowDistance);
+    params.maxFollowDistance      = node->declare_parameter("max_follow_distance", params.maxFollowDistance);
+    params.detectionTimeout       = node->declare_parameter("detection_timeout", params.detectionTimeout);
+    params.minDetectionConfidence = node->declare_parameter("min_detection_confidence", params.minDetectionConfidence);
+    params.trackConfirmTime       = node->declare_parameter("track_confirm_time", params.trackConfirmTime);
+    params.controlFrequency       = node->declare_parameter("control_frequency", params.controlFrequency);
+    
+    // Ensure controlFrequency is positive to avoid division by zero when calculating the timer period
+    if (params.controlFrequency <= 0.0f) {
+        return std::unexpected(cogidrone::Error{
+            .message = "Navigation parameter `controlFrequency` must be positive!"sv
+        });
+    }
+
+    cogidrone::log(LOGGING_LEVEL::INFO, "Navigation parameters initialized successfully"sv);
 
     // * Partial assembly
     auto n = std::unique_ptr<Navigation>(
@@ -87,11 +90,11 @@ std::expected<std::unique_ptr<Navigation>, cogidrone::Error> Navigation::create(
             .params = std::move(params)
         })
     );
-    cogidrone::log(LOGGING_LEVEL::INFO, "Navigation object partially constructed");
+    cogidrone::log(LOGGING_LEVEL::INFO, "Navigation object partially constructed"sv);
 
     // Wire the node
     n->wire();
-    cogidrone::log(LOGGING_LEVEL::INFO, "Navigation object wired successfully");
+    cogidrone::log(LOGGING_LEVEL::INFO, "Navigation object wired successfully"sv);
 
     // * Return the fully constructed Navigation object
     return n;
@@ -122,7 +125,7 @@ void Navigation::wire() noexcept {
         rclcpp::QoS(10)
     );
 
-    m.flightCommandPublisher = m.node->create_publisher<std_msgs::msg::String>(
+    m.flightCommandPublisher = m.node->create_publisher<std_msgs::msg::UInt8>(
         "/navigation/flight_command",
         rclcpp::QoS(10)
     );
@@ -133,21 +136,41 @@ void Navigation::wire() noexcept {
     );
 
     // * Control timer
-    const auto period = std::chrono::duration_cast<std::chrono::nanoseconds>(
+    // ? Navigation polls because it's a controller, and controllers are clocked by 
+    // ? definition - it must publish setpoints when nothing changed, and it must
+    // ? notice when nothing arrived. Perception reacts because it's a transformer 
+    // ? - no input, no work. The timer isn't a busy-wait; it's the control clock, 
+    // ? and the executor sleeps between ticks. Therefore, since the camera/detector 
+    // ? runs at whatever rate it runs - 10-60 Hz, which is jittery and sometimes 
+    // ? drops frames - the control can't depend on it. Control must run at a steady 
+    // ? rate. Decoupling the two is the entire point of a control loop: we sample 
+    // ? inputs asynchronously, then act on a fixed schedule. If Navigation ran on 
+    // ? detection callbacks, its control rate would inherit the detector's jitter.
+    const auto PERIOD = std::chrono::duration_cast<std::chrono::nanoseconds>(
         std::chrono::duration<double>(1.0 / m.params.controlFrequency)
     );
     m.controlTimer = m.node->create_wall_timer(
-        period,
+        PERIOD,
         [this]() { this->onControlTick(); }
     );
 
     // * Timestamps
     stateEntryTime = m.node->now();
-    lastDetectionTime = m.node->now();
+    // ? `person.timestamp` is deliberately NOT initialized: time 0 means
+    // ? "no detection has ever arrived", which the watchdog treats as stale.
+    // ? Initializing it to now() would fake a detection for detectionTimeout.
 }
 
 
 // * Callbacks
+// ! [4.3]: `onDetections()` ignores `hypothesis.class_id`
+// !    It picks the highest score regardless of class. If Perception ever publishes
+// !    heads and persons in the same array, Navigation may follow a head. Either:
+// !      * filter by `hypothesis.class_id` (requires a shared class-id convention), or
+// !      * make Perception publish only person detections on `/perception/detections`.
+// ! 
+// !    This is a cross-subsystem contract - decide it explicitly rather than relying 
+// !    on "Perception only sends persons".S
 void Navigation::onDetections(const vision_msgs::msg::Detection2DArray& msg) {
     // * Pick the most confident detection in the array
     const vision_msgs::msg::Detection2D* best = nullptr;
@@ -169,7 +192,6 @@ void Navigation::onDetections(const vision_msgs::msg::Detection2DArray& msg) {
     person.confidence = best->results.front().hypothesis.score;
     person.timestamp = m.node->now();
     person.valid = true;
-    lastDetectionTime = m.node->now();
 
     // TODO: Extract the 3D camera-frame position from the fused detection. This
     //     : requires the depth estimate (DepthAnything) and camera intrinsics,
@@ -183,6 +205,7 @@ void Navigation::onControlTick() {
     // * Evaluate the state machine, and transition if requested
     if (auto next = evaluateTransitions()) {
         transitionTo(*next);
+        publishStatus();                                                                // | DEBUG: Update mission status
     }
 
     // ? Behaviors that don't exist yet fall back to hover - the safe default.
@@ -205,26 +228,20 @@ void Navigation::onControlTick() {
             break;
 
         case MissionState::LANDING:
+            // ! APPEARENTLY FALSE COMMENT:
             // ? LANDING is owned by Pixhawk (its land() hands control to PX4's
             // ? landing controller). Navigation keeps streaming its last
             // ? setpoint - PX4 ignores it in auto-land. No new commands here.
             break;
     }
-
-    // * Publish mission status
-    publishStatus();
 }
 
 
 // * State machine
-// TODO: I feel like we can do this without allocating a next-state, and then comparing. Instead
-//     : we could just return early on a transition, and return nullopt if no transition is taken. 
-[[nodiscard]] std::optional<MissionState> Navigation::evaluateTransitions() {
+std::optional<MissionState> Navigation::evaluateTransitions() {
     // ? No lock: `state`/`stateEntryTime` are timer-thread-owned. The only
-    // ? cross-thread data read here is `person`/`lastDetectionTime`, guarded
+    // ? cross-thread data read here is `person`/`person.timestamp`, guarded
     // ? inside detectionIsValid()/personIsLost() by personMutex.
-    MissionState next = state;
-
     switch (state) {
         case MissionState::IDLE:
             // TODO: mission start trigger - tied to the manual override design
@@ -233,26 +250,28 @@ void Navigation::onControlTick() {
 
         case MissionState::SEARCHING:
             if (detectionIsValid()) 
-                next = MissionState::PERSON_DETECTED;
+                return MissionState::PERSON_DETECTED;
+                
+            // TODO: add lawnmower search pattern (or other) to avoid staying in one place forever
             break;
 
         case MissionState::PERSON_DETECTED:
             // ? Require stable tracking for trackConfirmTime before committing to follow
             if ((m.node->now() - stateEntryTime).seconds() > m.params.trackConfirmTime) {
-                next = detectionIsValid() ? MissionState::FOLLOWING
+                return detectionIsValid() ? MissionState::FOLLOWING
                                           : MissionState::SEARCHING;
             }
             break;
 
         case MissionState::FOLLOWING:
             if (personIsLost()) 
-                next = MissionState::PERSON_LOST;
+                return MissionState::PERSON_LOST;
             // TODO: OBSTACLE_AVOIDANCE transition - blocked on Representation
             break;
 
         case MissionState::PERSON_LOST:
             if (detectionIsValid()) 
-                next = MissionState::PERSON_DETECTED;
+                return MissionState::PERSON_DETECTED;
             // TODO: timeout -> RETURNING (return-home strategy is a design choice)
             break;
 
@@ -260,9 +279,7 @@ void Navigation::onControlTick() {
             break;                                                                      // LANDING/EMERGENCY are exited via explicit commands only
     }
 
-    //// if (next != state) transitionTo(next);
-    if (next == state) return std::nullopt;
-    return next;
+    return std::nullopt;
 }
 
 void Navigation::transitionTo(MissionState next) {
@@ -279,13 +296,14 @@ void Navigation::onEnter(MissionState entered) {
     // ? Edge-triggered outputs: exactly once per transition, never per tick.
     switch (entered) {
         case MissionState::LANDING:
-            publishFlightCommand("LAND");                                               // TODO: Use custom message enum type to ensure safety. See "src/controller/FLIGHT_COMMAND_MSG.md" for implementation details.
+            publishFlightCommand(cogidrone::FlightCommand::LAND);
             break;
         default:
-            break;                                                                      // no entry action
+            break;                                                                      // No entry action
     }
 }
 
+// ! REMOVE ONCE WE IMPLEMENT OUR OWN MESSAGE TYPE
 std::string Navigation::toString(MissionState state) noexcept {
     switch (state) {
         case MissionState::IDLE:                return "IDLE";
@@ -387,15 +405,14 @@ void Navigation::publishSetpoint(const Vec3& positionNed, float yaw) {
     auto sp = std::make_unique<px4_msgs::msg::TrajectorySetpoint>();                    // ? unique_ptr publish: zero-copy intra-process
     sp->position = {positionNed.x, positionNed.y, positionNed.z};
     sp->yaw = yaw;
-    sp->timestamp = m.node->now().nanoseconds() / 1000;                                  // µs, stamped at publish: always fresh for Pixhawk's stream
+    sp->timestamp = m.node->now().nanoseconds() / 1000;                                 // µs, stamped at publish: always fresh for Pixhawk's stream
 
     m.setpointPublisher->publish(std::move(sp));
 }
 
-// navigation.cpp
-void Navigation::publishFlightCommand(const std::string& command) {
-    auto msg = std::make_unique<std_msgs::msg::String>();
-    msg->data = command;
+void Navigation::publishFlightCommand(cogidrone::FlightCommand command) {
+    auto msg = std::make_unique<std_msgs::msg::UInt8>();
+    msg->data = static_cast<uint8_t>(command);
     m.flightCommandPublisher->publish(std::move(msg));
 }
 
@@ -422,7 +439,7 @@ bool Navigation::detectionIsValid() const {
     if (!person.valid) return false;
     if (person.confidence < m.params.minDetectionConfidence) return false;
 
-    const double sinceDetection = (m.node->now() - lastDetectionTime).seconds();
+    const double sinceDetection = (m.node->now() - person.timestamp).seconds();
     if (sinceDetection > m.params.detectionTimeout) return false;
 
     // TODO: Distance bounds check (min/maxFollowDistance) requires the person's
@@ -436,5 +453,10 @@ bool Navigation::detectionIsValid() const {
 
 bool Navigation::personIsLost() const {
     std::lock_guard lock(personMutex);
-    return (m.node->now() - lastDetectionTime).seconds() > m.params.detectionTimeout;
+
+    // ? Deliberate hysteresis: "lost" means "no detection for detectionTimeout",
+    // ? NOT "the latest frame was empty". A single dropped detection should not
+    // ? abort FOLLOWING. `person.valid` is the immediate signal used by
+    // ? detectionIsValid(); this is the coasting window.
+    return (m.node->now() - person.timestamp).seconds() > m.params.detectionTimeout;
 }

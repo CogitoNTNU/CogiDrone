@@ -1,7 +1,6 @@
 #include "pixhawk.h"
 
 
-
 Pixhawk::~Pixhawk() = default;
 
 std::expected<std::unique_ptr<Pixhawk>, cogidrone::Error> Pixhawk::create() {
@@ -67,10 +66,10 @@ void Pixhawk::wire() noexcept {
         }
     );
 
-    m.navigationCommandSubscription  = m.node->create_subscription<std_msgs::msg::String>(
+    m.navigationCommandSubscription  = m.node->create_subscription<std_msgs::msg::UInt8>(
         "/navigation/flight_command", 
         rclcpp::QoS(10),
-        [this](const std_msgs::msg::String& msg) { 
+        [this](const std_msgs::msg::UInt8& msg) { 
             this->onNavigationCommand(msg);
         }
     );
@@ -107,14 +106,24 @@ void Pixhawk::onSetpointInput(const px4_msgs::msg::TrajectorySetpoint& msg) {
     currentSetpoint = msg;
 }
 
-void Pixhawk::onNavigationCommand(const std_msgs::msg::String& msg) {
-    cogidrone::log(LOGGING_LEVEL::INFO, "Flight command: " + msg.data);
+void Pixhawk::onNavigationCommand(const std_msgs::msg::UInt8& msg) {
+    const auto command = static_cast<cogidrone::FlightCommand>(msg.data);
 
-    if (msg.data == "LAND") {
-        land();
+    switch (command) {
+        case cogidrone::FlightCommand::LAND:
+            cogidrone::log(LOGGING_LEVEL::INFO, "Flight command: LAND");
+            land();
+            break;
+
+        case cogidrone::FlightCommand::START:
+        case cogidrone::FlightCommand::EMERGENCY:
+            // TODO: each needs a corresponding Pixhawk action (design decision)
+            break;
+
+        default:
+            cogidrone::log(LOGGING_LEVEL::WARNING, "Unknown flight command received");
+            break;
     }
-    // TODO: "START", "EMERGENCY", "RETURN" - each needs a corresponding
-    //     : Pixhawk action, which is a design decision (arm? mode switch?).
 }
 
 void Pixhawk::streamTick() {

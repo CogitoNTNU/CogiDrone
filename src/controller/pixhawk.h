@@ -6,7 +6,8 @@
 #include <mutex>
 
 #include "rclcpp/rclcpp.hpp"
-#include "std_msgs/msg/string.hpp"
+// #include "std_msgs/msg/string.hpp"
+#include "std_msgs/msg/u_int8.hpp"
 #include "px4_msgs/msg/offboard_control_mode.hpp"
 #include "px4_msgs/msg/trajectory_setpoint.hpp"
 #include "px4_msgs/msg/vehicle_command.hpp"
@@ -14,6 +15,7 @@
 #include "px4_msgs/msg/vehicle_status.hpp"
 
 #include "logging.h"
+#include "controller/flight_commands.h"
 
 
 // * Flight Controller class
@@ -52,7 +54,8 @@ private:
 
         // Control input (from Navigation)
         rclcpp::Subscription<px4_msgs::msg::TrajectorySetpoint>::SharedPtr setpointInputSubscription;
-        rclcpp::Subscription<std_msgs::msg::String>::SharedPtr navigationCommandSubscription ;
+        rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr navigationCommandSubscription;
+
 
         // Heartbeat timer - the offboard stream
         rclcpp::TimerBase::SharedPtr streamTimer;
@@ -109,7 +112,7 @@ private:
     void onLocalPosition(const px4_msgs::msg::VehicleLocalPosition& msg);
     void onStatus(const px4_msgs::msg::VehicleStatus& msg);
     void onSetpointInput(const px4_msgs::msg::TrajectorySetpoint& msg);                 // From Navigation
-    void onNavigationCommand(const std_msgs::msg::String& msg);                         // From Navigation
+    void onNavigationCommand(const std_msgs::msg::UInt8& msg);                          // From Navigation
     void streamTick();                                                                  // 10 Hz: the offboard heartbeat + state machine step
 
     // * Helpers

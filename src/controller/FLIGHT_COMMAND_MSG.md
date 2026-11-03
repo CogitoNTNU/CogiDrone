@@ -1,4 +1,5 @@
-## 3. Custom message with an enum — don't create a `.msg`; use `UInt8` + a C++ enum
+# UInt8 with enum class
+## Custom message with an enum — don't create a `.msg`; use `UInt8` + a C++ enum
 
 Here's the catch: **a real `.msg` file requires rosidl codegen**, which requires colcon/ament — the exact machinery you just spent a day escaping. You'd have to create an interface package, build it on the Jetson, then vendor the generated output into `vendored` the same way you did `px4_msgs`. That's a lot of ceremony for one byte.
 
@@ -109,3 +110,68 @@ The downside vs a real `.msg`: the terminal shows `1`, not `LAND`, and the wire 
 | Codegen required | no | no |
 
 The typo protection is the real win: `publishFlightCommand("LAND")` compiles even if you meant `"LANDING"`, and the failure is a drone that doesn't land. `FlightCommand::LAND` cannot be misspelled.
+
+
+# Better, and more correct, custom PX4 message implemation
+## Custom message type 
+### Option A — `std_msgs/UInt8` + shared C++ enum 
+
+Zero codegen, compile-time safety at call sites, no new package.
+
+```cpp
+// src/controller/flight_command.h
+#pragma once
+#include <cstdint>
+
+namespace cogidrone {
+enum class FlightCommand : uint8_t {
+    LAND      = 1,
+    START     = 2,
+    EMERGENCY = 3,
+};
+} // namespace cogidrone
+```
+
+Navigation publishes `std_msgs::msg::UInt8` with `static_cast<uint8_t>(command)`; Pixhawk subscribes to `UInt8` and switches on the enum. Both sides include the same header.
+
+**Trade-off:** `ros2 topic echo` shows `1`, not `LAND`. Acceptable for one byte.
+
+### Option B — proper interface package (when you have 3+ message types)
+
+This is how `px4_msgs` was made. You'd create:
+
+```
+cogidrone_msgs/
+  package.xml
+  CMakeLists.txt
+  msg/FlightCommand.msg
+```
+
+```cmake
+# cogidrone_msgs/CMakeLists.txt
+find_package(rosidl_default_generators REQUIRED)
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/FlightCommand.msg"
+)
+```
+
+```xml
+<!-- package.xml -->
+<buildtool_depend>ament_cmake</buildtool_depend>
+<buildtool_depend>rosidl_default_generators</buildtool_depend>
+<exec_depend>rosidl_default_runtime</exec_depend>
+<member_of_group>rosidl_interface_packages</member_of_group>
+```
+
+Then build on the Jetson with colcon, and **vendor the generated output** into `vendored/cogidrone_msgs/` exactly like `px4_msgs`:
+
+```bash
+cd ~/cogidrone_msgs_ws
+colcon build --packages-select cogidrone_msgs
+# copy install/cogidrone_msgs/{include,lib,share} → vendored/cogidrone_msgs/
+```
+
+Then in `CMakeLists.txt`, add the include dir and link the typesupport libs — same pattern as `px4_msgs`.
+
+**Cost:** every message change requires a Jetson round-trip (edit `.msg` → colcon build → re-vendor). For one enum, that's overkill. For a growing set of custom messages (fused detections, mission commands, telemetry), it's the right investment.
+

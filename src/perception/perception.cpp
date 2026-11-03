@@ -89,7 +89,8 @@ void Perception::onFrame(const sensor_msgs::msg::Image& msg) {
     // ? These fused detections are NOT ment to be published yet. FusedDetections should just bundle every
     // ? models' output together for each frame (each fusedDetection contains all people, all heads, and
     // ? the depth heatmap image). We then have to calculate the 3D position of each detected person and head
-    // ? using the depth heatmap image, AND THEN publish the final fused detections. 
+    // ? using the depth heatmap image, AND THEN publish the final fused detections. IMPORTANT: PERCEPTION
+    // ? SHOULD PUBLISH AN EMPTY DETECTION IF NO PEOPLE ARE DETECTED.
     auto fusedDetections = /*Model::*/ fuse(/* people, heads, distances */);
 
     // TODO: This publish call SHOULD work seamlessly once the above mentioned TODOs are implemented
