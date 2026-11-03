@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Flight Viewer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="style.css">
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
+</head>
+<body>
+<div id="view"></div>
+<div id="labels"></div>
+
+<div id="head" class="card">
+  <div id="title">Flight viewer</div>
+  <div id="sub" class="muted">loading…</div>
+</div>
+
+<div id="side" class="card">
+  <div class="sec">Layers</div>
+  <label><input type="checkbox" data-layer="path" checked> Path</label>
+  <label><input type="checkbox" data-layer="ticks" checked> Time marks</label>
+  <label><input type="checkbox" data-layer="frames" checked> Camera frames</label>
+  <label class="subopt"><input type="checkbox" id="sframes"> + frames of sightings</label>
+  <label><input type="checkbox" data-layer="sightings" checked> Sightings</label>
+  <label><input type="checkbox" data-layer="persons" checked> Persons</label>
+  <label><input type="checkbox" data-layer="truth" checked> Sim truth</label>
+  <label><input type="checkbox" data-layer="drone" checked> Drone</label>
+  <label><input type="checkbox" data-layer="terrain" checked> Terrain</label>
+  <label><input type="checkbox" data-layer="solved" checked> Solved persons</label>
+  <label><input type="checkbox" data-layer="photos" id="photosOn"> Drone photos on ground <span class="muted">(exp.)</span></label>
+  <div class="sec">Map</div>
+  <div class="row2"><span>Background</span><select id="bg" title="map source (view.py builds it)">
+    <option value="auto">auto</option><option value="sim">sim (Bymarka)</option><option value="kartverket">Kartverket (NO)</option>
+    <option value="global">global: Esri imagery</option><option value="osm">global: OpenStreetMap</option><option value="flat">flat grid (offline)</option>
+  </select></div>
+  <div id="bgMsg" class="muted small"></div>
+  <div class="row"><span>Photo opacity</span><input id="popac" type="range" min="0.1" max="1" step="0.05" value="0.85"><b id="popacV">0.85</b></div>
+  <div class="row"><span>Photo range</span><input id="prange" type="range" min="20" max="200" step="5" value="70"><b id="prangeV">70 m</b></div>
+  <div class="row"><span>Max photos</span><input id="pmax" type="range" min="10" max="600" step="10" value="150"><b id="pmaxV">150</b></div>
+  <div class="sec">Display</div>
+  <div class="row"><span>Fade after</span><input id="fade" type="range" min="0" max="600" step="5" value="0"><b id="fadeV">off</b></div>
+  <div class="row"><span>Marker size</span><input id="msize" type="range" min="0.5" max="6" step="0.1" value="1"><b id="msizeV">1.0×</b></div>
+  <div class="row"><span>Sphere opacity</span><input id="opac" type="range" min="1" max="2" step="0.05" value="1"><b id="opacV">1.0×</b></div>
+  <div class="row"><span>Frustum size</span><input id="fsize" type="range" min="1" max="20" step="0.5" value="4"><b id="fsizeV">4 m</b></div>
+  <div class="btns">
+    <button id="topdown" title="T">Top-down</button>
+    <button id="tilt">Tilted</button>
+    <button id="fit">Fit</button>
+  </div>
+  <div class="sec">Legend</div>
+  <div class="leg"><span class="grad"></span><span id="legT">time</span></div>
+  <div class="leg"><span class="ico frus"></span>camera frame (pyramid = view)</div>
+  <div class="leg"><span class="ico sph"></span>sighting: colour of the person, opacity = conf</div>
+  <div class="leg"><span class="ico ring"></span>person (cluster), count in range</div>
+  <div class="leg"><span class="ico ring off"></span>candidate (not pinged yet)</div>
+  <div class="leg"><span class="ico pin"></span>sim truth person</div>
+  <div class="leg"><span class="ico ring solv"></span>solved person, ellipse = 2σ</div>
+  <div class="hint muted">Left drag: pan · right drag / Ctrl+drag: orbit and tilt · wheel: zoom · hover: details · click: pin · Space: play · Esc: clear</div>
+</div>
+
+<div id="solver" class="card">
+  <div class="solvHead"><b>Position solver</b><button id="solvFold" title="fold">–</button></div>
+  <div id="solvBody">
+    <div class="muted small">Weights of the position sources (0 = off). Every slider re-solves live.</div>
+    <div class="row"><span>Rays (triang.)</span><input id="w_ray" type="range" min="0" max="5" step="0.1"><b id="w_rayV"></b></div>
+    <div class="row"><span>Terrain hit</span><input id="w_terrain" type="range" min="0" max="5" step="0.1"><b id="w_terrainV"></b></div>
+    <div class="row"><span>Head size</span><input id="w_head" type="range" min="0" max="5" step="0.1"><b id="w_headV"></b></div>
+    <div class="row"><span>Body height</span><input id="w_body" type="range" min="0" max="5" step="0.1"><b id="w_bodyV"></b></div>
+    <div class="row"><span>Depth camera</span><input id="w_depth" type="range" min="0" max="5" step="0.1"><b id="w_depthV"></b></div>
+    <div class="sec">Parameters</div>
+    <div class="row"><span>Cluster radius</span><input id="clusterM" type="range" min="1" max="15" step="0.5"><b id="clusterMV"></b></div>
+    <div class="row"><span>Min sightings</span><input id="minSight" type="range" min="1" max="15" step="1"><b id="minSightV"></b></div>
+    <div class="row"><span>Min conf</span><input id="minConf" type="range" min="0.2" max="0.9" step="0.01"><b id="minConfV"></b></div>
+    <div class="row"><span>Head px min</span><input id="headMinPx" type="range" min="0" max="30" step="1"><b id="headMinPxV"></b></div>
+    <div class="row"><span>Head height</span><input id="headH" type="range" min="0.15" max="0.5" step="0.01"><b id="headHV"></b></div>
+    <div class="row"><span>Body height</span><input id="bodyH" type="range" min="1.2" max="2.0" step="0.01"><b id="bodyHV"></b></div>
+    <div class="row"><span>Terrain σ</span><input id="terrainSigma" type="range" min="0.2" max="5" step="0.1"><b id="terrainSigmaV"></b></div>
+    <label><input type="checkbox" id="reTerrain"> re-intersect rays with this map</label>
+    <label><input type="checkbox" id="useTime" checked> only sightings in the time range</label>
+    <div id="solvOut" class="mono small"></div>
+    <div class="btns"><button id="solvReset">Defaults</button><button id="solvExport" title="persons_solved.csv + .json">Export solved persons</button></div>
+  </div>
+</div>
+
+<div id="scale" class="card"><svg id="north" width="26" height="26" viewBox="-13 -13 26 26"><g id="northG"><path d="M0,-11 L5,6 L0,3 L-5,6 Z" fill="#e6e9ec"/><text x="0" y="12" font-size="7" text-anchor="middle" fill="#e6e9ec" dy="-14">N</text></g></svg>
+  <div><div id="sbar"></div><div id="slab" class="mono small"></div></div><div id="cursorLL" class="mono small muted"></div></div>
+
+<div id="info" class="card hidden">
+  <div id="infoHead"><b id="infoTitle"></b><button id="infoClose" title="Esc">×</button></div>
+  <div id="imgWrap"><img id="infoImg" alt=""><canvas id="infoBox"></canvas></div>
+  <div id="infoBody"></div>
+</div>
+
+<div id="timeline" class="card">
+  <button id="play" title="Space">▶</button>
+  <select id="speed" title="playback speed">
+    <option value="1">1×</option><option value="2">2×</option><option value="5" selected>5×</option>
+    <option value="10">10×</option><option value="30">30×</option>
+  </select>
+  <div id="dual">
+    <div id="track"></div><div id="sel"></div>
+    <input id="t0" type="range" min="0" max="1" step="0.1" value="0">
+    <input id="t1" type="range" min="0" max="1" step="0.1" value="1">
+  </div>
+  <div id="tlab" class="mono">0:00 – 0:00</div>
+</div>
+
+<div id="err" class="card hidden"></div>
+<script type="module" src="app.js"></script>
+</body>
+</html>
