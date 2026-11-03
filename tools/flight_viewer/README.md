@@ -16,8 +16,27 @@ python3 tools/flight_viewer/view.py RUN_DIR --anchor 63.4261,10.2806     # log w
 
 `view.py` builds the terrain background if the run does not have it yet (`terrain.py`),
 serves this folder and the run on `http://127.0.0.1:8765/` and opens Chromium/Firefox.
-Everything is offline except the map tiles (Kartverket / AWS / Esri / OSM, cached afterwards);
-without network the background is a flat metric grid.
+`Ctrl-C` stops the server. Everything is offline except the map tiles (Kartverket / AWS / Esri /
+OSM, cached afterwards); without network the background is a flat metric grid.
+
+| `view.py` option | Default | |
+|---|---|---|
+| `RUN_DIR` | `~/flight_runs/latest` | The run-log directory |
+| `--port` | 8765 | 0 = any free port |
+| `--host` | 127.0.0.1 | `0.0.0.0` to open it from another machine: `http://<host>:8765/` (or `ssh -L 8765:localhost:8765 <host>` and keep the default) |
+| `--no-browser` | | Only serve, don't open a browser |
+| `--background` | `auto` | Map source (see Maps) |
+| `--margin` | 150 | Terrain around the flown area, m |
+| `--rebuild-terrain` | | Rebuild the background even if cached |
+| `--anchor LAT,LON[,ALT]` | | Put local (0, 0) of a log without GPS on the map |
+
+**heads.py** runs the head detector after the flight on the saved crops of every sighting that
+has no head yet, fills the v2 columns of `sightings.csv` (rays, head box, `d_head`, `d_body`) and
+upgrades v1 logs (the first run keeps a copy as `sightings.v1.csv`). It needs ultralytics, hence
+the venv Python. Options: `--model` (default `~/cogidrone_deps/models/head_medium.pt`, Muhammad's
+`medium.pt`, not in git), `--conf 0.25`, `--imgsz 320`, `--min-px` (skip shorter person boxes),
+`--head-height-m` / `--body-height-m` (default: the log's `meta.estimators`, else 0.23 / 1.70),
+`--redo` (also re-detect sightings that have a head), `--device cuda:0`. Reload the viewer after it.
 
 **Controls:** left drag pans, right drag (or Ctrl+drag) orbits and tilts, the wheel zooms to
 the cursor. Hover a marker for details, click to pin, Esc clears it. Space plays. The time

@@ -185,7 +185,7 @@ model puts `camera_link` (the depth origin, i.e. the left IR imager) **0.12 m fo
 centre and level with the body** (0.242 m over the model origin on the ground, 2 mm over
 `base_link`); the color imager is 15 mm to its right. If the real mount differs (or gets tilted
 down), measure it and start the sim with the same values, e.g. `cam_pitch:=20 cam_x:=0.14`
-(degrees, positive = down; see [sim.md](sim.md#sim-camera-vs-the-real-d435i)), and update the TF.
+(degrees, positive = down; see [sim.md](sim.md#7-sim-camera-vs-the-real-d435i)), and update the TF.
 
 <!-- TODO: measured camera position on the real drone. -->
 
