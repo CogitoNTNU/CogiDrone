@@ -2,7 +2,9 @@
 
     ros2 launch cogidrone_bringup sim_cpp.launch.py
     ros2 launch cogidrone_bringup sim_cpp.launch.py headless:=true yolo:=true
+    ros2 launch cogidrone_bringup sim_cpp.launch.py headless:=true yolo:=true view:=true  # one window
     ros2 launch cogidrone_bringup sim_cpp.launch.py world:=sar   # the big search-and-rescue map
+    ros2 launch cogidrone_bringup sim_cpp.launch.py cam_pitch:=30   # camera tilted 30 deg down
 
 Starts sim.launch.py (Gazebo + PX4 SITL + XRCE agent + camera bridge, without the Python
 autonomy) and the C++ `cogidrone` process (perception + navigation + pixhawk nodes). The
@@ -53,6 +55,19 @@ def generate_launch_description():
                 "world", default_value="cogidrone", description="cogidrone or sar (see sim.launch.py)"
             ),
             DeclareLaunchArgument(
+                "cam_pitch", default_value="0", description="Camera tilt in deg, positive = down"
+            ),
+            DeclareLaunchArgument("cam_x", default_value="0.12", description="Camera forward, m"),
+            DeclareLaunchArgument("cam_z", default_value="0.242", description="Camera height, m"),
+            DeclareLaunchArgument("cam_res", default_value="720p", description="720p or 480p (D435i modes)"),
+            DeclareLaunchArgument("cam_fps", default_value="30", description="Color camera rate, Hz"),
+            DeclareLaunchArgument("cam_aa", default_value="4", description="Color camera MSAA samples"),
+            DeclareLaunchArgument(
+                "view",
+                default_value="false",
+                description="With yolo:=true: one window with the camera and the YOLO boxes",
+            ),
+            DeclareLaunchArgument(
                 "yolo",
                 default_value="false",
                 description="Feed the Python YOLO detections to Navigation",
@@ -63,6 +78,12 @@ def generate_launch_description():
                     "headless": LaunchConfiguration("headless"),
                     "world": LaunchConfiguration("world"),
                     "autonomy": "false",
+                    "cam_pitch": LaunchConfiguration("cam_pitch"),
+                    "cam_x": LaunchConfiguration("cam_x"),
+                    "cam_z": LaunchConfiguration("cam_z"),
+                    "cam_res": LaunchConfiguration("cam_res"),
+                    "cam_fps": LaunchConfiguration("cam_fps"),
+                    "cam_aa": LaunchConfiguration("cam_aa"),
                 }.items(),
             ),
             Node(
@@ -90,6 +111,7 @@ def generate_launch_description():
             Node(
                 package="cogidrone_perception",
                 executable="detector",
+                parameters=[{"show": ParameterValue(LaunchConfiguration("view"), value_type=bool)}],
                 output="screen",
                 condition=IfCondition(yolo),
             ),

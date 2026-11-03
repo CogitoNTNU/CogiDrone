@@ -1,10 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  CogiDrone: PX4's stock x500 (same frame as our Holybro X500 V2) plus a front camera
-  shaped like the Intel RealSense D435i (RGB 69 deg HFOV, depth 87 deg HFOV, 640x480).
+  CogiDrone: PX4's stock x500 (same frame as our Holybro X500 V2) plus a front camera matching
+  the Intel RealSense D435i as realsense-ros runs it by default (table + sources: docs/sim.md):
+    color 1280x720 @ 30 Hz, HFOV 69.8 deg (fx = fy = 918 px; realsense-ros' 640x480 default is
+          the 4:3 crop of the same sensor: 55.2 deg, fx 612, launch arg cam_res:=480p)
+    depth 848x480, 87 x 56.5 deg, 0.31-10 m, no noise (see below)
+    color imager 15 mm to the right of the depth origin (left IR), as seen from behind.
   Topics are bridged to the same ROS 2 names realsense-ros uses, see
   ros2_ws/src/cogidrone_bringup/config/gz_bridge.yaml.
   Note: real D435i depth is 16UC1 (mm), the sim publishes 32FC1 (m).
+
+  Mount and color mode: change them with launch args instead of editing this file, e.g.
+    ros2 launch cogidrone_bringup sim_cpp.launch.py cam_pitch:=30 cam_x:=0.12 cam_z:=0.242
+    ros2 launch cogidrone_bringup sim_cpp.launch.py cam_res:=480p cam_fps:=15 cam_aa:=0
+  (sim.launch.py writes a copy of this model with the camera_link pose and the color sensor's
+  size/FOV/rate/anti-aliasing replaced). cam_pitch is in degrees, positive = tilted down.
+  Keep the pose below on ONE line and keep the color sensor's tags as they are (the launch
+  edits them with regexes).
 -->
 <sdf version="1.9">
   <model name="cogidrone_x500">
@@ -32,24 +44,29 @@
         </material>
       </visual>
 
+      <!-- Depth origin = camera_link (the left IR imager, like realsense-ros' camera_link). -->
       <sensor name="color" type="camera">
-        <pose>0 0.0175 0 0 0 0</pose>
+        <pose>0 -0.015 0 0 0 0</pose>
         <always_on>true</always_on>
-        <!-- Real D435i does 30 Hz; 15 keeps CPU-only rendering real-time on laptops. -->
-        <update_rate>15</update_rate>
+        <!-- Real D435i: 30 Hz. On a laptop without a GPU use cam_fps:=15 (see docs/sim.md). -->
+        <update_rate>30</update_rate>
         <visualize>false</visualize>
         <topic>/cogidrone/camera/color/image</topic>
         <camera>
           <camera_info_topic>/cogidrone/camera/color/camera_info</camera_info_topic>
-          <horizontal_fov>1.2043</horizontal_fov>
+          <horizontal_fov>1.2175</horizontal_fov>
           <image>
-            <width>640</width>
-            <height>480</height>
+            <width>1280</width>
+            <height>720</height>
             <format>R8G8B8</format>
+            <!-- MSAA samples (SDF default 4): smooth edges on branches and grass. -->
+            <anti_aliasing>4</anti_aliasing>
           </image>
+          <!-- A real camera sees to the horizon; 100 m (the old value) cut the far shore and the
+               hills off and left bare sky. 3 km reaches the hills around Bymarka. -->
           <clip>
             <near>0.1</near>
-            <far>100</far>
+            <far>3000</far>
           </clip>
         </camera>
       </sensor>
@@ -63,14 +80,17 @@
           <camera_info_topic>/cogidrone/camera/depth/camera_info</camera_info_topic>
           <horizontal_fov>1.5184</horizontal_fov>
           <image>
-            <width>640</width>
+            <width>848</width>
             <height>480</height>
             <format>R_FLOAT32</format>
           </image>
           <clip>
-            <near>0.2</near>
+            <near>0.31</near>
             <far>10</far>
           </clip>
+          <!-- No <noise> on purpose: the real RMS error is <= 2 % at 2 m (~1.5 cm), but Gazebo
+               Harmonic's depth noise pass turned most of the image into -inf (tested). Add noise
+               in the consumer if a test needs it. -->
         </camera>
       </sensor>
     </link>

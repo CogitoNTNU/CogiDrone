@@ -3,12 +3,18 @@
     ros2 launch cogidrone_bringup sim.launch.py
     ros2 launch cogidrone_bringup sim.launch.py headless:=true autonomy:=false
     ros2 launch cogidrone_bringup sim.launch.py altitude:=1.0
+    ros2 launch cogidrone_bringup sim.launch.py cam_pitch:=30   # camera tilted 30 deg down
+    ros2 launch cogidrone_bringup sim.launch.py cam_res:=480p cam_fps:=15   # lighter camera
+    ros2 launch cogidrone_bringup sim.launch.py headless:=true view:=true   # one window: camera + YOLO boxes
 
 Starts: Micro XRCE-DDS Agent, Gazebo, PX4 SITL, the Gazebo->ROS camera bridge and,
-unless autonomy:=false, the YOLO detector and offboard controller.
+unless autonomy:=false, the YOLO detector and offboard controller. view:=true opens one window
+with the camera and the YOLO boxes (the detector's own, no rqt needed).
 """
 
+import math
 import os
+import re
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
@@ -91,6 +97,63 @@ def _sky_env():
     return {"GZ_RENDERING_RESOURCE_PATH": media} if os.path.isdir(media) else {}
 
 
+# Front camera mount of cogidrone_x500 (camera_link relative to the model origin, which is on the
+# ground under base_link). Defaults = the pose written in sim/models/cogidrone_x500/model.sdf.
+CAM_DEFAULTS = {"cam_x": "0.12", "cam_z": "0.242", "cam_pitch": "0"}
+_CAM_POSE = re.compile(r'(<link name="camera_link">\s*<pose>)[^<]*(</pose>)')
+# Color modes of the real D435i (realsense-ros rgb_camera.color_profile). fx = fy is the same
+# sensor: 720p is the full 16:9 frame scaled, 480p a 4:3 crop of it (docs/sim.md).
+CAM_RES = {"720p": (1280, 720, 1.2175), "480p": (640, 480, 0.9634)}
+# Color mode defaults = what model.sdf says.
+COLOR_DEFAULTS = {"cam_res": "720p", "cam_fps": "30", "cam_aa": "4"}
+
+
+def _color_sensor_edit(sdf, res, fps, aa):
+    """Replace size, FOV, rate and anti-aliasing of the color sensor (not the depth one)."""
+    w, h, hfov = CAM_RES[res]
+    start = sdf.index('<sensor name="color"')
+    end = sdf.index("</sensor>", start)
+    block = sdf[start:end]
+    for tag, val in (("update_rate", f"{fps:g}"), ("horizontal_fov", f"{hfov}"),
+                     ("anti_aliasing", f"{aa}"), ("width", f"{w}"), ("height", f"{h}")):
+        block, n = re.subn(rf"<{tag}>[^<]*</{tag}>", f"<{tag}>{val}</{tag}>", block, count=1)
+        if n != 1:
+            raise RuntimeError(f"<{tag}> not found in the color sensor of the drone model")
+    return sdf[:start] + block + sdf[end:]
+
+
+def _camera_model_env(context, model):
+    """If the camera mount (cam_x / cam_z / cam_pitch) or color mode (cam_res / cam_fps / cam_aa)
+    differ from the defaults, write a copy of the drone model with them and point PX4's spawn
+    (PX4_GZ_MODELS) at it. The repo file stays as is."""
+    cam = {k: float(LaunchConfiguration(k).perform(context)) for k in CAM_DEFAULTS}
+    col = {k: LaunchConfiguration(k).perform(context).strip() for k in COLOR_DEFAULTS}
+    if col["cam_res"] not in CAM_RES:
+        raise RuntimeError(f"cam_res:={col['cam_res']}: use one of {', '.join(CAM_RES)}")
+    fps, aa = float(col["cam_fps"]), int(col["cam_aa"])
+    same_mount = all(cam[k] == float(v) for k, v in CAM_DEFAULTS.items())
+    same_color = (col["cam_res"] == COLOR_DEFAULTS["cam_res"] and fps == float(COLOR_DEFAULTS["cam_fps"])
+                  and aa == int(COLOR_DEFAULTS["cam_aa"]))
+    if model != "cogidrone_x500" or (same_mount and same_color):
+        return {}
+    src = os.path.join(_repo_sim_dir(), "models", model, "model.sdf")
+    with open(src) as f:
+        sdf = f.read()
+    pose = f"{cam['cam_x']} 0 {cam['cam_z']} 0 {math.radians(cam['cam_pitch']):.6f} 0"
+    sdf, n = _CAM_POSE.subn(lambda m: m.group(1) + pose + m.group(2), sdf)
+    if n != 1:
+        raise RuntimeError(f"camera_link <pose> not found in {src}")
+    sdf = _color_sensor_edit(sdf, col["cam_res"], fps, aa)
+    root = os.path.expanduser("~/.cache/cogidrone/models")
+    os.makedirs(os.path.join(root, model), exist_ok=True)
+    with open(os.path.join(root, model, "model.sdf"), "w") as f:
+        f.write(sdf)
+    print(f"[sim.launch] camera: x={cam['cam_x']} z={cam['cam_z']} pitch={cam['cam_pitch']} deg down, "
+          f"color {col['cam_res']} @ {fps:g} Hz, MSAA {aa} -> {root}/{model}/model.sdf")
+    # px4-rc.gzsim spawns file://${PX4_GZ_MODELS}/<model>/model.sdf.
+    return {"PX4_GZ_MODELS": root}
+
+
 def _already_running():
     """PIDs + command lines of a Gazebo server/GUI or PX4 SITL that is already running."""
     found = []
@@ -132,6 +195,7 @@ def _px4(context):
         # background and orphans it, so it kept running after Ctrl-C and broke the next run.
         # In standalone mode PX4 just waits for the world and spawns the drone into it.
         "PX4_GZ_STANDALONE": "1",
+        **_camera_model_env(context, LaunchConfiguration("model").perform(context)),
     }
     gz_server = ExecuteProcess(
         cmd=[
@@ -190,6 +254,32 @@ def generate_launch_description():
                 "or any world in sim/worlds or PX4's worlds folder",
             ),
             DeclareLaunchArgument("model", default_value="cogidrone_x500"),
+            DeclareLaunchArgument(
+                "cam_pitch",
+                default_value=CAM_DEFAULTS["cam_pitch"],
+                description="Front camera tilt in degrees, positive = down (D435i mount)",
+            ),
+            DeclareLaunchArgument(
+                "cam_x", default_value=CAM_DEFAULTS["cam_x"], description="Camera forward of centre, m"
+            ),
+            DeclareLaunchArgument(
+                "cam_z", default_value=CAM_DEFAULTS["cam_z"], description="Camera height over the model origin (ground), m"
+            ),
+            DeclareLaunchArgument(
+                "cam_res", default_value=COLOR_DEFAULTS["cam_res"],
+                description="Color camera mode like the real D435i: 720p (1280x720, 69.8 deg) or 480p (640x480, 55.2 deg)",
+            ),
+            DeclareLaunchArgument(
+                "cam_fps", default_value=COLOR_DEFAULTS["cam_fps"], description="Color camera rate, Hz"
+            ),
+            DeclareLaunchArgument(
+                "cam_aa", default_value=COLOR_DEFAULTS["cam_aa"],
+                description="Color camera anti-aliasing (MSAA samples: 0, 2, 4, 8)",
+            ),
+            DeclareLaunchArgument(
+                "view", default_value="false",
+                description="Detector opens a window with the camera and YOLO boxes (needs autonomy:=true)",
+            ),
             ExecuteProcess(cmd=["xrce-agent"], output="screen"),
             OpaqueFunction(function=_px4),
             Node(
@@ -201,6 +291,7 @@ def generate_launch_description():
             Node(
                 package="cogidrone_perception",
                 executable="detector",
+                parameters=[{"show": ParameterValue(LaunchConfiguration("view"), value_type=bool)}],
                 output="screen",
                 condition=autonomy,
             ),

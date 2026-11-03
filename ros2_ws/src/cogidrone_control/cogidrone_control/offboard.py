@@ -14,6 +14,8 @@ import math
 from enum import Enum, auto
 
 import rclpy
+from rclpy.qos import qos_profile_sensor_data
+from sensor_msgs.msg import CameraInfo
 from vision_msgs.msg import Detection2DArray
 
 from cogidrone_control.px4_node import RATE_HZ, Px4Node, wrap_pi
@@ -32,8 +34,10 @@ class Offboard(Px4Node):
         super().__init__("offboard")
         self.declare_parameter("altitude", 3.0)  # m above takeoff point
         self.declare_parameter("target_class", "person")
-        self.declare_parameter("image_width", 640)  # must match the camera
-        self.declare_parameter("hfov_deg", 69.0)  # D435i RGB
+        # Used until camera_info arrives (then fx and cx come from it). D435i 1280x720: 69.8 deg;
+        # its 640x480 mode is a 4:3 crop with 55.2 deg.
+        self.declare_parameter("image_width", 1280)
+        self.declare_parameter("hfov_deg", 69.8)
         # Fraction of the bearing error corrected per tick.
         self.declare_parameter("yaw_gain", 0.5)
         # Spin speed when nothing is seen.
@@ -53,8 +57,12 @@ class Offboard(Px4Node):
         self.lost_timeout = p("lost_timeout_s")
         self.land_after = p("land_after_s")
 
+        self.cx = self.image_width / 2
         self.create_subscription(
             Detection2DArray, "/cogidrone/detections", self.on_detections, 10
+        )
+        self.create_subscription(
+            CameraInfo, "/camera/camera/color/camera_info", self.on_info, qos_profile_sensor_data
         )
 
         self.state = State.WAIT_FOR_PX4
@@ -70,6 +78,10 @@ class Offboard(Px4Node):
 
     # --- inputs -------------------------------------------------------------
 
+    def on_info(self, msg: CameraInfo):
+        if msg.k[0] > 0:
+            self.focal_px, self.cx = msg.k[0], msg.k[2]
+
     def on_detections(self, msg: Detection2DArray):
         best = None
         for det in msg.detections:
@@ -82,7 +94,7 @@ class Offboard(Px4Node):
             return
         # Pixel offset from image center -> bearing (rad). Right of center = positive = clockwise in NED.
         self.target_bearing = math.atan(
-            (best[0] - self.image_width / 2) / self.focal_px
+            (best[0] - self.cx) / self.focal_px
         )
         self.target_seen_at = self.get_clock().now()
 
