@@ -1,0 +1,651 @@
+<title>CogiDrone Wiring Plan</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one reading column; diagrams sit in their own horizontally scrollable cards. Status
+   (have / buy / make / check) is encoded the same way everywhere: chip colour + box border style. */
+:root{
+  --bg:#f3f4f1; --surface:#ffffff; --surface-2:#f8f9f6; --ink:#1b2129; --muted:#5a6370; --faint:#8b93a0;
+  --border:#d9ddd6; --power:#c4561f; --signal:#2b62b0; --rf:#7a4fb0;
+  --have:#2f7d54; --have-bg:#e3f1e8; --buy:#b0640c; --buy-bg:#fbeedb; --make:#7a4fb0; --make-bg:#efe7f8;
+  --check:#9a7a00; --check-bg:#f6f0cf; --crit:#b23a2a; --crit-bg:#fbe5e1;
+  --mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+  --sans:'IBM Plex Sans',-apple-system,'Segoe UI',sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#13161b; --surface:#1a1e25; --surface-2:#20252d; --ink:#e7e9ec; --muted:#a2aab6; --faint:#6f7784;
+    --border:#30363f; --power:#e8834d; --signal:#78a6e6; --rf:#b596e6;
+    --have:#5dbb8a; --have-bg:#16301f; --buy:#e5a04a; --buy-bg:#35260f; --make:#b596e6; --make-bg:#2a2140;
+    --check:#d9bf4a; --check-bg:#2f2a0f; --crit:#e7796a; --crit-bg:#3a1b16; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#13161b; --surface:#1a1e25; --surface-2:#20252d; --ink:#e7e9ec; --muted:#a2aab6; --faint:#6f7784;
+  --border:#30363f; --power:#e8834d; --signal:#78a6e6; --rf:#b596e6;
+  --have:#5dbb8a; --have-bg:#16301f; --buy:#e5a04a; --buy-bg:#35260f; --make:#b596e6; --make-bg:#2a2140;
+  --check:#d9bf4a; --check-bg:#2f2a0f; --crit:#e7796a; --crit-bg:#3a1b16; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;margin:0;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:36px 72px}
+.wrap{max-width:1040px;margin:0 auto;display:flex;flex-direction:column;gap:44px}
+header{display:flex;flex-direction:column;gap:8px}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--power)}
+h1{font-family:var(--mono);font-weight:600;font-size:clamp(26px,4.2vw,36px);margin:0;text-wrap:balance;line-height:1.15}
+.lede{color:var(--muted);max-width:68ch;margin:0;font-size:15px}
+h2{font-family:var(--mono);font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);
+  border-bottom:1px solid var(--border);padding-bottom:8px;margin:0 0 16px}
+h3{font-size:15px;margin:0 0 8px}
+section>p,.note{max-width:72ch}
+.note{color:var(--muted);font-size:13px;margin:8px 0 0}
+code{font-family:var(--mono);font-size:.88em;background:var(--surface-2);border:1px solid var(--border);border-radius:4px;padding:0 4px;word-break:break-word}
+a{color:var(--signal)}
+
+.summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:2px}
+.stat b{font-family:var(--mono);font-size:24px;font-variant-numeric:tabular-nums}
+.stat span{font-size:13px;color:var(--muted)}
+.stat.have b{color:var(--have)} .stat.buy b{color:var(--buy)} .stat.make b{color:var(--make)} .stat.check b{color:var(--check)}
+@media (max-width:640px){.summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+.alerts{display:flex;flex-direction:column;gap:8px}
+.alert{display:grid;grid-template-columns:84px minmax(0,1fr);gap:14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:11px 14px}
+.alert p{margin:0;font-size:14px}
+@media (max-width:520px){.alert{grid-template-columns:minmax(0,1fr);gap:6px}}
+
+.chip{font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;font-weight:600;padding:3px 7px;border-radius:5px;display:inline-block;white-space:nowrap;align-self:start;text-align:center}
+.chip.have{background:var(--have-bg);color:var(--have)} .chip.buy{background:var(--buy-bg);color:var(--buy)}
+.chip.make{background:var(--make-bg);color:var(--make)} .chip.check{background:var(--check-bg);color:var(--check)}
+.chip.crit{background:var(--crit-bg);color:var(--crit)} .chip.ok{background:var(--have-bg);color:var(--have)}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;overflow-x:auto}
+.card svg{display:block;min-width:900px;width:100%;height:auto}
+.card.narrow svg{min-width:560px}
+.legend{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:12px;font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{display:inline-block;width:22px;height:0;border-top:3px solid}
+.legend i.box{width:16px;height:12px;border:2px solid;border-radius:3px}
+
+svg text{font-family:var(--mono)}
+.n{fill:var(--surface);stroke:var(--border);stroke-width:1.4}
+.n.have{stroke:var(--have)} .n.buy{stroke:var(--buy);stroke-dasharray:6 4;stroke-width:2}
+.n.make{stroke:var(--make);stroke-dasharray:2 3;stroke-width:2} .n.check{stroke:var(--check);stroke-dasharray:6 4;stroke-width:2}
+.t{fill:var(--ink);font-size:12.5px;font-weight:600}
+.s{fill:var(--muted);font-size:10.5px}
+.p{fill:var(--muted);font-size:9.5px}
+.tag-have{fill:var(--have)} .tag-buy{fill:var(--buy)} .tag-make{fill:var(--make)} .tag-check{fill:var(--check)}
+.tg{font-size:9px;font-weight:600;letter-spacing:.05em}
+.wp{stroke:var(--power);stroke-width:2.6;fill:none}
+.wd{stroke:var(--signal);stroke-width:2.2;fill:none}
+.wr{stroke:var(--rf);stroke-width:2;fill:none;stroke-dasharray:2 5;stroke-linecap:round}
+.wc{stroke:var(--power);stroke-width:2;fill:none;stroke-dasharray:6 5}
+.port{fill:var(--surface-2);stroke:var(--border)}
+.frame{fill:none;stroke:var(--faint);stroke-width:1.5}
+.arm{stroke:var(--faint);stroke-width:7;stroke-linecap:round}
+.prop{fill:none;stroke:var(--faint);stroke-dasharray:3 4}
+.zone{fill:var(--surface-2);stroke:var(--border)}
+.fov{fill:var(--signal);opacity:.10}
+
+.tablewrap{overflow-x:auto;border:1px solid var(--border);border-radius:10px}
+table{border-collapse:collapse;width:100%;min-width:860px;font-size:13px;background:var(--surface)}
+th{font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);text-align:left;padding:9px 11px;background:var(--surface-2);border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:9px 11px;border-bottom:1px solid var(--border);vertical-align:top}
+tr:last-child td{border-bottom:none}
+td.m{font-family:var(--mono);font-size:12px}
+td .sub{color:var(--muted);font-size:12px;display:block}
+
+.renders{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.renders figure{margin:0;background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.renders img{display:block;width:100%;height:auto}
+.renders figcaption{font-size:12.5px;color:var(--muted);padding:8px 12px}
+@media (max-width:700px){.renders{grid-template-columns:minmax(0,1fr)}}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+@media (max-width:820px){.grid2{grid-template-columns:minmax(0,1fr)}}
+.steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.steps li{padding-left:2px}
+.checklist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.checklist li{display:grid;grid-template-columns:22px minmax(0,1fr);gap:8px;font-size:14px}
+.checklist li::before{content:"";width:14px;height:14px;border:1.5px solid var(--muted);border-radius:3px;margin-top:3px}
+footer{color:var(--faint);font-size:12px;font-family:var(--mono)}
+td.num{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+td.shop{font-family:var(--mono);font-size:12px;white-space:nowrap}
+tfoot td{font-family:var(--mono);font-weight:600;border-top:2px solid var(--ink);padding:10px 11px}
+table.links{min-width:720px}
+.refs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+@media (max-width:820px){.refs{grid-template-columns:minmax(0,1fr)}}
+.refs ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.refs li span{color:var(--muted);font-size:12.5px;display:block}
+h3 .chip{margin-left:6px;vertical-align:2px}
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">CogiDrone · Holybro X500 V2 · Pixhawk 6C · Jetson Orin Nano Super</div>
+  <h1>Wiring and mounting plan</h1>
+  <p class="lede">Every part on the drone, how it connects, and where it goes. It covers what we own, what's on the shopping list, and what we have to make ourselves. Each connection was checked against the part's datasheet or pinout and against what our code expects (<a href="https://github.com/CogitoNTNU/CogiDrone/tree/c%2B%2B/gazebo-sim"><code>c++/gazebo-sim</code></a> branch, PX4 v1.17). Every product, datasheet and code link is in <a href="#parts">Parts and links</a> and <a href="#refs">References</a>.</p>
+</header>
+
+<section>
+  <h2>Status</h2>
+  <div class="summary">
+    <div class="stat have"><b>17</b><span>parts we already own</span></div>
+    <div class="stat buy"><b>11</b><span>parts ordered or to pick up (≈ 1 160 kr)</span></div>
+    <div class="stat make"><b>4</b><span>things to make or print</span></div>
+    <div class="stat check"><b>4</b><span>things to check in the boxes</span></div>
+  </div>
+</section>
+
+<section id="parts">
+  <h2>Parts and links</h2>
+  <h3>Ordered <span class="chip buy">elefun 364 + Proshop 746 kr</span></h3>
+  <p class="note" style="margin:0 0 10px">Ordered 4 Nov 2026. elefun order 1280826 comes as a letter parcel with Posten (not trackable). Proshop order 70193376 goes to the PostNord locker at Rema 1000 Havstein and ships 9–11 Nov (the DeLOCK plug comes from their remote warehouse).</p>
+  <div class="tablewrap">
+  <table class="links">
+    <thead><tr><th>Item</th><th>For</th><th>Shop</th><th>Qty</th><th>kr</th></tr></thead>
+    <tbody>
+      <tr><td><a href="https://www.elefun.no/vare-69422/ladekabel-overganger-bronto-overgang-male-deans-til-female-xt60">Bronto adapter, male Deans → female XT60</a></td><td>Charging the Jetson battery on the e450</td><td class="shop">elefun</td><td class="num">1</td><td class="num">59</td></tr>
+      <tr><td><a href="https://www.elefun.no/vare-55825/kontakter-bronto-t-plug-deans-3x-male">Bronto T-Plug (Deans), 3× male</a></td><td>Jetson power lead, battery end</td><td class="shop">elefun</td><td class="num">1</td><td class="num">29</td></tr>
+      <tr><td><a href="https://www.elefun.no/vare-56910/ledning-bronto-silikonkabel-18awg">Bronto silicone wire 18 AWG, 1 m red + 1 m black</a></td><td>Jetson power lead</td><td class="shop">elefun</td><td class="num">1</td><td class="num">39</td></tr>
+      <tr><td><a href="https://www.elefun.no/vare-33067/radioutstyr-tilbehor-buzzer-2s-8s-lipo-alarm-voltage-tester">Buzzer 2s–8s LiPo alarm &amp; voltage tester</a></td><td>Low-voltage warning on the Jetson battery</td><td class="shop">elefun</td><td class="num">1</td><td class="num">95</td></tr>
+      <tr><td><a href="https://www.elefun.no/vare-41511/krympeplast-bunting-fuse-5mm-2-meter">Fuse heat-shrink 5 mm, 2 m</a></td><td>Jetson lead joints, XM+ joints</td><td class="shop">elefun</td><td class="num">1</td><td class="num">45</td></tr>
+      <tr><td><a href="https://www.elefun.no/vare-57841/krympeplast-bunting-bronto-2mm-2-meter">Bronto heat-shrink 2 mm, 2 m</a></td><td>Small joints on the TELEM2 crossover cable</td><td class="shop">elefun</td><td class="num">1</td><td class="num">36</td></tr>
+      <tr><td><a href="https://www.elefun.no/vare-38843/">Panasonic FM 35 V 470 µF low-ESR capacitor</a></td><td>Across + and − in the plug's terminal: damps the plug-in voltage spike</td><td class="shop">elefun</td><td class="num">1</td><td class="num">12</td></tr>
+      <tr><td><a href="https://www.proshop.no/SSD/Intenso-Premium-M2-SSD-250GB-PCIe-30-M2-2280/3072745">Intenso Premium 250 GB NVMe, M.2 2280</a></td><td>Jetson storage (no storage in the dev kit box)</td><td class="shop">Proshop</td><td class="num">1</td><td class="num">676</td></tr>
+      <tr><td><a href="https://www.proshop.no/Stroemkabel-intern/DeLOCK-Power-Adapter-2-pin-Terminal-Block-to-DC-jack-55-x-25-mm/3278617">DeLOCK terminal block → 5.5 × 2.5 mm DC plug (male)</a></td><td>Jetson end of the power lead</td><td class="shop">Proshop</td><td class="num">1</td><td class="num">70</td></tr>
+    </tbody>
+    <tfoot><tr><td colspan="4">elefun 315 + 49 shipping, Proshop 746 (free shipping)</td><td class="num">1 110</td></tr></tfoot>
+  </table>
+  </div>
+
+  <h3 style="margin-top:22px">Pick up <span class="chip buy">Kjell City Lade, 48 kr</span></h3>
+  <p class="note" style="margin:0 0 10px">Replaces the Biltema blade-fuse holder, which was sold out in every Trondheim store. One of each was in stock on 4 Nov; reserve with "Hent i butikk". 3.15 A slow is just as good; never 5 A, and avoid fast (F) fuses.</p>
+  <div class="tablewrap">
+  <table class="links">
+    <thead><tr><th>Item</th><th>For</th><th>Shop</th><th>Qty</th><th>kr</th></tr></thead>
+    <tbody>
+      <tr><td><a href="https://www.kjell.com/no/produkter/elektro-og-verktoy/elektronikk/sikringer/sikringsholdere/sikringsholder-5-x-20-mm-p41107">Sikringsholder 5 x 20 mm (41107)</a></td><td>Inline fuse holder, 2 × 12 cm 1.25 mm² leads, max 5 A</td><td class="shop">Kjell</td><td class="num">1</td><td class="num">9</td></tr>
+      <tr><td><a href="https://www.kjell.com/no/produkter/elektro-og-verktoy/elektronikk/sikringer/glassrorsikringer/glassrorsikring-5-x-20-mm-4-a-trege-t-10-pk.-p36927">Glassrørsikring 5 x 20 mm 4 A Trege (T), 10 pcs (36927)</a></td><td>Fuse for the Jetson lead, plus spares</td><td class="shop">Kjell</td><td class="num">1</td><td class="num">39</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3 style="margin-top:22px">Dropped or found elsewhere <span class="chip check">not ordered</span></h3>
+  <div class="tablewrap">
+  <table class="links">
+    <thead><tr><th>Item</th><th>Why not</th></tr></thead>
+    <tbody>
+      <tr><td>Biltema midi holder + 3 A blade fuses</td><td>Holder sold out in Trondheim; replaced by the Kjell glass-fuse holder</td></tr>
+      <tr><td>LiPo-safe bag</td><td>Packs live in a (not airtight) metal box and are charged supervised on concrete with sprinklers</td></tr>
+      <tr><td>2× 18650 for the Pocket</td><td>The drone already flies</td></tr>
+      <tr><td>M2.5 × 18 screws, M2.5 locknuts</td><td>Sourced locally. The frame kit has 4 × M2.5 locknuts, M2.5 × 12 screws and 5 mm standoffs, but 12 mm is too short with the 10 mm printed spacers</td></tr>
+      <tr><td>USB-A → USB-C cable</td><td>Only if the converter's "Type-C USB cable" turns out to be C-to-C; we'll find one</td></tr>
+      <tr><td>microSD card</td><td>The NVMe SSD replaces it</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3 style="margin-top:22px">Already bought <span class="chip have">have</span></h3>
+  <div class="tablewrap">
+  <table class="links">
+    <thead><tr><th>Item</th><th>Role</th></tr></thead>
+    <tbody>
+      <tr><td><a href="https://holybro.com/products/px4-development-kit-x500-v2">Holybro X500 V2 PX4 dev kit (433 MHz)</a></td><td>Frame, PDB, ESCs, motors, props, Pixhawk 6C + cable set, PM02 V3, M10 GPS, SiK pair, platform board</td></tr>
+      <tr><td><a href="https://holybro.com/products/uart-to-usb-converter">Holybro UART to USB converter</a></td><td>Pixhawk TELEM2 to Jetson USB</td></tr>
+      <tr><td><a href="https://no.rs-online.com/web/p/processor-development-tools/2647384">NVIDIA Jetson Orin Nano Super dev kit</a></td><td>Companion computer, 19 V PSU in the box</td></tr>
+      <tr><td><a href="https://www.generationrobots.com/en/403758-intel-realsense-camera-de-profondeur-d435i.html">Intel RealSense D435i</a></td><td>Camera, USB 3 cable in the box</td></tr>
+      <tr><td><a href="https://www.elefun.no/vare-60928/radioutstyr-sender-radiomaster-pocket-16ch-cc2500-lbt-charcoal">RadioMaster Pocket CC2500 LBT</a></td><td>RC transmitter</td></tr>
+      <tr><td><a href="https://www.elefun.no/vare-34562/radioutstyr-mottakere-frsky-xm-plus-16ch-sbus-mottaker">FrSky XM+ 16ch SBUS receiver</a></td><td>RC receiver</td></tr>
+      <tr><td><a href="https://www.elefun.no/vare-73666/">Sunpadow 4S 5200 mAh 110C, XT60</a></td><td>Flight battery</td></tr>
+      <tr><td><a href="https://www.elefun.no/p/prod.aspx?v=46366">4S 2200 mAh 35C, Deans</a></td><td>Jetson battery</td></tr>
+      <tr><td><a href="https://www.proshop.no/Fjernstyrt/SkyRC-Charger-e450-2-4S-6-8S-LiPo-LiFe-LiHV/3311550">SkyRC e450</a></td><td>Charger</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="note">Orders and stock updated 4 Nov 2026. The original vendors and reasoning are in the <a href="https://claude.ai/code/artifact/2a45d089-8410-4873-ada0-f07cd1a426c0">build sheet</a>. Tools we need but aren't buying: soldering iron, solder, multimeter.</p>
+</section>
+
+<section>
+  <h2>Read before wiring</h2>
+  <div class="alerts">
+    <div class="alert"><span class="chip ok">Verified</span><p><strong>The 4S Jetson battery goes straight into the barrel jack. No 19 V converter.</strong> NVIDIA's <a href="https://esys.ir/images/img_Item/3029/Files/Jetson-Orin-Nano-DevKit-Carrier-Board-Specification_SP-11324-001_v1.3.pdf">carrier board specification</a> (SP-11324-001 v1.3, Dec 2024) says "DC Jack: 9-20 V (19V supply provided)" (p. 3) and "Max current supported is 3.5 A", 5.5 × 2.5 mm, centre positive (§3.8, p. 26). The board's own regulator (GS9230) turns that into 5 V for the module (p. 31). A 4S pack is 12.0–16.8 V, inside the range at both ends. The 19 V figure is just the adapter in the box. Three things this adds: a <strong>470 µF capacitor</strong> at the plug against the plug-in spike, <strong>camera and UART converter on different USB stacks</strong> (each stack's 5 V is rated 0.5 A in table 5-3), and <strong>25 W mode</strong> in flight.</p></div>
+    <div class="alert"><span class="chip crit">Will not work</span><p><strong>A straight Pixhawk cable from TELEM2 to the UART-to-USB converter won't work.</strong> The converter's 6-pin port uses the same pin order as the Pixhawk (5V, TX, RX, CTS, RTS, GND), so a straight cable joins TX to TX and RX to RX. It also ties the Pixhawk's 5 V to the Jetson's USB 5 V. Make the <a href="#crossover">crossover cable</a> below: TX and RX swapped, CTS and RTS swapped, and pin 1 (5 V) left unconnected, as in <a href="https://docs.px4.io/v1.17/en/companion_computer/pixhawk_companion">PX4's own TELEM2 wiring table</a> (see the <a href="https://cdn.shopify.com/s/files/1/0604/5905/7341/files/PinoutsV1.3.jpg">converter pinout</a>).</p></div>
+    <div class="alert"><span class="chip crit">Software</span><p><strong>The Jetson setup guide uses the wrong serial port.</strong> <a href="https://github.com/CogitoNTNU/CogiDrone/blob/c%2B%2B/gazebo-sim/docs/jetson.md#L166"><code>docs/jetson.md:166</code></a> and <a href="https://github.com/CogitoNTNU/CogiDrone/blob/c%2B%2B/gazebo-sim/scripts/jetson/install-user.sh#L69"><code>scripts/jetson/install-user.sh:69</code></a> start the PX4 agent on <code>/dev/ttyTHS1</code>, the Jetson's header UART. With the converter it's <code>/dev/ttyUSB0</code>, as <a href="https://github.com/CogitoNTNU/CogiDrone/blob/c%2B%2B/gazebo-sim/docs/hardware.md"><code>docs/hardware.md</code></a> and <a href="https://github.com/CogitoNTNU/CogiDrone/blob/c%2B%2B/gazebo-sim/docs/architecture.md#L167"><code>docs/architecture.md</code></a> already say.</p></div>
+    <div class="alert"><span class="chip check">Mounting</span><p><strong>Use Holybro's own depth-camera mount, level. Then update the sim camera pose.</strong> In the 3D model no propeller enters the D435i's depth or colour view with that mount, so no tilt is needed. The real camera sits <strong>0.135 m forward and 0.044 m below</strong> the frame centre. The sim model has 0.12 m forward and about 0 m. Put the measured numbers into <a href="https://github.com/CogitoNTNU/CogiDrone/blob/c%2B%2B/gazebo-sim/sim/models/cogidrone_x500/model.sdf#L16"><code>model.sdf</code></a> and the TF.</p></div>
+    <div class="alert"><span class="chip check">Software</span><p><strong>There's no launch file for the real drone yet.</strong> Only <a href="https://github.com/CogitoNTNU/CogiDrone/blob/c%2B%2B/gazebo-sim/ros2_ws/src/cogidrone_bringup/launch/sim.launch.py"><code>sim.launch.py</code></a> and <a href="https://github.com/CogitoNTNU/CogiDrone/blob/c%2B%2B/gazebo-sim/ros2_ws/src/cogidrone_bringup/launch/sim_cpp.launch.py"><code>sim_cpp.launch.py</code></a> exist. On the drone, three things have to run together: the XRCE agent on the serial port, the <code>realsense2_camera</code> node, and the <code>cogidrone</code> node with the remap <code>/camera/image → /camera/camera/color/image_raw</code>. Copy that remap from <a href="https://github.com/CogitoNTNU/CogiDrone/blob/c%2B%2B/gazebo-sim/ros2_ws/src/cogidrone_bringup/launch/sim_cpp.launch.py#L69"><code>sim_cpp.launch.py:69</code></a>.</p></div>
+  </div>
+</section>
+
+<section>
+  <h2>Wiring diagram</h2>
+  <div class="card">
+    <svg viewBox="0 0 1120 720" role="img" aria-label="Wiring diagram of the whole drone, coloured by part status">
+      <defs>
+        <marker id="aP" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="var(--power)"/></marker>
+        <marker id="aS" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="var(--signal)"/></marker>
+      </defs>
+
+      <!-- column headings -->
+      <text x="30" y="22" class="p">FLIGHT POWER</text>
+      <text x="450" y="22" class="p">FLIGHT CONTROLLER</text>
+      <text x="720" y="22" class="p">ON THE DRONE</text>
+      <text x="960" y="22" class="p">ON THE GROUND</text>
+      <text x="30" y="398" class="p">JETSON POWER (separate battery, shares nothing with flight power)</text>
+      <text x="200" y="612" class="p">CHARGING (on the bench, in the LiPo bag)</text>
+
+      <!-- ===== Flight power ===== -->
+      <rect x="30" y="40" width="160" height="62" rx="8" class="n have"/>
+      <text x="110" y="64" text-anchor="middle" class="t">Flight battery</text>
+      <text x="110" y="80" text-anchor="middle" class="s">Sunpadow 4S 5200 110C</text>
+      <text x="110" y="94" text-anchor="middle" class="s">female XT60 · JST-XH bal.</text>
+
+      <rect x="240" y="40" width="150" height="62" rx="8" class="n have"/>
+      <text x="315" y="64" text-anchor="middle" class="t">PM02 V3</text>
+      <text x="315" y="80" text-anchor="middle" class="s">analog V/I sense</text>
+      <text x="315" y="94" text-anchor="middle" class="s">XT60 in / out</text>
+
+      <rect x="240" y="150" width="150" height="58" rx="8" class="n have"/>
+      <text x="315" y="174" text-anchor="middle" class="t">PDB (kit)</text>
+      <text x="315" y="190" text-anchor="middle" class="s">XT60 in · XT30 out</text>
+
+      <rect x="240" y="256" width="150" height="62" rx="8" class="n have"/>
+      <text x="315" y="280" text-anchor="middle" class="t">4× ESC + motor</text>
+      <text x="315" y="296" text-anchor="middle" class="s">BLHeli_S 20A · 2216</text>
+      <text x="315" y="310" text-anchor="middle" class="s">KV920 · 1045 props</text>
+
+      <line x1="190" y1="71" x2="236" y2="71" class="wp" marker-end="url(#aP)"/>
+      <text x="213" y="64" text-anchor="middle" class="p">XT60</text>
+      <line x1="315" y1="102" x2="315" y2="146" class="wp" marker-end="url(#aP)"/>
+      <text x="322" y="128" class="p">XT60</text>
+      <line x1="315" y1="208" x2="315" y2="252" class="wp" marker-end="url(#aP)"/>
+      <text x="322" y="234" class="p">XT30 ×4</text>
+
+      <!-- ===== Pixhawk ===== -->
+      <rect x="450" y="40" width="190" height="300" rx="10" class="n have"/>
+      <text x="545" y="66" text-anchor="middle" class="t">Pixhawk 6C</text>
+      <text x="545" y="82" text-anchor="middle" class="s">PX4 v1.17</text>
+      <!-- left ports -->
+      <rect x="450" y="62" width="58" height="18" class="port"/><text x="456" y="75" class="p">POWER1</text>
+      <rect x="450" y="280" width="58" height="18" class="port"/><text x="456" y="293" class="p">PWM 1–4</text>
+      <!-- right ports -->
+      <rect x="582" y="98" width="58" height="18" class="port"/><text x="588" y="111" class="p">GPS1</text>
+      <rect x="582" y="158" width="58" height="18" class="port"/><text x="588" y="171" class="p">TELEM1</text>
+      <rect x="582" y="218" width="58" height="18" class="port"/><text x="588" y="231" class="p">RC IN</text>
+      <rect x="582" y="290" width="58" height="18" class="port"/><text x="588" y="303" class="p">TELEM2</text>
+      <text x="545" y="140" text-anchor="middle" class="s">stabilisation</text>
+      <text x="545" y="155" text-anchor="middle" class="s">failsafes · EKF2</text>
+      <text x="545" y="200" text-anchor="middle" class="s">powers GPS, SiK,</text>
+      <text x="545" y="215" text-anchor="middle" class="s">XM+ from its ports</text>
+
+      <path d="M390,75 L446,71" class="wp" marker-end="url(#aP)"/>
+      <text x="418" y="64" text-anchor="middle" class="p">6-pin</text>
+      <path d="M450,289 C420,289 420,287 394,287" class="wd" marker-end="url(#aS)"/>
+      <text x="420" y="306" text-anchor="middle" class="p">PWM</text>
+
+      <!-- ===== Drone side peripherals ===== -->
+      <rect x="720" y="84" width="180" height="46" rx="8" class="n have"/>
+      <text x="810" y="104" text-anchor="middle" class="t">M10 GPS + compass</text>
+      <text x="810" y="120" text-anchor="middle" class="s">on the kit mast</text>
+      <line x1="640" y1="107" x2="716" y2="107" class="wd" marker-end="url(#aS)"/>
+
+      <rect x="720" y="144" width="180" height="46" rx="8" class="n have"/>
+      <text x="810" y="164" text-anchor="middle" class="t">SiK radio (air)</text>
+      <text x="810" y="180" text-anchor="middle" class="s">433 MHz · MAVLink 57600</text>
+      <line x1="640" y1="167" x2="716" y2="167" class="wd" marker-end="url(#aS)"/>
+
+      <rect x="720" y="204" width="180" height="58" rx="8" class="n have"/>
+      <text x="810" y="224" text-anchor="middle" class="t">FrSky XM+</text>
+      <text x="810" y="239" text-anchor="middle" class="s">ACCST V2 · SBUS out</text>
+      <text x="810" y="253" text-anchor="middle" class="s">solder 5V · GND · SBUS</text>
+      <line x1="716" y1="227" x2="644" y2="227" class="wd" marker-end="url(#aS)"/>
+      <text x="680" y="220" text-anchor="middle" class="p">SBUS</text>
+      <rect x="868" y="197" width="30" height="13" rx="3" class="tag-make"/><text x="883" y="207" text-anchor="middle" class="tg" fill="var(--surface)">MAKE</text>
+
+      <rect x="720" y="280" width="180" height="46" rx="8" class="n make"/>
+      <text x="810" y="300" text-anchor="middle" class="t">Crossover GH 6-pin</text>
+      <text x="810" y="316" text-anchor="middle" class="s">2↔3 · 4↔5 · 6–6 · pin 1 open</text>
+      <line x1="640" y1="299" x2="716" y2="301" class="wd" marker-end="url(#aS)"/>
+      <text x="680" y="292" text-anchor="middle" class="p">uXRCE</text>
+
+      <rect x="720" y="340" width="180" height="46" rx="8" class="n have"/>
+      <text x="810" y="360" text-anchor="middle" class="t">UART→USB (FT231X)</text>
+      <text x="810" y="376" text-anchor="middle" class="s">GH6 port · USB-C</text>
+      <line x1="810" y1="326" x2="810" y2="336" class="wd" marker-end="url(#aS)"/>
+
+      <!-- ===== Ground ===== -->
+      <rect x="960" y="144" width="140" height="46" rx="8" class="n have"/>
+      <text x="1030" y="164" text-anchor="middle" class="t">SiK (ground)</text>
+      <text x="1030" y="180" text-anchor="middle" class="s">USB → laptop QGC</text>
+      <path d="M900,160 L956,160" class="wr"/>
+      <text x="928" y="153" text-anchor="middle" class="p">433</text>
+
+      <rect x="960" y="204" width="140" height="58" rx="8" class="n have"/>
+      <text x="1030" y="224" text-anchor="middle" class="t">RadioMaster Pocket</text>
+      <text x="1030" y="239" text-anchor="middle" class="s">CC2500 · FrSky X2 LBT</text>
+      <text x="1030" y="253" text-anchor="middle" class="s">2× 18650 fitted</text>
+      <path d="M956,232 L904,232" class="wr"/>
+      <text x="930" y="225" text-anchor="middle" class="p">2.4 GHz</text>
+
+
+      <!-- ===== Jetson + camera ===== -->
+      <rect x="720" y="420" width="180" height="110" rx="10" class="n have"/>
+      <text x="810" y="444" text-anchor="middle" class="t">Jetson Orin Nano</text>
+      <text x="810" y="460" text-anchor="middle" class="s">Super 8 GB · 25 W mode</text>
+      <rect x="720" y="468" width="62" height="18" class="port"/><text x="726" y="481" class="p">DC 9–20V</text>
+      <rect x="838" y="440" width="62" height="18" class="port" transform="translate(0,26)"/><text x="844" y="479" class="p">USB-A ①</text>
+      <rect x="838" y="492" width="62" height="18" class="port"/><text x="844" y="505" class="p">USB-A ②</text>
+      <rect x="760" y="510" width="62" height="18" class="port"/><text x="766" y="523" class="p">M.2 2280</text>
+      <text x="810" y="548" text-anchor="middle" class="p">USB-C kept free for flashing</text>
+
+      <path d="M810,386 C810,402 870,405 870,462" class="wd" marker-end="url(#aS)"/>
+      <text x="882" y="404" class="p">ttyUSB0 · 921600</text>
+
+      <rect x="960" y="470" width="140" height="58" rx="8" class="n have"/>
+      <text x="1030" y="492" text-anchor="middle" class="t">RealSense D435i</text>
+      <text x="1030" y="507" text-anchor="middle" class="s">USB 3 · box cable 1 m</text>
+      <text x="1030" y="521" text-anchor="middle" class="s">RGB · depth · IMU</text>
+      <line x1="900" y1="501" x2="956" y2="499" class="wd" marker-end="url(#aS)"/>
+
+      <rect x="760" y="566" width="150" height="44" rx="8" class="n buy"/>
+      <text x="835" y="586" text-anchor="middle" class="t">NVMe SSD 250 GB</text>
+      <text x="835" y="601" text-anchor="middle" class="s">Intenso · Proshop</text>
+      <line x1="791" y1="562" x2="791" y2="532" class="wd" marker-end="url(#aS)"/>
+      <rect x="866" y="559" width="40" height="13" rx="3" class="tag-buy"/><text x="886" y="569" text-anchor="middle" class="tg" fill="var(--surface)">BUY</text>
+
+      <!-- ===== Jetson power chain ===== -->
+      <rect x="30" y="420" width="150" height="62" rx="8" class="n have"/>
+      <text x="105" y="444" text-anchor="middle" class="t">Jetson battery</text>
+      <text x="105" y="460" text-anchor="middle" class="s">4S 2200 35C</text>
+      <text x="105" y="474" text-anchor="middle" class="s">female Deans · JST-XH</text>
+
+      <rect x="214" y="420" width="104" height="62" rx="8" class="n buy"/>
+      <text x="266" y="444" text-anchor="middle" class="t">Male Deans</text>
+      <text x="266" y="460" text-anchor="middle" class="s">+ 18 AWG</text>
+      <text x="266" y="474" text-anchor="middle" class="s">red / black</text>
+      <rect x="284" y="413" width="28" height="13" rx="3" class="tag-buy"/><text x="298" y="423" text-anchor="middle" class="tg" fill="var(--surface)">BUY</text>
+
+      <rect x="352" y="420" width="128" height="62" rx="8" class="n buy"/>
+      <text x="416" y="444" text-anchor="middle" class="t">Inline fuse</text>
+      <text x="416" y="460" text-anchor="middle" class="s">5×20 glass, Kjell</text>
+      <text x="416" y="474" text-anchor="middle" class="s">4 A slow, + wire</text>
+      <rect x="446" y="413" width="28" height="13" rx="3" class="tag-buy"/><text x="460" y="423" text-anchor="middle" class="tg" fill="var(--surface)">BUY</text>
+
+      <rect x="514" y="420" width="150" height="62" rx="8" class="n buy"/>
+      <text x="589" y="444" text-anchor="middle" class="t">DeLOCK DC plug</text>
+      <text x="589" y="460" text-anchor="middle" class="s">5.5 × 2.5 mm</text>
+      <text x="589" y="474" text-anchor="middle" class="s">centre = +</text>
+
+      <line x1="180" y1="451" x2="210" y2="451" class="wp" marker-end="url(#aP)"/>
+      <line x1="318" y1="451" x2="348" y2="451" class="wp" marker-end="url(#aP)"/>
+      <line x1="480" y1="451" x2="510" y2="451" class="wp" marker-end="url(#aP)"/>
+      <path d="M664,451 C692,451 692,477 716,477" class="wp" marker-end="url(#aP)"/>
+      <text x="690" y="440" text-anchor="middle" class="p">12–16.8V</text>
+      <rect x="214" y="490" width="450" height="18" rx="4" fill="none" stroke="var(--make)" stroke-dasharray="2 3"/>
+      <text x="439" y="503" text-anchor="middle" class="p" fill="var(--make)">MAKE: one soldered lead, battery to barrel plug (see detail below)</text>
+
+      <rect x="30" y="520" width="150" height="50" rx="8" class="n buy"/>
+      <text x="105" y="541" text-anchor="middle" class="t">LiPo buzzer 2–8S</text>
+      <text x="105" y="557" text-anchor="middle" class="s">alarm at 3.5 V/cell</text>
+      <line x1="105" y1="482" x2="105" y2="516" class="wd" marker-end="url(#aS)"/>
+      <text x="112" y="502" class="p">balance lead</text>
+      <rect x="146" y="513" width="28" height="13" rx="3" class="tag-buy"/><text x="160" y="523" text-anchor="middle" class="tg" fill="var(--surface)">BUY</text>
+
+      <!-- ===== Charging ===== -->
+      <rect x="30" y="626" width="150" height="62" rx="8" class="n have"/>
+      <text x="105" y="650" text-anchor="middle" class="t">SkyRC e450</text>
+      <text x="105" y="666" text-anchor="middle" class="s">2–4S · 50 W · 4 A</text>
+      <text x="105" y="680" text-anchor="middle" class="s">XT60 lead · XH bal.</text>
+
+      <rect x="232" y="626" width="170" height="62" rx="8" class="n buy"/>
+      <text x="317" y="650" text-anchor="middle" class="t">Deans ↔ XT60 adapter</text>
+      <text x="317" y="666" text-anchor="middle" class="s">Bronto male Deans →</text>
+      <text x="317" y="680" text-anchor="middle" class="s">female XT60</text>
+      <rect x="368" y="619" width="28" height="13" rx="3" class="tag-buy"/><text x="382" y="629" text-anchor="middle" class="tg" fill="var(--surface)">BUY</text>
+
+      <rect x="452" y="626" width="160" height="62" rx="8" class="n have"/>
+      <text x="532" y="650" text-anchor="middle" class="t">Metal box, concrete</text>
+      <text x="532" y="666" text-anchor="middle" class="s">one pack at a time,</text>
+      <text x="532" y="680" text-anchor="middle" class="s">always supervised</text>
+
+      <line x1="180" y1="657" x2="228" y2="657" class="wc" marker-end="url(#aP)"/>
+      <path d="M300,626 C300,560 210,520 184,480" class="wc" marker-end="url(#aP)"/>
+      <text x="262" y="560" class="p">→ Jetson pack</text>
+      <path d="M44,626 C10,560 10,160 40,106" class="wc" marker-end="url(#aP)"/>
+      <text x="16" y="360" class="p" transform="rotate(-90 16 360)">XT60 direct → flight pack</text>
+    </svg>
+    <div class="legend">
+      <span><i style="border-color:var(--power)"></i>power</span>
+      <span><i style="border-color:var(--power);border-top-style:dashed"></i>charging only</span>
+      <span><i style="border-color:var(--signal)"></i>data</span>
+      <span><i style="border-color:var(--rf);border-top-style:dotted"></i>radio link</span>
+      <span><i class="box" style="border-color:var(--have)"></i>have</span>
+      <span><i class="box" style="border-color:var(--buy);border-style:dashed"></i>buy</span>
+      <span><i class="box" style="border-color:var(--make);border-style:dotted"></i>make</span>
+      <span><i class="box" style="border-color:var(--check);border-style:dashed"></i>check</span>
+    </div>
+  </div>
+  <p class="note">The two power systems share only one ground wire, pin 6 of the TELEM2 cable. The serial link needs that ground, and it's safe. Never join the 5 V lines.</p>
+</section>
+
+<section>
+  <h2>Every connection</h2>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>From</th><th>To</th><th>Cable / connector</th><th>Electrical</th><th>Software / setting</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td>Flight battery</td><td>PM02 V3</td><td class="m">XT60</td><td>4S, 14.8–16.8 V</td><td><code>BAT1_N_CELLS</code> = 4, calibrate V/I in QGC</td><td><span class="chip have">have</span></td></tr>
+      <tr><td>PM02 V3</td><td>PDB</td><td class="m">XT60 (kit)</td><td>full pack current</td><td>—</td><td><span class="chip have">have</span></td></tr>
+      <tr><td>PM02 V3</td><td>Pixhawk POWER1</td><td class="m">6-pin (kit)</td><td>5.2 V supply + analog V/I</td><td>analog PM is correct for 6C (not PM02D)</td><td><span class="chip have">have</span></td></tr>
+      <tr><td>PDB</td><td>4× ESC</td><td class="m">XT30 (pre-installed)</td><td>20 A ESCs</td><td>—</td><td><span class="chip have">have</span></td></tr>
+      <tr><td>Pixhawk PWM 1–4</td><td>ESC signal</td><td class="m">kit cable</td><td>PWM / DShot</td><td>QGC → Actuators, Quad X order, <strong>props off</strong></td><td><span class="chip have">have</span></td></tr>
+      <tr><td>Pixhawk GPS1</td><td>M10 GPS + compass</td><td class="m">GH 10-pin (kit)</td><td>5 V from Pixhawk</td><td>compass cal with Jetson running</td><td><span class="chip have">have</span></td></tr>
+      <tr><td>Pixhawk TELEM1</td><td>SiK air radio</td><td class="m">GH 6-pin (kit), straight</td><td>5 V from Pixhawk</td><td><code>MAV_0_CONFIG</code> = TELEM1, 57600 (default)</td><td><span class="chip have">have</span></td></tr>
+      <tr><td>SiK ground</td><td>Laptop</td><td class="m">USB (kit)</td><td>USB power</td><td>QGroundControl auto-connects</td><td><span class="chip have">have</span></td></tr>
+      <tr><td>Pixhawk RC IN</td><td>XM+ pads</td><td class="m">kit RC cable, cut + solder 3 wires</td><td>5 V, GND, SBUS</td><td>Pocket on <strong>FrSky X2 (LBT)</strong>, XM+ SBUS mode, check sticks in QGC → Radio</td><td><span class="chip make">make</span></td></tr>
+      <tr><td>Pocket</td><td>2× 18650</td><td class="m">battery bay</td><td>charges over USB-C</td><td>—</td><td><span class="chip have">have</span></td></tr>
+      <tr><td>Pixhawk TELEM2</td><td>UART→USB GH 6-pin</td><td class="m">crossover GH 6-pin (from a spare kit cable)</td><td>3.3 V logic, <strong>pin 1 open</strong></td><td><code>UXRCE_DDS_CFG</code>=TELEM2, <code>SER_TEL2_BAUD</code>=921600, <code>UXRCE_DDS_DOM_ID</code>=0, <code>MAV_1_CONFIG</code>≠TELEM2</td><td><span class="chip make">make</span></td></tr>
+      <tr><td>UART→USB</td><td>Jetson USB-A ①</td><td class="m">included Type-C cable<span class="sub">find a C→A cable if it is C-to-C</span></td><td>USB 2 is enough</td><td><code>xrce-agent serial --dev /dev/ttyUSB0 -b 921600</code>, user in <code>dialout</code></td><td><span class="chip check">check</span></td></tr>
+      <tr><td>Jetson USB-A ②</td><td>D435i</td><td class="m">box cable, USB-C → A, USB 3</td><td>~0.7 A from Jetson</td><td><code>realsense2_camera</code> → <code>/camera/camera/color/image_raw</code>; <code>rs-enumerate-devices</code> must say USB 3.x</td><td><span class="chip have">have</span></td></tr>
+      <tr><td>Jetson battery</td><td>Jetson DC jack</td><td class="m">male Deans → 4 A slow glass fuse → DeLOCK 5.5×2.5</td><td>12.0–16.8 V into the <a href="https://esys.ir/images/img_Item/3029/Files/Jetson-Orin-Nano-DevKit-Carrier-Board-Specification_SP-11324-001_v1.3.pdf">9–20 V jack</a>, ≈ 2.0 A at 14 V, 2.3 A empty. 470 µF at the plug</td><td>25 W power mode in flight (avoid MAXN SUPER on battery)</td><td><span class="chip make">make</span></td></tr>
+      <tr><td>Jetson battery balance</td><td>Buzzer</td><td class="m">JST-XH 5-pin</td><td>—</td><td>set alarm to 3.5 V/cell</td><td><span class="chip buy">buy</span></td></tr>
+      <tr><td>e450</td><td>Flight battery</td><td class="m">XT60 lead + XH balance</td><td>≤ 4 A, ~1.5–2 h</td><td>LiPo, 4S, balance charge</td><td><span class="chip have">have</span></td></tr>
+      <tr><td>e450</td><td>Jetson battery</td><td class="m">XT60 lead → Deans adapter + XH</td><td>2.2 A (1C), ~1 h</td><td>LiPo, 4S, 2.2 A</td><td><span class="chip buy">buy</span></td></tr>
+      <tr><td>Jetson M.2 2280 slot</td><td>NVMe SSD</td><td class="m">M.2 Key M</td><td>PCIe 3.0 x4</td><td>Install JetPack with the Jetson ISO on a USB stick, SSD as target</td><td><span class="chip buy">buy</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section>
+  <h2>Things to make</h2>
+  <div class="grid2">
+    <div class="card narrow" id="crossover">
+      <h3>TELEM2 crossover cable</h3>
+      <svg viewBox="0 0 560 300" role="img" aria-label="Crossover cable pin map">
+        <text x="40" y="24" class="t">Pixhawk TELEM2</text>
+        <text x="380" y="24" class="t">Converter GH 6-pin</text>
+        <g class="s">
+          <text x="40" y="58">1  +5V</text><text x="40" y="98">2  TX (out)</text><text x="40" y="138">3  RX (in)</text>
+          <text x="40" y="178">4  CTS (in)</text><text x="40" y="218">5  RTS (out)</text><text x="40" y="258">6  GND</text>
+          <text x="420" y="58">1  VBUS</text><text x="420" y="98">2  TX</text><text x="420" y="138">3  RX</text>
+          <text x="420" y="178">4  Ct</text><text x="420" y="218">5  Rt</text><text x="420" y="258">6  GND</text>
+        </g>
+        <line x1="150" y1="54" x2="200" y2="54" stroke="var(--crit)" stroke-width="2.4"/>
+        <text x="206" y="58" class="p" fill="var(--crit)">cut + insulate, do not connect</text>
+        <line x1="368" y1="54" x2="410" y2="54" stroke="var(--crit)" stroke-width="2.4"/>
+        <path d="M150,94 C270,94 290,134 410,134" class="wd"/>
+        <path d="M150,134 C270,134 290,94 410,94" class="wd"/>
+        <path d="M150,174 C270,174 290,214 410,214" class="wd" stroke-dasharray="5 4"/>
+        <path d="M150,214 C270,214 290,174 410,174" class="wd" stroke-dasharray="5 4"/>
+        <line x1="150" y1="254" x2="410" y2="254" stroke="var(--ink)" stroke-width="2.2"/>
+        <text x="280" y="290" text-anchor="middle" class="p">dashed = flow control, recommended but optional</text>
+      </svg>
+      <ol class="steps">
+        <li>Take a spare GH 6-pin cable from the Pixhawk 6C cable set (it has five). Pinouts: <a href="https://docs.holybro.com/autopilot/pixhawk-6c/pixhawk-6c-pinout">Pixhawk 6C ports</a>, <a href="https://cdn.shopify.com/s/files/1/0604/5905/7341/files/PinoutsV1.3.jpg">converter</a>.</li>
+        <li>Cut it in the middle. Join 2↔3 and 3↔2, 4↔5 and 5↔4, 6↔6. Leave pin 1 cut on both halves.</li>
+        <li>Solder each joint and slide 2 mm heat-shrink over it. Label the cable "TELEM2 X".</li>
+        <li>Check with a multimeter that pin 1 isn't connected to anything and that 2↔3 has continuity.</li>
+      </ol>
+    </div>
+
+    <div class="card narrow">
+      <h3>Jetson power lead</h3>
+      <svg viewBox="0 0 560 300" role="img" aria-label="Jetson power lead">
+        <rect x="20" y="110" width="90" height="70" rx="6" class="n have"/>
+        <text x="65" y="140" text-anchor="middle" class="t">4S 2200</text>
+        <text x="65" y="156" text-anchor="middle" class="s">female Deans</text>
+        <rect x="128" y="120" width="50" height="50" rx="5" class="n buy"/>
+        <text x="153" y="149" text-anchor="middle" class="s">Deans ♂</text>
+        <path d="M178,132 L240,132" stroke="var(--crit)" stroke-width="3"/>
+        <rect x="240" y="116" width="96" height="32" rx="5" class="n buy"/>
+        <text x="288" y="137" text-anchor="middle" class="s">5×20 · 4 A T</text>
+        <path d="M336,132 L360,132" stroke="var(--crit)" stroke-width="3"/>
+        <circle cx="364" cy="132" r="4" fill="var(--make)"/>
+        <path d="M368,132 L440,132" stroke="var(--crit)" stroke-width="3"/>
+        <path d="M178,160 L440,160" stroke="var(--ink)" stroke-width="3"/>
+        <rect x="440" y="112" width="96" height="66" rx="6" class="n have"/>
+        <text x="488" y="138" text-anchor="middle" class="t">DeLOCK</text>
+        <text x="488" y="154" text-anchor="middle" class="s">5.5 × 2.5</text>
+        <text x="488" y="168" text-anchor="middle" class="s">+ ctr / − sleeve</text>
+        <text x="200" y="124" class="p">red 18 AWG</text>
+        <text x="282" y="104" class="p">holder leads 1.25 mm²</text>
+        <text x="342" y="118" class="p" fill="var(--make)">splice</text>
+        <text x="380" y="124" class="p">red 18 AWG</text>
+        <text x="260" y="176" class="p">black 18 AWG, no fuse</text>
+        <line x1="418" y1="132" x2="418" y2="142" stroke="var(--ink)" stroke-width="1.5"/><line x1="410" y1="142" x2="426" y2="142" stroke="var(--ink)" stroke-width="2"/><line x1="410" y1="147" x2="426" y2="147" stroke="var(--ink)" stroke-width="2"/><line x1="418" y1="147" x2="418" y2="160" stroke="var(--ink)" stroke-width="1.5"/>
+        <rect x="390" y="186" width="56" height="13" rx="3" class="tag-buy"/><text x="418" y="196" text-anchor="middle" class="tg" fill="var(--surface)">470 µF</text>
+        <line x1="418" y1="160" x2="418" y2="186" stroke="var(--buy)" stroke-width="1" stroke-dasharray="2 2"/>
+        <text x="20" y="226" class="s">Jack: 9–20 V, max 3.5 A (NVIDIA SP-11324-001 §3.8). 4S = 12.0–16.8 V.</text>
+        <text x="20" y="244" class="s">25 W mode + camera ≈ 28 W: 2.0 A at 14 V (buzzer), 2.3 A at 12 V.</text>
+        <text x="20" y="262" class="s">4 A slow (T) glass fuse, or 3.15 A T. Never 5 A, avoid fast (F).</text>
+        <text x="20" y="280" class="s">470 µF across the plug damps the spike when the pack is plugged in.</text>
+      </svg>
+      <ol class="steps">
+        <li>Solder red and black 18 AWG to the male Deans plug. Mind the polarity: the plug only fits one way round.</li>
+        <li>Cut the red wire 5–10 cm from the Deans and solder one fuse-holder lead to each end, with 5 mm heat-shrink over both joints. Fit the 4 A slow fuse, screw the holder tight and tape over the seam against vibration.</li>
+        <li>Red goes to the centre pin terminal (+), black to the sleeve (−). Heat-shrink everything.</li>
+        <li>Put the 470 µF capacitor's legs into the plug's screw terminal with the wires: the long leg (+) with red, the striped leg (−) with black. Reversed, an electrolytic capacitor can burst.</li>
+        <li><strong>Multimeter check before connecting the Jetson:</strong> +12–16.8 V on the centre pin and 0 V on the sleeve, with the fuse fitted.</li>
+      </ol>
+    </div>
+
+    <div class="card narrow">
+      <h3>XM+ receiver to RC IN</h3>
+      <p class="note" style="margin-top:0">Cut the connector off one end of the kit's RC cable (it needs ≈ 25 cm; splice with a spare kit cable if shorter). Solder <strong>5V</strong>, <strong>GND</strong> and <strong>SBUS</strong> to the XM+ pads and heat-shrink the three joints. Put the receiver in the printed <strong>pole case</strong> (<code>hardware/3dprint/xmplus_pole_case.stl</code> + lid) instead of wrapping it in wide heat-shrink, feed the antennas through the two guides, and zip-tie it to the right landing-gear pole. Bind with the Pocket on <strong>FrSky X2 (LBT)</strong> and check the sticks in QGC → Radio.</p>
+    </div>
+
+    <div class="card narrow">
+      <h3>Printed parts: camera, Jetson, antennas</h3>
+      <p class="note" style="margin-top:0">Holybro sells the depth-camera mount separately (per the dev kit page), so print it from their <a href="https://docs.holybro.com/drone-development-kit/px4-development-kit-x500v2/download">3D-print zip</a>. The D435i bolts on with two short M3 screws on the 45 mm pattern (holes "B"). The Jetson hangs on four printed 10 mm M2.5 spacers. The dev kit's two Wi-Fi PCB antennas are clipped, not glued, to the plastic base: slide each outward and lift, then fit them to a printed antenna mount. Our files are in <code>hardware/3dprint/</code> (XM+ pole case and lid, Jetson spacers). Print in PETG.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Mounting layout (3D model)</h2>
+  <p style="margin:0 0 14px;max-width:72ch">Built in Blender from <a href="https://docs.holybro.com/drone-development-kit/px4-development-kit-x500v2/download">Holybro's official STEP files</a> for the X500 V2 frame (including their depth-camera mount), the Pixhawk 6C and the GPS, and from Intel's D435 mesh in <a href="https://github.com/realsenseai/realsense-ros">realsense-ros</a>. The Jetson, batteries and small parts are modelled from their published dimensions. The model is <code>hardware/blender/cogidrone_x500.blend</code>.</p>
+  <div class="renders">
+    <figure><img src="img/x500-iso_front-left.jpg" alt="Drone from the front left: Jetson battery across the front of the top plate, D435i on Holybro's mount at the front of the rails, flight battery under the rails" loading="lazy"><figcaption>Front left. Jetson pack across the front of the top plate, D435i on Holybro's rail mount, flight pack in the strap mount.</figcaption></figure>
+    <figure><img src="img/x500-iso_rear-right.jpg" alt="Drone from the rear right: Jetson hanging under the rear platform board with its ports facing back, GPS mast above it" loading="lazy"><figcaption>Rear right. Jetson hangs under the rear platform board, ports facing back. The GPS mast stands on the same board.</figcaption></figure>
+    <figure><img src="img/x500-side_left.jpg" alt="Side view with the camera's depth field of view drawn as a blue wedge, clear of the propellers" loading="lazy"><figcaption>Side, nose left. The blue wedge is the D435i depth view (87° × 58°); no propeller enters it.</figcaption></figure>
+    <figure><img src="img/x500-top.jpg" alt="Top view, nose up" loading="lazy"><figcaption>Top, nose up. Pixhawk arrow forward, GPS behind the body.</figcaption></figure>
+    <figure><img src="img/x500-XMplus_pole_closeup.jpg" alt="Close-up of the printed XM+ case on the right landing-gear pole with the two antennas pointing down in a V" loading="lazy"><figcaption>XM+ in the printed pole case, antennas down in a 90° V, cable up the pole.</figcaption></figure>
+    <figure><img src="img/x500-Jetson_mount_closeup.jpg" alt="Close-up of the Jetson hanging under the platform board on four orange printed spacers" loading="lazy"><figcaption>Jetson on four printed 10 mm spacers under the platform board.</figcaption></figure>
+  </div>
+  <div class="tablewrap" style="margin-top:16px">
+  <table>
+    <thead><tr><th>Part</th><th>Where</th><th>Why there</th><th>Checked in the model</th></tr></thead>
+    <tbody>
+      <tr><td>Pixhawk 6C</td><td>Top plate centre, on its foam pad, arrow forward</td><td>Standard X500 position, centred over the CG</td><td>Fits between the plate screws</td></tr>
+      <tr><td>Jetson Orin Nano</td><td>Upside down under the rear platform board on the 58 × 86 mm holes, on four <strong>printed 10 mm spacers</strong> with M2.5 × 18 screws (the kit's M2.5 × 12 are too short) and the kit's M2.5 locknuts. Heatsink down, ports to the rear</td><td>Holybro's own companion-computer suggestion. The 10 mm spacers clear the M.2 slots and Wi-Fi card under the carrier. Ports reachable from behind</td><td>10 mm from the flight pack, 142 mm above the ground</td></tr>
+      <tr><td>GPS mast</td><td>Kit position, on top of the same platform board</td><td>Holybro's own layout</td><td>GPS sits 135 mm above the Jetson, well clear of its USB 3 noise</td></tr>
+      <tr><td>Jetson battery 4S 2200 (120 × 35 × 28)</td><td>Across the front edge of the top plate, foam pad + strap</td><td>Balances the Jetson at the rear. Short lead to the front, buzzer on top</td><td>Clear of props and of the Pixhawk (2 mm)</td></tr>
+      <tr><td>Flight battery 4S 5200 (139 × 47 × 40)</td><td>Kit strap mount under the rails, centred 20 mm forward</td><td>Rear end clears the Jetson; front end clears the camera mount</td><td>129 mm above the ground</td></tr>
+      <tr><td>D435i</td><td>Holybro's depth-camera mount on the front ends of the rails, level</td><td>Holybro designed it for this camera and frame</td><td>0 prop points in the depth or colour view (540 sample points per prop disc), with or without a 10° tilt down</td></tr>
+      <tr><td>XM+ receiver</td><td><strong>Right landing-gear pole, 45 % down</strong>, in the printed pole case, antennas pointing down in a 90° V</td><td>Best of 22 spots scored in the model: 95 % clear view toward the ground, ~10 cm from the Jetson's USB 3 / Wi-Fi, 27 cm from the SiK</td><td>No collisions; RC cable ≈ 25 cm with slack</td></tr>
+      <tr><td>SiK air radio</td><td>Rear-left arm, antenna pointing down</td><td>Opposite side from the XM+, short cable to TELEM1</td><td>—</td></tr>
+      <tr><td>UART-to-USB</td><td>Zip-tied to the right rail, next to the Jetson</td><td>Short USB lead to the Jetson's rear USB-A port</td><td>—</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="note">Centre of gravity from the off-centre masses: about 2 mm forward of the frame centre, all-up weight about 2.2 kg. The Jetson dev kit mass (176 g) and frame kit mass (1050 g) are estimates, so still do the two-finger balance check on the real drone. The Orin Nano carrier's holes should match the platform board's 58 × 86 mm Jetson Nano pattern; measure centre to centre before drilling or ordering. Removing the dev kit's plastic base frees the carrier but the Wi-Fi antennas are stuck to the base: re-stick them on the platform, and keep Wi-Fi on 5 GHz or off in flight so it doesn't interfere with the 2.4 GHz RC link.</p>
+</section>
+
+<section>
+  <h2>Software match</h2>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>What the code expects</th><th>Where</th><th>Hardware reality</th><th>Result</th></tr></thead>
+    <tbody>
+      <tr><td><code>/fmu/out/vehicle_status_v1</code>, <code>vehicle_local_position_v1</code>; <code>/fmu/in/offboard_control_mode</code>, <code>trajectory_setpoint</code>, <code>vehicle_command</code></td><td class="m"><a href="https://github.com/CogitoNTNU/CogiDrone/blob/c%2B%2B/gazebo-sim/src/controller/pixhawk.cpp"><code>src/controller/pixhawk.cpp</code></a></td><td>PX4 v1.17 on the Pixhawk publishes these <code>_v1</code> names, matching <code>px4_msgs</code> release/1.17</td><td><span class="chip ok">match</span><span class="sub">flash v1.17</span></td></tr>
+      <tr><td>XRCE agent over UDP (sim) / serial (drone)</td><td class="m"><a href="https://github.com/CogitoNTNU/CogiDrone/blob/c%2B%2B/gazebo-sim/docs/architecture.md#L167"><code>docs/architecture.md:167</code></a></td><td>FT231X → <code>ftdi_sio</code> → <code>/dev/ttyUSB0</code>, 921600 is within the chip's 3 Mbaud</td><td><span class="chip ok">match</span></td></tr>
+      <tr><td><code>/dev/ttyTHS1</code></td><td class="m"><a href="https://github.com/CogitoNTNU/CogiDrone/blob/c%2B%2B/gazebo-sim/docs/jetson.md#L166"><code>docs/jetson.md:166</code></a><br><a href="https://github.com/CogitoNTNU/CogiDrone/blob/c%2B%2B/gazebo-sim/scripts/jetson/install-user.sh#L69"><code>install-user.sh:69</code></a></td><td>We don't use the header UART</td><td><span class="chip crit">fix</span><span class="sub">change to ttyUSB0</span></td></tr>
+      <tr><td>User in <code>dialout</code></td><td class="m"><a href="https://github.com/CogitoNTNU/CogiDrone/blob/c%2B%2B/gazebo-sim/scripts/jetson/install-system.sh#L90"><code>install-system.sh:90</code></a></td><td>Needed to open ttyUSB0 without sudo</td><td><span class="chip ok">match</span></td></tr>
+      <tr><td>Camera on <code>/camera/camera/color/image_raw</code></td><td class="m"><a href="https://github.com/CogitoNTNU/CogiDrone/blob/c%2B%2B/gazebo-sim/ros2_ws/src/cogidrone_perception/cogidrone_perception/detector.py#L45"><code>detector.py:45</code></a><br><a href="https://github.com/CogitoNTNU/CogiDrone/blob/c%2B%2B/gazebo-sim/ros2_ws/src/cogidrone_bringup/config/gz_bridge.yaml"><code>gz_bridge.yaml</code></a></td><td><code>realsense2_camera</code> default namespace and name are both <code>camera</code></td><td><span class="chip ok">match</span></td></tr>
+      <tr><td>C++ core subscribes <code>/camera/image</code></td><td class="m"><a href="https://github.com/CogitoNTNU/CogiDrone/blob/c%2B%2B/gazebo-sim/ros2_ws/src/cogidrone_bringup/launch/sim_cpp.launch.py#L69"><code>sim_cpp.launch.py:69</code></a></td><td>Needs the same remap in a real-drone launch file that doesn't exist yet</td><td><span class="chip check">to do</span></td></tr>
+      <tr><td>Depth as 32FC1 metres (sim)</td><td class="m"><a href="https://github.com/CogitoNTNU/CogiDrone/blob/c%2B%2B/gazebo-sim/sim/models/cogidrone_x500/model.sdf#L7"><code>model.sdf:7</code></a></td><td>D435i publishes 16UC1 millimetres</td><td><span class="chip check">to do</span><span class="sub">when depth is used</span></td></tr>
+      <tr><td><code>camera_link</code> 0.12 m ahead, ~0 m above <code>base_link</code></td><td class="m"><a href="https://github.com/CogitoNTNU/CogiDrone/blob/c%2B%2B/gazebo-sim/sim/models/cogidrone_x500/model.sdf#L16"><code>model.sdf:16</code></a></td><td>Real mount lower and tilted to keep props out of view</td><td><span class="chip check">to do</span><span class="sub">measure, update pose</span></td></tr>
+      <tr><td>RC joystick in sim via USB</td><td class="m"><a href="https://github.com/CogitoNTNU/CogiDrone/blob/c%2B%2B/gazebo-sim/docs/jetson.md#L149"><code>docs/jetson.md:149</code></a></td><td>Pocket over USB-C data cable on the sim box; on the drone it uses RF to the XM+</td><td><span class="chip ok">match</span></td></tr>
+      <tr><td>MAVLink on TELEM2 ("Onboard")</td><td class="m"><a href="https://claude.ai/code/artifact/2a45d089-8410-4873-ada0-f07cd1a426c0">build sheet</a></td><td>Code uses uXRCE-DDS on TELEM2, not MAVLink</td><td><span class="chip crit">ignore sheet</span><span class="sub">follow <a href="https://github.com/CogitoNTNU/CogiDrone/blob/c%2B%2B/gazebo-sim/docs/hardware.md">hardware.md</a></span></td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section>
+  <h2>Bench order, first power-up</h2>
+  <div class="grid2">
+    <ul class="checklist">
+      <li>Jetson lead: multimeter shows +12–16.8 V on the centre pin, fuse fitted. Capacitor stripe on the black wire. Plug fits tight (2.5 mm pin)</li>
+      <li>Jetson powers up on its own pack. J14 recovery jumper removed. Set 25 W mode, then 10 min of <code>sudo tegrastats</code> with the camera streaming: no reboot, fuse not warm</li>
+      <li>Buzzer on the Jetson pack balance lead, alarm set to 3.5 V/cell</li>
+      <li>Crossover cable: pin 1 open (multimeter), 2↔3 continuity</li>
+      <li><code>ls /dev/serial/by-id/</code> shows the FTDI device; agent running on ttyUSB0</li>
+      <li>PX4 params set (UXRCE_DDS_CFG, SER_TEL2_BAUD, DOM_ID), Pixhawk rebooted</li>
+    </ul>
+    <ul class="checklist">
+      <li><code>ros2 topic list</code> on the Jetson shows <code>/fmu/out/vehicle_status_v1</code></li>
+      <li><code>rs-enumerate-devices</code> reports USB 3.x for the D435i, plugged into the other USB stack from the UART converter</li>
+      <li>Camera image has no props in it (props on, motors off). The model says none should be</li>
+      <li>XM+ bound on X2 LBT, sticks move in QGC → Radio</li>
+      <li>Motor order and direction in QGC → Actuators, <strong>props off</strong>, smoke stopper if you have one</li>
+      <li>Compass calibrated with everything mounted and the Jetson running; CG check on two fingers (model: ~2 mm forward)</li>
+    </ul>
+  </div>
+</section>
+
+<section id="refs">
+  <h2>References</h2>
+  <div class="refs">
+    <div>
+      <h3>Datasheets and guides</h3>
+      <ul>
+        <li><a href="https://docs.px4.io/v1.17/en/frames_multicopter/holybro_x500v2_pixhawk6c">PX4: Holybro X500 V2 + Pixhawk 6C build</a><span>Assembly guide for our exact kit</span></li>
+        <li><a href="https://docs.holybro.com/drone-development-kit/px4-development-kit-x500v2">Holybro: PX4 Development Kit X500 V2</a><span>Kit contents and parts</span></li>
+        <li><a href="https://docs.holybro.com/autopilot/pixhawk-6c/pixhawk-6c-pinout">Holybro: Pixhawk 6C ports</a><span>TELEM, RC IN, GPS and POWER pinouts</span></li>
+        <li><a href="https://docs.px4.io/v1.17/en/flight_controller/pixhawk6c.html">PX4: Pixhawk 6C</a><span>Serial port mapping and PX4 support</span></li>
+        <li><a href="https://cdn.shopify.com/s/files/1/0604/5905/7341/files/PinoutsV1.3.jpg">Holybro: UART to USB converter pinout v1.3</a><span>Why the TELEM2 cable must be crossed</span></li>
+        <li><a href="https://docs.px4.io/v1.17/en/companion_computer/pixhawk_companion">PX4: companion computer on TELEM2</a><span>Crossover table, pin 1 not connected</span></li>
+        <li><a href="https://developer.nvidia.com/embedded/downloads">NVIDIA Jetson download center</a><span>Orin Nano carrier board spec: DC jack 9–20 V, 3.5 A, centre +</span></li>
+      </ul>
+    </div>
+    <div>
+      <h3>Software and setup</h3>
+      <ul>
+        <li><a href="https://docs.px4.io/v1.17/en/middleware/uxrce_dds.html">PX4: uXRCE-DDS</a><span>Agent, UXRCE_DDS_CFG, baud rate, domain ID</span></li>
+        <li><a href="https://docs.px4.io/v1.17/en/config/actuators.html">PX4: actuator setup</a><span>Motor order and direction, props off</span></li>
+        <li><a href="https://docs.px4.io/v1.17/en/config/radio.html">PX4: radio setup</a><span>Calibrating the Pocket and XM+</span></li>
+        <li><a href="https://github.com/realsenseai/realsense-ros">realsense-ros</a><span>D435i ROS 2 driver and topic names</span></li>
+        <li><a href="https://github.com/PX4/PX4-gazebo-models/blob/main/models/x500_base/model.sdf">PX4 x500_base model</a><span>Frame origin used for the camera pose</span></li>
+        <li><a href="https://qgroundcontrol.com">QGroundControl</a><span>Parameters, calibration, flying</span></li>
+        <li><a href="https://flydrone.no">flydrone.no</a><span>Operator registration and A1/A3 certificate</span></li>
+        <li><a href="https://github.com/CogitoNTNU/CogiDrone/tree/c%2B%2B/gazebo-sim">CogiDrone on GitHub (c++/gazebo-sim)</a><span><a href="https://github.com/CogitoNTNU/CogiDrone/blob/c%2B%2B/gazebo-sim/docs/hardware.md">hardware.md</a> · <a href="https://github.com/CogitoNTNU/CogiDrone/blob/c%2B%2B/gazebo-sim/docs/jetson.md">jetson.md</a> · <a href="https://github.com/CogitoNTNU/CogiDrone/blob/c%2B%2B/gazebo-sim/docs/architecture.md">architecture.md</a> · <a href="https://github.com/CogitoNTNU/CogiDrone/blob/c%2B%2B/gazebo-sim/sim/models/cogidrone_x500/model.sdf">model.sdf</a></span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<footer>Links and prices checked 29 Oct 2026. RS Online and Proshop block automated checks but open normally in a browser.</footer>
+</div>

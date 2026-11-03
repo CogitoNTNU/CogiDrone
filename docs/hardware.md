@@ -45,9 +45,10 @@ ssh <user>@<sim-jetson-host>
 | Pixhawk ↔ Jetson link | Holybro UART-to-USB converter | TELEM2 → Jetson USB-A |
 | Flight battery | Sunpadow 4S 5200 mAh 110C, XT60 | Powers motors and Pixhawk |
 | Jetson battery | 4S 2200 mAh 35C, Deans | Powers **only** the Jetson (and the camera through its USB port) |
-| Jetson power lead | Deans pigtail → 3 A inline fuse → 5.5×2.5 mm barrel plug | Battery to Jetson barrel jack, no converter |
+| Jetson power lead | Deans pigtail → 4 A slow 5×20 mm glass fuse → DeLOCK 5.5×2.5 mm screw-terminal plug, 470 µF across the plug | Battery to Jetson barrel jack, no converter. Built by us, see [shopping-list.md](shopping-list.md#building-the-jetson-power-lead) |
 | Low-voltage buzzer | Generic, on the Jetson battery's balance lead | The only low-battery warning for the Jetson pack |
-| Charger | SkyRC e450 | Charges both 4S packs, one at a time |
+| Charger | SkyRC e450 | Charges both 4S packs, one at a time. The Jetson pack goes through a Deans → XT60 adapter |
+| Jetson storage | Intenso Premium 250 GB NVMe, M.2 2280 | In the carrier board's 2280 slot. No storage comes with the dev kit |
 
 ## Drone: how it is connected
 
@@ -86,7 +87,7 @@ flowchart LR
     RX -- "SBUS → RC IN<br/>(5V, GND, SBUS soldered)" --> FC
     FC -- "TELEM2 (uXRCE-DDS, 921600)" --> USBUART
     USBUART -- "USB-A" --> JET
-    JBAT -- "Deans → 3 A fuse → barrel jack" --> JET
+    JBAT -- "Deans → 4 A fuse → barrel plug" --> JET
     JBAT -. balance lead .-> BUZ
     JET -- "USB 3 (blue USB-A port)" --> CAM
 
@@ -113,7 +114,11 @@ Rules for the Jetson lead:
 - The plug must be **5.5 × 2.5 mm**, not the similar 5.5 × 2.1 mm. A loose plug reboots the Jetson
   in flight.
 - The fuse protects the jack, which is rated for 3.5 A. A nearly empty pack under full load (25 W
-  mode plus the camera) draws about 2.5 A, so use a slow-blow fuse.
+  mode plus the camera) draws about 2.5 A, so use a **slow-blow (T)** fuse: 4 A or 3.15 A, never
+  more. A fast (F) fuse can blow on the inrush when the Jetson starts.
+- A 470 µF / 35 V capacitor sits across the plug's screw terminal (stripe = − to black). It damps
+  the spike when the pack is plugged in, so the jack never sees more than its 20 V limit.
+- Remove the buzzer from the balance lead after use. It draws current and empties the pack.
 - **PX4 cannot see the Jetson battery.** The buzzer is its only low-voltage warning. Charge both
   packs before every session.
 
@@ -199,7 +204,7 @@ down), measure it and start the sim with the same values, e.g. `cam_pitch:=20 ca
 
 ## Bench checklist before the first flight
 
-- [ ] Jetson lead polarity checked with a multimeter, 5.5 × 2.5 mm plug fits tightly
+- [ ] Jetson lead polarity checked with a multimeter (+12–16.8 V on the centre pin, Jetson unplugged), fuse fitted, plug fits tightly
 - [ ] Flashing jumper removed (J14 pins 9–10 are only for recovery mode)
 - [ ] Low-voltage buzzer goes off on the Jetson pack
 - [ ] Sticks move in QGC's Radio page (SBUS reaches the Pixhawk)
