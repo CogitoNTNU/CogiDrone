@@ -217,6 +217,7 @@ typings
 # Development
 .backup
 .dev
+temp.*
 
 # Logs
 logs
