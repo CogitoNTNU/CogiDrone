@@ -58,6 +58,9 @@ std::expected<std::unique_ptr<Navigation>, cogidrone::Error> Navigation::create(
     n->wire();
     cogidrone::log(LOGGING_LEVEL::INFO, "Navigation object wired successfully"sv);
 
+    // | DEBUG: Publish status
+    n->publishStatus();                                                                 // ! NOTE: Unsure if this works
+
     // * Return the fully constructed Navigation object
     return n;
 }
@@ -77,9 +80,15 @@ void Navigation::wire() noexcept {
         }
     );
 
-    // TODO: Manual override channel - the mechanism (string commands? joy topic?
-    //     : direct Drone-level call?) is a design decision, not yet made.
-    // ! WHEN IMPLEMENTING IT, DO NOT MUTATE RUNTIME STATE FROM THE CALLBACK.
+
+    // * Manual override
+    // ? `Bool` is a LEVEL: true = pilot has control, false = Navigation has
+    // ? control. The publisher is the RC bridge (not yet implemented) that
+    // ? mirrors the pilot's mode switch onto ROS.
+    // ? QoS: volatile + depth 1 is enough IF the bridge publishes periodically.
+    // ? If the bridge latches the switch instead, both sides must use
+    // ? transient_local so a late-joining Navigation learns the current state.
+    // ! No explicit callback group - same invariant as the other callbacks.
     // ? The override callback must only post a request - e.g. an
     // ? `std::atomic_bool overrideRequested` or an atomic enum - and the control
     // ? step (`onDetections` / `onWatchdogTick`) consumes it. Reasons:
@@ -93,6 +102,13 @@ void Navigation::wire() noexcept {
     // ?      stays correct in both configurations.
     // ?   3. A direct Drone-level call runs on whatever thread Drone calls from -
     // ?      not an executor thread at all. Atomic is mandatory there.
+    m.manualOverrideSubscription = m.node->create_subscription<std_msgs::msg::Bool>(
+        "/navigation/manual_override",
+        rclcpp::QoS(1).transient_local(),                                               // ? Latch the last state for late-joining Navigation
+        [this](const std_msgs::msg::Bool& msg) {
+            this->onManualOverride(msg);
+        }
+    );
 
     // TODO: Drone state (position/velocity/orientation) - the source is undecided.
     //     : Estimation is scrapped; candidates are subscribing to
@@ -139,9 +155,15 @@ void Navigation::wire() noexcept {
 
 
 // * Callbacks
-// ! See note about mutex in `navigation.h` if you're confused why this callback does not lock
+// ? No lock: the executor serializes this callback with onWatchdogTick() and
+// ? onManualOverride() via the node's default MutuallyExclusive group.
+// ? If controlMutex is reinstated, uncomment the lock_guard below.
 void Navigation::onDetections(const vision_msgs::msg::Detection2DArray& msg) {
     // | std::lock_guard lock(controlMutex);
+
+    // ? Apply any pending override FIRST - it must take effect even if the rest
+    // ? of the control step is skipped.
+    consumeManualOverride();
 
     // ? Heartbeat: Perception is alive, regardless of whether a person was found.
     lastHeartbeatTime = m.node->now();
@@ -174,7 +196,11 @@ void Navigation::onDetections(const vision_msgs::msg::Detection2DArray& msg) {
 
         // TODO: person.position = ... (world-frame, from fused detections)
     }
-
+    
+    // ? While overridden, keep `person` fresh (so the mission resumes with
+    // ? current data) but do not run the state machine or behaviors.
+    if (manualOverrideActive) return;
+    
     // * Drive the state machine and behavior on every frame
     if (auto next = evaluateTransitions()) {
         transitionTo(*next);
@@ -184,9 +210,19 @@ void Navigation::onDetections(const vision_msgs::msg::Detection2DArray& msg) {
     executeBehavior();
 }
 
-// ! See note about mutex in `navigation.h` if you're confused why this callback does not lock
+// ? No lock: same reason as onDetections().
+// ? If controlMutex is reinstated, uncomment the lock_guard below.
 void Navigation::onWatchdogTick() {
     // | std::lock_guard lock(controlMutex);
+
+    // ? Consume the override request even when Perception is silent: otherwise a
+    // ? pilot who engages override while Perception is dead could never release
+    // ? it (no frames -> no consumption).
+    consumeManualOverride();
+
+    // ? While overridden, Perception silence is not our problem - the pilot is
+    // ? flying. Do not run the crash protocol.
+    if (manualOverrideActive) return;
 
     // ? The detection callback normally drives the state machine. This timer
     // ? only acts when NO frames arrive at all - i.e. Perception is dead, not
@@ -196,13 +232,22 @@ void Navigation::onWatchdogTick() {
     onPerceptionCrashed();
 }
 
+void Navigation::onManualOverride(const std_msgs::msg::Bool& msg) {
+    manualOverrideRequested.store(msg.data, std::memory_order_relaxed);
+}
 
 
 // * State machine
 std::optional<MissionState> Navigation::evaluateTransitions() {
-    // ? No lock: `state`/`stateEntryTime` are timer-thread-owned. The only
-    // ? cross-thread data read here is `person`/`person.timestamp`, guarded
-    // ? inside detectionIsValid()/personIsLost() by personMutex.
+    // ? No lock: called only from onDetections(), which is serialized by the
+    // ? executor. `person`/`person.timestamp` are read here without a mutex for
+    // ? the same reason. If controlMutex is reinstated, the caller must hold it.
+
+    // ? Manual override freezes the mission: the pilot is flying, so no
+    // ? transition should fire. Timeouts are meaningless while we are not the
+    // ? pilot.
+    if (manualOverrideActive) return std::nullopt;
+
     switch (state) {
         case MissionState::IDLE:
             // TODO: mission start trigger - tied to the manual override design
@@ -266,7 +311,9 @@ void Navigation::onEnter(MissionState entered) {
 
 
 void Navigation::onPerceptionCrashed() {
-    // ! Caller holds `controlMutex`.
+    // ! Caller must hold controlMutex if mutex is reinstated - do NOT lock here!
+    // ? Called only from onWatchdogTick(), which is serialized by the executor.
+    
     // ? Protocol: Perception is gone. We cannot see the person and cannot know
     // ? whether they are still there. Stop following and hold.
     if (state == MissionState::PERSON_LOST) return;                                     // Already handled
@@ -287,10 +334,33 @@ void Navigation::onPerceptionCrashed() {
 }
 
 
-void Navigation::onManualOverride(const std_msgs::msg::Bool& msg) {
-    manualOverrideRequested.store(msg.data, std::memory_order_relaxed);
-}
+void Navigation::consumeManualOverride() {
+    // ? Control step only. Level comparison, NOT exchange(false): the override
+    // ? is a state ("pilot has control"), not an event. exchange() would lose
+    // ? repeated identical values.
+    const bool REQUESTED = manualOverrideRequested.load(std::memory_order_relaxed);
+    if (REQUESTED == manualOverrideActive) return;
 
+    manualOverrideActive = REQUESTED;
+
+    if (manualOverrideActive) {
+        RCLCPP_WARN(m.node->get_logger(),
+                    "Manual override ENGAGED - suspending mission (state: %s)",
+                    toString(state).c_str());
+    } else {
+        // ? Restart the dwell timer: evidence gathered before the override is
+        // ? stale. Without this, a long override would instantly satisfy
+        // ? trackConfirmTime on the first frame after release.
+        // ? NOTE: `person.timestamp` is deliberately NOT reset. If the person
+        // ? was absent during the override, personIsLost() is immediately true
+        // ? and FOLLOWING -> PERSON_LOST fires on the first frame. That is
+        // ? correct since: the person really is lost.
+        stateEntryTime = m.node->now();
+        RCLCPP_INFO(m.node->get_logger(),
+                    "Manual override RELEASED - resuming mission (state: %s)",
+                    toString(state).c_str());
+    }
+}
 
 // TODO: REFACTOR SUCH THAT WE CAN REMOVE THIS
 std::string Navigation::toString(MissionState state) noexcept {
@@ -311,7 +381,15 @@ std::string Navigation::toString(MissionState state) noexcept {
 
 // * Behaviors
 void Navigation::executeBehavior() {
-    // ! Caller holds controlMutex.
+    // ! Caller must hold controlMutex if mutex is reinstated - do NOT lock here!
+    // ? No lock: called only from onDetections(), which is serialized by the executor. 
+
+    // ? Manual override: publish NOTHING. PX4 is not in offboard mode and would
+    // ? ignore us, but publishing would still overwrite Pixhawk's stored
+    // ? `currentSetpoint` - so on release the drone would jump to a stale
+    // ? mission target. Silence is correct.
+    if (manualOverrideActive) return;
+
     switch (state) {
         case MissionState::IDLE:
         case MissionState::SEARCHING:
@@ -436,14 +514,16 @@ void Navigation::publishFlightCommand(cogidrone::FlightCommand command) {
 
 void Navigation::publishStatus() {
     auto msg = std::make_unique<std_msgs::msg::String>();                               // ? unique_ptr publish: zero-copy intra-process
-    msg->data = toString(state);
+    msg->data = manualOverrideActive ? "MANUAL_OVERRIDE" : toString(state);
     m.missionStatusPublisher->publish(std::move(msg));
 }
 
 
 // * Helpers
 bool Navigation::detectionIsValid() const {
-    // ! Caller holds controlMutex.
+    // ! Caller must hold controlMutex if mutex is reinstated - do NOT lock here!
+    // ? No lock: caller (onDetections/onWatchdogTick) is serialized by the executor. 
+
     if (!person.valid) return false;
     if (person.confidence < m.params.minDetectionConfidence) return false;
 
@@ -455,7 +535,9 @@ bool Navigation::detectionIsValid() const {
 }
 
 bool Navigation::personIsLost() const {
-    // ! Caller holds controlMutex.
+    // ! Caller must hold controlMutex if mutex is reinstated - do NOT lock here!
+    // ? No lock: caller (onDetections/onWatchdogTick) is serialized by the executor. 
+
     // ? Deliberate hysteresis: "lost" means "no detection for detectionTimeout",
     // ? NOT "the latest frame was empty". A single dropped detection should not
     // ? abort FOLLOWING.
@@ -463,7 +545,9 @@ bool Navigation::personIsLost() const {
 }
 
 bool Navigation::perceptionIsDead() const {
-    // ! Caller holds controlMutex.
+    // ! Caller must hold controlMutex if mutex is reinstated - do NOT lock here!
+    // ? No lock: caller (onDetections/onWatchdogTick) is serialized by the executor. 
+    
     // ? `lastHeartbeatTime` is updated on EVERY frame (including empty ones), so
     // ? this distinguishes "Perception stopped talking" from "person not in frame".
     return (m.node->now() - lastHeartbeatTime).seconds() > m.params.detectionTimeout;

@@ -2,9 +2,10 @@
 
 #include <expected>
 #include <optional>
+#include <atomic>
 #include <memory>
 #include <string>
-#include <mutex>
+// | #include <mutex>
 
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/string.hpp"
@@ -17,17 +18,6 @@
 #include "controller/flight_commands.h"
 #include "math/vec3.h"
 
-
-// TODO: WE NEED TO REFACTOR THIS ENTIRE FILE, ALONG WITH `navigation.cpp`!
-//     : This current implementation was converted by zai/GLM-5.3 from the original Claude generated
-//     : code. The code is in the same style as the same project, but it is not idiomatic C++20, and 
-//     : it is not well-structured. The code needs to be refactored to be more readable, maintainable, 
-//     : and efficient. This includes using modern C++ features, such as smart pointers, ranges, and 
-//     : concepts, as well as improving the overall architecture of the navigation system such that
-//     : it doesn't do the tasks of the perception and estimation systems. We also have to incorporate
-//     : the flightcontroller - as much of this code is what the flightcontroller does. We also have
-//     : to split the monolithic navigation class into smaller classes that are more curated to handle
-//     : specific subtasks tasks. 
 
 // * Design choice - Why we don't have a fixed-rate control loop
 // ? The only arguments for a fixed-rate control loop are:
@@ -48,7 +38,7 @@
 // * Mission states
 // ? The full mission lifecycle. States whose behaviors depend on subsystems
 // ? that don't exist yet (drone state source, obstacle map, fused detections)
-// ? are declared but their behaviors are stubs - see onControlTick().
+// ? are declared but their behaviors are stubs.
 enum class MissionState {
     IDLE,                                                                               // Waiting for mission start
     SEARCHING,                                                                          // Looking for person
@@ -71,9 +61,12 @@ struct PersonDetection {
 };
 
 
-// ? Runtime-tunable ROS parameters, not compile-time constants. `create()`
-// ? overwrites them from the parameter server (YAML / `ros2 param set`), so
-// ? they must stay plain, mutable, per-instance members.
+// ? Loaded ONCE in create() from the parameter server (defaults from
+// ? NavigationParams). No YAML file; override at startup with
+// ? `ros2 param set /navigation <name> <value>` BEFORE the node spins.
+// ? NOT retuned live: there is no add_on_set_parameters_callback, so a
+// ? `ros2 param set` after startup changes the parameter server but NOT
+// ? `m.params`. Add the callback if live retuning is ever needed.
 struct NavigationParams {
     // Following
     float targetFollowDistance      = 4.0f;                                             // meters
@@ -90,14 +83,6 @@ struct NavigationParams {
     // Control
     float controlFrequency          = 30.0f;                                            // Hz
 };
-
-
-// ! APPEARENTLY FALSE COMMENT:
-// ? If we ever need to reference the default nagivation parameters, we can use this
-// ? constant - which is a copy constructed at compile time. This could be useful for
-// ? resetting the parameters to their defaults, or for comparing the current parameters
-// Compile-time default parameter set - usable in constant expressions, e.g. validation
-// inline constexpr NavigationParams DEFAULT_NAVIGATION_PARAMS{};
 
 
 class Navigation {
@@ -129,7 +114,7 @@ private:
         // ? Loaded once in create() from the parameter server (defaults from
         // ? NavigationParams). No YAML file; override at runtime with
         // ? `ros2 param set /navigation <name> <value>`.
-        NavigationParams params;                                                        // ? Not const: loaded from the parameter server, may be retuned live
+        NavigationParams params;                                                        // ? Loaded once in create(); not retuned at runtime
     } m;
 
     // * Runtime state (written by callbacks/timer on different executor threads)
@@ -138,50 +123,54 @@ private:
     // ? object EXPERIENCES - mutable state initialized to safe defaults and
     // ? mutated for the object's whole life by different executor threads.
     // ?
-    // ! THREAD-SAFETY INVARIANT - this block is protected by TWO mechanisms:
-    // ! 1. EXECUTOR SERIALIZATION (primary, implicit)
-    // ?    onDetections() (subscription) and onWatchdogTick() (timer) are both
-    // ?    created in wire() WITHOUT an explicit callback group. rclcpp therefore
-    // ?    assigns both to the node's DEFAULT callback group, which is created as
-    // ?    CallbackGroupType::MutuallyExclusive (rclcpp node_base.cpp). The
-    // ?    executor refuses to take a second entity from a group whose
-    // ?    can_be_taken_from atomic is false, and only resets it after the
-    // ?    callback returns (rclcpp executor.cpp). Therefore the two callbacks can
-    // ?    NEVER run concurrently - not under MultiThreadedExecutor, and not with
-    // ?    intra-process comms enabled (the intra-process waitable is added to the
-    // ?    SAME callback group - rclcpp node_topics.cpp).
-    // ! 2. controlMutex (secondary, explicit)
-    // ?    Defense-in-depth. If anyone ever passes an explicit ReentrantCallbackGroup
-    // ?    to either create_subscription() or create_wall_timer(), mechanism 1
-    // ?    silently disappears. The mutex keeps the code correct in that case.
-    // ?    Cost: one uncontended lock per frame (~20 ns) - negligible.
+    // ! THREAD-SAFETY INVARIANT - currently upheld by EXECUTOR SERIALIZATION only.
+    // ? onDetections() (subscription), onWatchdogTick() (timer), and
+    // ? onManualOverride() (subscription) are all created in wire() WITHOUT an
+    // ? explicit callback group. rclcpp therefore assigns all three to the node's
+    // ? DEFAULT callback group, which is CallbackGroupType::MutuallyExclusive
+    // ? (rclcpp node_base.cpp). The executor refuses to take a second entity from
+    // ? a group whose can_be_taken_from atomic is false, and only resets it after
+    // ? the callback returns (rclcpp executor.cpp). Therefore no two callbacks can
+    // ? run concurrently - not under MultiThreadedExecutor, and not with
+    // ? intra-process comms enabled (the intra-process waitable is added to the
+    // ? SAME callback group - rclcpp node_topics.cpp).
     // ?
-    // ! RULES FOR ANY FUTURE CALLBACK (manual override, services, etc.):
-    // ?    - If it touches person, lastHeartbeatTime, state, or
-    // ?      stateEntryTime, it MUST either (a) be in the same MutuallyExclusive
-    // ?      group, or (b) take controlMutex.
-    // ?    - PREFER (c): do NOT touch this block at all. Post a request
-    // ?      (std::atomic flag / queue) and let the control step consume it.
-    // ?      This is the only option that stays correct if the callback is ever
-    // ?      moved to a Reentrant group. See the manual-override note in wire().
-    PersonDetection person;                                                             // guarded by controlMutex
-    rclcpp::Time lastHeartbeatTime{};                                                   // guarded by controlMutex - updated on EVERY frame
+    // ! RULES FOR ANY FUTURE CALLBACK:
+    // ?    - If it touches person, lastHeartbeatTime, state, or stateEntryTime,
+    // ?      it MUST be created without an explicit callback group (i.e. join the
+    // ?      default MutuallyExclusive group).
+    // ?    - PREFER posting a request (std::atomic) and letting the control step
+    // ?      consume it. That stays correct even if the callback is later moved
+    // ?      to a Reentrant group. See onManualOverride().
+    // ?
+    // ! REINSTATING controlMutex (if the invariant is ever broken):
+    // ?    1. Uncomment `#include <mutex>` at the top of this file.
+    // ?    2. Uncomment `std::mutex controlMutex;` below.
+    // ?    3. Uncomment `std::lock_guard lock(controlMutex);` at the top of
+    // ?       onDetections() and onWatchdogTick().
+    // ?    4. Do NOT lock inside the helpers (detectionIsValid, personIsLost,
+    // ?       perceptionIsDead) - std::mutex is not recursive. They assume the
+    // ?       caller holds it.
+    // ?    5. Do NOT lock in onManualOverride() - it only writes an atomic.
+    // ?    6. Re-verify: every path that reads/writes the members below must be
+    // ?       reachable only from a lock-holding callback.
+    PersonDetection person;                                                             // guarded by controlMutex (if reinstated)
+    rclcpp::Time lastHeartbeatTime{};                                                   // guarded by controlMutex (if reinstated) - updated on EVERY frame
     
-    MissionState state = MissionState::IDLE;                                            // guarded by controlMutex
-    rclcpp::Time stateEntryTime{};                                                      // guarded by controlMutex
+    MissionState state = MissionState::IDLE;                                            // guarded by controlMutex (if reinstated)
+    rclcpp::Time stateEntryTime{};                                                      // guarded by controlMutex (if reinstated)
     
-    // ! We can remove this mutex IF AND ONLY IF every callback that touches 
-    // ! `person`, `lastHeartbeatTime`, `state`, or `stateEntryTime` is a ROS 
-    // ! callback created without an explicit callback group. As of now, that
-    // ! is true, but it is fragile. If any callback is ever moved to a Reentrant
-    // ! group, the invariant is broken and the mutex is mandatory. Defense-in-depth.
-    // ? Helpers assume the caller holds it and do NOT lock internally since 
-    // ? `std::mutex` is not recursive.
-    // | std::mutex controlMutex;                                                            // ? Not mutable: locked from non-const methods which invoke const helpers
-
-    std::atomic_bool manualOverrideActive{false};                                       // orthogonal to MissionState
-    std::atomic_bool manualOverrideRequested{false};                                    // posted by callback, consumed by control step
-
+    // ? No mutex today: the executor serializes all callbacks (see invariant above).
+    // ? To reinstate, uncomment the line below and follow the guide above.
+    // | std::mutex controlMutex;
+    
+    // ? Only the control step touches it (`consumeManualOverride`, `executeBehavior`,
+    // ? `evaluateTransitions`, `publishStatus`). Both entry points are serialized by 
+    // ? the executor. A plain bool is correct and more precise, but if we ever expose 
+    // ? `bool isOverridden() const` to Drone, this must become atomic.
+    bool manualOverrideActive = false;                                                  // Orthogonal to MissionState, owned by the control step
+    std::atomic_bool manualOverrideRequested{false};                                    // written by callback, consumed by control step
+    
     // * Default ctor
     explicit Navigation(M&& m) : m(std::move(m)) {}                                     // No default ctor exposed
     void wire() noexcept;                                                               // Wire the node's subscriptions and publishers to the member methods
@@ -189,13 +178,15 @@ private:
     // * Callbacks
     void onDetections(const vision_msgs::msg::Detection2DArray& msg);                   // Drives control on every frame
     void onWatchdogTick();                                                              // Fires only when Perception goes silent
+    void onManualOverride(const std_msgs::msg::Bool& msg);
+
 
     // * Control
     [[nodiscard]] std::optional<MissionState> evaluateTransitions();                    // Returns the next state if a transition is due
     void transitionTo(MissionState next);
     void onEnter(MissionState entered);   
     void onPerceptionCrashed();                                                         // Crash protocol: Perception is gone
-    void onManualOverride(const std_msgs::msg::Bool& msg);
+    void consumeManualOverride();                                                       // Applies a pending request (control step only)
     [[nodiscard]] static std::string toString(MissionState state) noexcept;
 
     // * Behaviors
