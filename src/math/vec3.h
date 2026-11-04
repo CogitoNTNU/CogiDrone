@@ -3,6 +3,10 @@
 #include <cmath>
 
 
+
+// NOTE: Minimal linear-algebra types. Eigen is not vendored in vendored/ros2, so the
+// navigation math is kept dependency-free until Eigen is actually pulled in.
+
 namespace cogidrone {
 inline constexpr float kPi = 3.14159265358979323846f;
 
