@@ -313,10 +313,10 @@ void Navigation::executeBehavior() {
 
 void Navigation::hoverBehavior() {
     // ? Hold a fixed home-relative hover setpoint.
-    // ? LIMITATION: without a drone state source we cannot "hold current
-    //     : position" - we command the origin at targetHeight and rely on PX4's
-    //     : position controller to fly there and stay. Revisit once the drone
-    //     : state source is decided.
+    // ? LIMITATION: without a drone state source we cannot "hold current position" - 
+    // ?           : we command the origin at targetHeight and rely on PX4's position
+    // ?           : controller to fly there and stay. Revisit once the drone state 
+    // ?           : source is decided.
     publishSetpoint(cogidrone::Vec3{0.0f, 0.0f, -m.params.targetHeight}, 0.0f);         // NED: negative z = up
 }
 
