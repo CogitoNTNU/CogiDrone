@@ -47,7 +47,7 @@ std::expected<std::unique_ptr<Navigation>, cogidrone::Error> Navigation::create(
             .setpointPublisher = nullptr,                                               // ? will be wired later
             .flightCommandPublisher = nullptr,                                          // ? will be wired later
             .missionStatusPublisher = nullptr,                                          // ? will be wired later
-            .controlTimer = nullptr,                                                    // ? will be wired later
+            .watchdogTimer = nullptr,                                                   // ? will be wired later
             .params = std::move(params)
         })
     );
@@ -96,30 +96,24 @@ void Navigation::wire() noexcept {
         rclcpp::QoS(10)
     );
 
-    // * Control timer
-    // ? Navigation polls because it's a controller, and controllers are clocked by 
-    // ? definition - it must publish setpoints when nothing changed, and it must
-    // ? notice when nothing arrived. Perception reacts because it's a transformer 
-    // ? - no input, no work. The timer isn't a busy-wait; it's the control clock, 
-    // ? and the executor sleeps between ticks. Therefore, since the camera/detector 
-    // ? runs at whatever rate it runs - 10-60 Hz, which is jittery and sometimes 
-    // ? drops frames - the control can't depend on it. Control must run at a steady 
-    // ? rate. Decoupling the two is the entire point of a control loop: we sample 
-    // ? inputs asynchronously, then act on a fixed schedule. If Navigation ran on 
-    // ? detection callbacks, its control rate would inherit the detector's jitter.
-    const auto PERIOD = std::chrono::duration_cast<std::chrono::nanoseconds>(
-        std::chrono::duration<double>(1.0 / m.params.controlFrequency)
+    // * Watchdog timer
+    // ? Not a control clock - the detection callback drives control. This timer
+    // ? exists for one job: detect that NO frames are arriving, so the crash
+    // ? protocol runs if Perception dies.
+    const auto WATCHDOG_PERIOD = std::chrono::milliseconds(
+        static_cast<int>(m.params.detectionTimeout * 1000.0f / 4.0f)                    // 4 checks per timeout window
     );
-    m.controlTimer = m.node->create_wall_timer(
-        PERIOD,
-        [this]() { this->onControlTick(); }
+    m.watchdogTimer = m.node->create_wall_timer(
+        WATCHDOG_PERIOD,
+        [this]() { this->onWatchdogTick(); }
     );
+
 
     // * Timestamps
     stateEntryTime = m.node->now();
+    lastHeartbeatTime = m.node->now();                                                  // ? give Perception detectionTimeout to send the first frame
     // ? `person.timestamp` is deliberately NOT initialized: time 0 means
     // ? "no detection has ever arrived", which the watchdog treats as stale.
-    // ? Initializing it to now() would fake a detection for detectionTimeout.
 }
 
 
@@ -133,6 +127,11 @@ void Navigation::wire() noexcept {
 // !    This is a cross-subsystem contract - decide it explicitly rather than relying 
 // !    on "Perception only sends persons".S
 void Navigation::onDetections(const vision_msgs::msg::Detection2DArray& msg) {
+    std::lock_guard lock(controlMutex);
+
+    // ? Heartbeat: Perception is alive, regardless of whether a person was found.
+    lastHeartbeatTime = m.node->now();
+
     // * Pick the most confident detection in the array
     const vision_msgs::msg::Detection2D* best = nullptr;
     for (const auto& detection : msg.detections) {
@@ -143,59 +142,37 @@ void Navigation::onDetections(const vision_msgs::msg::Detection2DArray& msg) {
         }
     }
 
-    std::lock_guard lock(personMutex);
-
-    if (!best) {                                                                        // ? no usable detection in this frame
+    // * Policy A: an empty array means "no person in this frame"
+    if (!best) {
         person.valid = false;
-        return;
+    } else {
+        person.confidence = best->results.front().hypothesis.score;
+        person.timestamp = m.node->now();
+        person.valid = true;
+
+        // TODO: person.position = ... (world-frame, from fused detections)
     }
 
-    person.confidence = best->results.front().hypothesis.score;
-    person.timestamp = m.node->now();
-    person.valid = true;
-
-    // TODO: Extract the 3D camera-frame position from the fused detection. This
-    //     : requires the depth estimate (DepthAnything) and camera intrinsics,
-    //     : which Perception will provide once Model::FusedDetections is
-    //     : finalized. Until then, person.position stays zero and is NOT used
-    //     : by any behavior.
-    // person.position = ...
-}
-
-void Navigation::onControlTick() {
-    // * Evaluate the state machine, and transition if requested
+    // * Drive the state machine and behavior on every frame
     if (auto next = evaluateTransitions()) {
         transitionTo(*next);
-        publishStatus();                                                                // | DEBUG: Update mission status
+        publishStatus();
     }
 
-    // ? Behaviors that don't exist yet fall back to hover - the safe default.
-    // ? Every state ends in exactly one publishSetpoint() call per tick.
-    switch (state) {
-        case MissionState::IDLE:
-        case MissionState::SEARCHING:
-        case MissionState::PERSON_DETECTED:
-        case MissionState::PERSON_LOST:
-        case MissionState::OBSTACLE_AVOIDANCE:                                          // TODO: behavior blocked on Representation
-        case MissionState::RETURNING:                                                   // TODO: behavior blocked on drone state source
-        case MissionState::EMERGENCY:
-            hoverBehavior();
-            break;
-
-        case MissionState::FOLLOWING:
-            // TODO: followBehavior() - blocked on fused detections (person world
-            //     : position) and drone state. Hover until then.
-            hoverBehavior();
-            break;
-
-        case MissionState::LANDING:
-            // ! APPEARENTLY FALSE COMMENT:
-            // ? LANDING is owned by Pixhawk (its land() hands control to PX4's
-            // ? landing controller). Navigation keeps streaming its last
-            // ? setpoint - PX4 ignores it in auto-land. No new commands here.
-            break;
-    }
+    executeBehavior();
 }
+
+void Navigation::onWatchdogTick() {
+    std::lock_guard lock(controlMutex);
+
+    // ? The detection callback normally drives the state machine. This timer
+    // ? only acts when NO frames arrive at all - i.e. Perception is dead, not
+    // ? just "person not in frame".
+    if (!perceptionIsDead()) return;
+
+    onPerceptionCrashed();
+}
+
 
 
 // * State machine
@@ -264,7 +241,30 @@ void Navigation::onEnter(MissionState entered) {
     }
 }
 
-// ! REMOVE ONCE WE IMPLEMENT OUR OWN MESSAGE TYPE
+
+void Navigation::onPerceptionCrashed() {
+    // ! Caller holds `controlMutex`.
+    // ? Protocol: Perception is gone. We cannot see the person and cannot know
+    // ? whether they are still there. Stop following and hold.
+    if (state == MissionState::PERSON_LOST) return;                                     // Already handled
+
+    RCLCPP_WARN(m.node->get_logger(),
+                "Perception silent for %.1f s - entering PERSON_LOST",
+                m.params.detectionTimeout);
+
+    transitionTo(MissionState::PERSON_LOST);
+    publishStatus();
+
+    // ? Deliberately NO setpoint publish: Pixhawk re-streams the last one, so
+    // ? the drone holds its last commanded position. Calling hoverBehavior()
+    // ? here would command the ORIGIN (see its comment), which is not "hold".
+    // 
+    // TODO: If PERSON_LOST persists for N seconds, publish FlightCommand::LAND.
+    //     : That is the decisive safe action once you decide the timeout.
+}
+
+
+// | REFACTOR SUCH THAT WE CAN REMOVE THIS
 std::string Navigation::toString(MissionState state) noexcept {
     switch (state) {
         case MissionState::IDLE:                return "IDLE";
@@ -282,6 +282,35 @@ std::string Navigation::toString(MissionState state) noexcept {
 
 
 // * Behaviors
+void Navigation::executeBehavior() {
+    // ! Caller holds controlMutex.
+    switch (state) {
+        case MissionState::IDLE:
+        case MissionState::SEARCHING:
+        case MissionState::PERSON_DETECTED:
+        case MissionState::OBSTACLE_AVOIDANCE:                                          // TODO: blocked on Representation
+        case MissionState::RETURNING:                                                   // TODO: blocked on drone state source
+        case MissionState::EMERGENCY:
+            hoverBehavior();
+            break;
+
+        case MissionState::PERSON_LOST:
+            // ? Hold: do NOT publish a new setpoint. Pixhawk re-streams the last
+            // ? one, so the drone holds its last commanded position. True "hold
+            // ? current position" needs a drone state source - see wire() TODO.
+            break;
+
+        case MissionState::FOLLOWING:
+            // TODO: followBehavior() - blocked on fused detections + drone state.
+            hoverBehavior();
+            break;
+
+        case MissionState::LANDING:
+            // ? LANDING is owned by Pixhawk. No new commands here.
+            break;
+    }
+}
+
 void Navigation::hoverBehavior() {
     // ? Hold a fixed home-relative hover setpoint.
     // ? LIMITATION: without a drone state source we cannot "hold current
@@ -386,38 +415,29 @@ void Navigation::publishStatus() {
 
 
 // * Helpers
-//// bool Navigation::commandIsSafe(const Vec3& velocity) const {
-////     if (m.drone.position.z < m.params.minAltitude)  return false;                       // ? too low
-////     if (m.drone.position.z > m.params.maxAltitude)  return false;                       // ? too high
-////     if (velocity.norm() > m.params.maxFollowSpeed)  return false;                       // ? too fast
-////     // TODO: Obstacle distance checks against the representation layer
-////     return true;
-//// }
-
 bool Navigation::detectionIsValid() const {
-    std::lock_guard lock(personMutex);
-
+    // ! Caller holds controlMutex.
     if (!person.valid) return false;
     if (person.confidence < m.params.minDetectionConfidence) return false;
 
     const double sinceDetection = (m.node->now() - person.timestamp).seconds();
     if (sinceDetection > m.params.detectionTimeout) return false;
 
-    // TODO: Distance bounds check (min/maxFollowDistance) requires the person's
-    //     : world position, which requires drone state + fused detections.
-    // TODO: Obstacle proximity check - blocked on Representation.
-    //// const float distance = (m.personWorldPosition - m.drone.position).norm();
-    //// if (distance < m.params.minFollowDistance || distance > m.params.maxFollowDistance) return false;
-
+    // TODO: Distance bounds check - requires world position + drone state.
     return true;
 }
 
 bool Navigation::personIsLost() const {
-    std::lock_guard lock(personMutex);
-
+    // ! Caller holds controlMutex.
     // ? Deliberate hysteresis: "lost" means "no detection for detectionTimeout",
     // ? NOT "the latest frame was empty". A single dropped detection should not
-    // ? abort FOLLOWING. `person.valid` is the immediate signal used by
-    // ? detectionIsValid(); this is the coasting window.
+    // ? abort FOLLOWING.
     return (m.node->now() - person.timestamp).seconds() > m.params.detectionTimeout;
+}
+
+bool Navigation::perceptionIsDead() const {
+    // ! Caller holds controlMutex.
+    // ? `lastHeartbeatTime` is updated on EVERY frame (including empty ones), so
+    // ? this distinguishes "Perception stopped talking" from "person not in frame".
+    return (m.node->now() - lastHeartbeatTime).seconds() > m.params.detectionTimeout;
 }

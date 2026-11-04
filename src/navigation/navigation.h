@@ -118,23 +118,19 @@ private:
         rclcpp::Publisher<std_msgs::msg::String>::SharedPtr missionStatusPublisher;     // Mission status (introspection only - not consumed by any subsystem)
 
         // Timer
-        // ? Navigation polls because it's a controller, and controllers are clocked by 
-        // ? definition - it must publish setpoints when nothing changed, and it must
-        // ? notice when nothing arrived. Perception reacts because it's a transformer 
-        // ? - no input, no work. The timer isn't a busy-wait; it's the control clock, 
-        // ? and the executor sleeps between ticks. Therefore, since the camera/detector 
-        // ? runs at whatever rate it runs - 10-60 Hz, which is jittery and sometimes 
-        // ? drops frames - the control can't depend on it. Control must run at a steady 
-        // ? rate. Decoupling the two is the entire point of a control loop: we sample 
-        // ? inputs asynchronously, then act on a fixed schedule. If Navigation ran on 
-        // ? detection callbacks, its control rate would inherit the detector's jitter.
-        rclcpp::TimerBase::SharedPtr controlTimer;
+        // ? Not a control clock. The detection callback drives control. This
+        // ? timer exists for one job: detect that NO frames are arriving, so
+        // ? the crash protocol can run if Perception dies.
+        rclcpp::TimerBase::SharedPtr watchdogTimer;
         
         // Parameters
         // ? Loaded once in create() from the parameter server (defaults from
         // ? NavigationParams). No YAML file; override at runtime with
         // ? `ros2 param set /navigation <name> <value>`.
         NavigationParams params;                                                        // ? Not const: loaded from the parameter server, may be retuned live
+    
+        // Watchdog
+        // const chrono::milliseconds watchdogPeriod;
     } m;
 
     // * Runtime state (written by callbacks/timer on different executor threads)
@@ -142,35 +138,40 @@ private:
     // ? MADE OF (wiring, created once in create()/wire()); this block is what the
     // ? object EXPERIENCES - mutable state initialized to safe defaults and
     // ? mutated for the object's whole life by different executor threads.
-    PersonDetection person;                                                             // guarded by personMutex
-    mutable std::mutex personMutex;                                                     // ? mutable: locked from const detectionIsValid()
-
-    // ? `state` and `stateEntryTime` are owned exclusively by the timer thread
-    // ? (onControlTick -> evaluateTransitions/transitionTo). No lock needed.
-    // ? When the manual-override channel lands, its callback must NOT mutate
-    // ? state directly - it should post a request (atomic flag / queue) that
-    // ? the timer thread consumes, preserving single-threaded ownership.
-    MissionState state = MissionState::IDLE;
-    rclcpp::Time stateEntryTime{};
+    
+    // ? One mutex guards ALL of it: the detection callback and the watchdog
+    // ? timer both run the state machine, so both touch `person`, `lastHeartbeatTime`,
+    // ? `state`, and `stateEntryTime`.
+    PersonDetection person;                                                             // guarded by controlMutex
+    rclcpp::Time lastHeartbeatTime{};                                                   // guarded by controlMutex - updated on EVERY frame
+    
+    MissionState state = MissionState::IDLE;                                            // guarded by controlMutex
+    rclcpp::Time stateEntryTime{};                                                      // guarded by controlMutex
+    
+    // ? Helpers assume the caller holds it and do NOT lock internally since 
+    // ? `std::mutex` is not recursive.
+    std::mutex controlMutex;                                                            // ? Not mutable: locked from non-const methods which invoke const helpers
 
     // * Default ctor
     explicit Navigation(M&& m) : m(std::move(m)) {}                                     // No default ctor exposed
     void wire() noexcept;                                                               // Wire the node's subscriptions and publishers to the member methods
 
     // * Callbacks
-    void onDetections(const vision_msgs::msg::Detection2DArray& msg);                   // Fused detections from Perception
-    void onControlTick();                                                               // Main control loop, runs at params.controlFrequency
+    void onDetections(const vision_msgs::msg::Detection2DArray& msg);                   // Drives control on every frame
+    void onWatchdogTick();                                                              // Fires only when Perception goes silent
 
-    // * State machine
+    // * Control
     [[nodiscard]] std::optional<MissionState> evaluateTransitions();                    // Returns the next state if a transition is due
     void transitionTo(MissionState next);
     void onEnter(MissionState entered);   
+    void onPerceptionCrashed();                                                         // Crash protocol: Perception is gone
     [[nodiscard]] static std::string toString(MissionState state) noexcept;
 
     // * Behaviors
     // ? A behavior's job: decide the next position setpoint and hand it to
     // ? publishSetpoint(). PX4 owns velocity/attitude control - Navigation
     // ? never commands velocities or motor-level anything.
+    void executeBehavior();                                                             // Dispatch on `state`
     void hoverBehavior();                                                               // Implemented: hold position setpoint
     // TODO: followBehavior() - target selection behind the person. Blocked on:
     //     1. Person world position (needs fused detections w/ depth from Perception)
@@ -193,9 +194,9 @@ private:
     void publishStatus();
 
     // * Helpers
-    // // [[nodiscard]] bool commandIsSafe(const Vec3& velocity) const;
     [[nodiscard]] bool detectionIsValid() const;
     [[nodiscard]] bool personIsLost() const;
+    [[nodiscard]] bool perceptionIsDead() const;
 
 
 public:
