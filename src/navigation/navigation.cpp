@@ -409,7 +409,6 @@ void Navigation::publishFlightCommand(cogidrone::FlightCommand command) {
 void Navigation::publishStatus() {
     auto msg = std::make_unique<std_msgs::msg::String>();                               // ? unique_ptr publish: zero-copy intra-process
     msg->data = toString(state);
-
     m.missionStatusPublisher->publish(std::move(msg));
 }
 
