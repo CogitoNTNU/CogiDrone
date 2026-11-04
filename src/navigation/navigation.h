@@ -4,7 +4,6 @@
 #include <optional>
 #include <memory>
 #include <string>
-#include <cmath>
 #include <mutex>
 
 #include "rclcpp/rclcpp.hpp"
@@ -15,6 +14,8 @@
 
 #include "logging.h"
 #include "controller/flight_commands.h"
+#include "math/vec3.h"
+
 
 // TODO: WE NEED TO REFACTOR THIS ENTIRE FILE, ALONG WITH `navigation.cpp`!
 //     : This current implementation was converted by zai/GLM-5.3 from the original Claude generated
@@ -27,34 +28,21 @@
 //     : to split the monolithic navigation class into smaller classes that are more curated to handle
 //     : specific subtasks tasks. 
 
+// * Design choice - Why we don't have a fixed-rate control loop
+// ? The only arguments for a fixed-rate control loop are:
+// ?  - Deterministic `dt` for a controller that integrates - PID integral 
+// ?    term, velocity/acceleration feedforward, jerk-limited trajectories. 
+// ?    We have none of these; you publish position setpoints.
+// ?  - Output rate independent of input rate - matters when the input is slow
+// ?    and the output must be fast. But Pixhawk already re-streams at 10 Hz,
+// ?    so the wire rate is decoupled from Navigation's rate regardless.
+// ?  - Deterministic state-machine cadence - matters if transitions must happen 
+// ?    at a known rate. They don't; they're time-based comparisons.
+// ? 
+// ? None apply. The tick is pure overhead: at 30 Hz with a 30 Hz camera, we're 
+// ? running the state machine twice per frame (once from the timer, once from 
+// ? the callback) for no benefit.
 
-// NOTE: Minimal linear-algebra types. Eigen is not vendored in vendored/ros2, so the
-// navigation math is kept dependency-free until Eigen is actually pulled in.
-
-// /* // ! RESTORE ONCE WE IMPLEMENT MATH:
-// * Math
-struct Vec3 {
-    float x = 0.0f;
-    float y = 0.0f;
-    float z = 0.0f;
-
-    [[nodiscard]] constexpr Vec3 operator+(const Vec3& o) const noexcept { return {x + o.x, y + o.y, z + o.z}; }
-    [[nodiscard]] constexpr Vec3 operator-(const Vec3& o) const noexcept { return {x - o.x, y - o.y, z - o.z}; }
-    [[nodiscard]] constexpr Vec3 operator*(float s) const noexcept { return {x * s, y * s, z * s}; }
-    [[nodiscard]] float norm() const noexcept { return std::sqrt(x * x + y * y + z * z); }
-    [[nodiscard]] Vec3 normalized() const noexcept;                                     // ? zero-safe
-};
-
-struct Quat {
-    float w = 1.0f;
-    float x = 0.0f;
-    float y = 0.0f;
-    float z = 0.0f;
-};
-
-[[nodiscard]] Vec3 rotate(const Quat& q, const Vec3& v) noexcept;                       // v' = q * v * q^-1
-[[nodiscard]] float yawOf(const Quat& q) noexcept;                                      // ZYX yaw extraction
-// */
 
 // * Mission states
 // ? The full mission lifecycle. States whose behaviors depend on subsystems
@@ -75,7 +63,7 @@ enum class MissionState {
 
 // * Data types
 struct PersonDetection {
-    Vec3 position;                                                                      // TODO: camera-frame position - requires fused detections (depth + intrinsics) from Perception
+    cogidrone::Vec3 position;                                                           // TODO: world-frame position (NED) - requires fused detections (depth + intrinsics) from Perception
     float confidence = 0.0f;                                                            // Detection confidence [0-1]
     rclcpp::Time timestamp{};
     bool valid = false;
@@ -200,7 +188,7 @@ private:
     // // [[nodiscard]] Vec3 cameraToWorld(const Vec3& camera) const;                         // Camera frame -> world frame
 
     // * Publishing
-    void publishSetpoint(const Vec3& positionNed, float yaw);                           // The ONLY path to the flight controller
+    void publishSetpoint(const cogidrone::Vec3& positionNed, float yaw);                // The ONLY path to the flight controller
     void publishFlightCommand(cogidrone::FlightCommand command);
     void publishStatus();
 

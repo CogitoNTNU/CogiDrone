@@ -4,45 +4,6 @@
 #include <string>
 
 
-// /* // | UNSURE IF BULLSHIT
-namespace {
-constexpr float kPi = 3.14159265358979323846f;
-
-// Normalize an angle to [-pi, pi]
-float normalizeAngle(float a) noexcept {
-    while (a > kPi)  a -= 2.0f * kPi;
-    while (a < -kPi) a += 2.0f * kPi;
-    return a;
-}
-} // namespace
-
-
-// * Math
-Vec3 Vec3::normalized() const noexcept {
-    const float n = norm();
-    return n > 0.0f ? Vec3{x / n, y / n, z / n} : Vec3{};
-}
-
-Vec3 rotate(const Quat& q, const Vec3& v) noexcept {
-    // ? Rodrigues' rotation formula: v' = v + 2w(u x v) + 2(u x (u x v)), u = q.xyz
-    const Vec3 u{q.x, q.y, q.z};
-    const Vec3 t{
-        2.0f * (u.y * v.z - u.z * v.y),
-        2.0f * (u.z * v.x - u.x * v.z),
-        2.0f * (u.x * v.y - u.y * v.x)
-    };
-    return v + t * q.w + Vec3{
-        u.y * t.z - u.z * t.y,
-        u.z * t.x - u.x * t.z,
-        u.x * t.y - u.y * t.x
-    };
-}
-
-float yawOf(const Quat& q) noexcept {
-    return std::atan2(2.0f * (q.w * q.z + q.x * q.y),
-                      1.0f - 2.0f * (q.y * q.y + q.z * q.z));
-}
-// */
 
 // * Ctors & dtor
 Navigation::~Navigation() = default;
@@ -327,7 +288,7 @@ void Navigation::hoverBehavior() {
     //     : position" - we command the origin at targetHeight and rely on PX4's
     //     : position controller to fly there and stay. Revisit once the drone
     //     : state source is decided.
-    publishSetpoint(Vec3{0.0f, 0.0f, -m.params.targetHeight}, 0.0f);                    // NED: negative z = up
+    publishSetpoint(cogidrone::Vec3{0.0f, 0.0f, -m.params.targetHeight}, 0.0f);         // NED: negative z = up
 }
 
 //// void Navigation::followBehavior() {
@@ -401,7 +362,7 @@ void Navigation::hoverBehavior() {
 
 
 // * Publishing
-void Navigation::publishSetpoint(const Vec3& positionNed, float yaw) {
+void Navigation::publishSetpoint(const cogidrone::Vec3& positionNed, float yaw) {
     auto sp = std::make_unique<px4_msgs::msg::TrajectorySetpoint>();                    // ? unique_ptr publish: zero-copy intra-process
     sp->position = {positionNed.x, positionNed.y, positionNed.z};
     sp->yaw = yaw;
