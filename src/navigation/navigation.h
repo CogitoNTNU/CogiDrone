@@ -187,7 +187,6 @@ private:
     void onEnter(MissionState entered);   
     void onPerceptionCrashed();                                                         // Crash protocol: Perception is gone
     void consumeManualOverride();                                                       // Applies a pending request (control step only)
-    [[nodiscard]] static std::string toString(MissionState state) noexcept;
 
     // * Behaviors
     // ? A behavior's job: decide the next position setpoint and hand it to
@@ -215,10 +214,14 @@ private:
     void publishFlightCommand(cogidrone::FlightCommand command);
     void publishStatus();
 
-    // * Helpers
+    // * State queries 
     [[nodiscard]] bool detectionIsValid() const;
     [[nodiscard]] bool personIsLost() const;
     [[nodiscard]] bool perceptionIsDead() const;
+
+
+    // * Helpers
+    [[nodiscard]] static std::string toString(MissionState state) noexcept;
 
 
 public:

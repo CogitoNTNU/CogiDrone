@@ -59,8 +59,9 @@ std::expected<std::unique_ptr<Navigation>, cogidrone::Error> Navigation::create(
     cogidrone::log(LOGGING_LEVEL::INFO, "Navigation object wired successfully"sv);
 
     // | DEBUG: Publish status
-    n->publishStatus();                                                                 // ! NOTE: Unsure if this works
-
+    n->publishStatus();                                                                 // ! Works only if `missionStatusPublisher` is late-joining,
+                                                                                        // ! transient_local; otherwise it silently fails.
+    
     // * Return the fully constructed Navigation object
     return n;
 }
@@ -82,12 +83,16 @@ void Navigation::wire() noexcept {
 
 
     // * Manual override
-    // ? `Bool` is a LEVEL: true = pilot has control, false = Navigation has
-    // ? control. The publisher is the RC bridge (not yet implemented) that
-    // ? mirrors the pilot's mode switch onto ROS.
-    // ? QoS: volatile + depth 1 is enough IF the bridge publishes periodically.
-    // ? If the bridge latches the switch instead, both sides must use
-    // ? transient_local so a late-joining Navigation learns the current state.
+    // ? `Bool` is a LEVEL: true = pilot has control, false = Navigation has control.
+    // ? The publisher is the RC bridge (not yet implemented) that mirrors the
+    // ? pilot's mode switch onto ROS.
+    // ! QoS CONTRACT: this subscriber uses TRANSIENT_LOCAL so a late-joining
+    // ! Navigation learns the current switch state. The RC bridge MUST publish
+    // ! with `rclcpp::QoS(1).transient_local()` too - a VOLATILE publisher will
+    // ! NOT match this subscription (DDS durability is requested <= offered), and
+    // ! the override would silently never arrive.
+    // ! TRANSIENT_LOCAL also requires RELIABLE reliability (rclcpp::QoS default).
+    // ?
     // ! No explicit callback group - same invariant as the other callbacks.
     // ? The override callback must only post a request - e.g. an
     // ? `std::atomic_bool overrideRequested` or an atomic enum - and the control
@@ -129,8 +134,8 @@ void Navigation::wire() noexcept {
 
     m.missionStatusPublisher = m.node->create_publisher<std_msgs::msg::String>(
         "/navigation/mission_status",
-        rclcpp::QoS(10)
-    );
+        rclcpp::QoS(1).transient_local()                                                // ? Latch the last status so the debug line in `create()`
+    );                                                                                  // ? works even if the publisher is late-joining
 
     // * Watchdog timer
     // ? Not a control clock - the detection callback drives control. This timer
@@ -360,23 +365,10 @@ void Navigation::consumeManualOverride() {
                     "Manual override RELEASED - resuming mission (state: %s)",
                     toString(state).c_str());
     }
+
+    publishStatus();
 }
 
-// TODO: REFACTOR SUCH THAT WE CAN REMOVE THIS
-std::string Navigation::toString(MissionState state) noexcept {
-    switch (state) {
-        case MissionState::IDLE:                return "IDLE";
-        case MissionState::SEARCHING:           return "SEARCHING";
-        case MissionState::PERSON_DETECTED:     return "PERSON_DETECTED";
-        case MissionState::FOLLOWING:           return "FOLLOWING";
-        case MissionState::PERSON_LOST:         return "PERSON_LOST";
-        case MissionState::OBSTACLE_AVOIDANCE:  return "OBSTACLE_AVOIDANCE";
-        case MissionState::RETURNING:           return "RETURNING";
-        case MissionState::LANDING:             return "LANDING";
-        case MissionState::EMERGENCY:           return "EMERGENCY";
-        default:                                return "UNKNOWN";
-    }
-}
 
 
 // * Behaviors
@@ -519,7 +511,7 @@ void Navigation::publishStatus() {
 }
 
 
-// * Helpers
+// * State queries
 bool Navigation::detectionIsValid() const {
     // ! Caller must hold controlMutex if mutex is reinstated - do NOT lock here!
     // ? No lock: caller (onDetections/onWatchdogTick) is serialized by the executor. 
@@ -552,3 +544,21 @@ bool Navigation::perceptionIsDead() const {
     // ? this distinguishes "Perception stopped talking" from "person not in frame".
     return (m.node->now() - lastHeartbeatTime).seconds() > m.params.detectionTimeout;
 }
+
+
+// * Helpers
+std::string Navigation::toString(MissionState state) noexcept {
+    switch (state) {
+        case MissionState::IDLE:                return "IDLE";
+        case MissionState::SEARCHING:           return "SEARCHING";
+        case MissionState::PERSON_DETECTED:     return "PERSON_DETECTED";
+        case MissionState::FOLLOWING:           return "FOLLOWING";
+        case MissionState::PERSON_LOST:         return "PERSON_LOST";
+        case MissionState::OBSTACLE_AVOIDANCE:  return "OBSTACLE_AVOIDANCE";
+        case MissionState::RETURNING:           return "RETURNING";
+        case MissionState::LANDING:             return "LANDING";
+        case MissionState::EMERGENCY:           return "EMERGENCY";
+        default:                                return "UNKNOWN";
+    }
+}
+
