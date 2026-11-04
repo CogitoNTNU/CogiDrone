@@ -44,6 +44,7 @@ std::expected<std::unique_ptr<Navigation>, cogidrone::Error> Navigation::create(
         new Navigation(M{                                                               // ? Transfer ownership into unique_ptr as ctor is private
             .node = std::move(node),
             .detectionSubscription = nullptr,                                           // ? will be wired later
+            .manualOverrideSubscription = nullptr,                                      // ? will be wired later
             .setpointPublisher = nullptr,                                               // ? will be wired later
             .flightCommandPublisher = nullptr,                                          // ? will be wired later
             .missionStatusPublisher = nullptr,                                          // ? will be wired later
@@ -138,21 +139,22 @@ void Navigation::wire() noexcept {
 
 
 // * Callbacks
-// ! [4.3]: `onDetections()` ignores `hypothesis.class_id`
-// !    It picks the highest score regardless of class. If Perception ever publishes
-// !    heads and persons in the same array, Navigation may follow a head. Either:
-// !      * filter by `hypothesis.class_id` (requires a shared class-id convention), or
-// !      * make Perception publish only person detections on `/perception/detections`.
-// ! 
-// !    This is a cross-subsystem contract - decide it explicitly rather than relying 
-// !    on "Perception only sends persons".S
+// ! See note about mutex in `navigation.h` if you're confused why this callback does not lock
 void Navigation::onDetections(const vision_msgs::msg::Detection2DArray& msg) {
-    std::lock_guard lock(controlMutex);
+    // | std::lock_guard lock(controlMutex);
 
     // ? Heartbeat: Perception is alive, regardless of whether a person was found.
     lastHeartbeatTime = m.node->now();
 
     // * Pick the most confident detection in the array
+    // ! [4.3]: `onDetections()` ignores `hypothesis.class_id`
+    // !    It picks the highest score regardless of class. If Perception ever publishes
+    // !    heads and persons in the same array, Navigation may follow a head. Either:
+    // !      * filter by `hypothesis.class_id` (requires a shared class-id convention), or
+    // !      * make Perception publish only person detections on `/perception/detections`.
+    // ! 
+    // !    This is a cross-subsystem contract - decide it explicitly rather than relying 
+    // !    on "Perception only sends persons".S
     const vision_msgs::msg::Detection2D* best = nullptr;
     for (const auto& detection : msg.detections) {
         if (detection.results.empty()) continue;                                        // ? Malformed entry
@@ -182,8 +184,9 @@ void Navigation::onDetections(const vision_msgs::msg::Detection2DArray& msg) {
     executeBehavior();
 }
 
+// ! See note about mutex in `navigation.h` if you're confused why this callback does not lock
 void Navigation::onWatchdogTick() {
-    std::lock_guard lock(controlMutex);
+    // | std::lock_guard lock(controlMutex);
 
     // ? The detection callback normally drives the state machine. This timer
     // ? only acts when NO frames arrive at all - i.e. Perception is dead, not
@@ -284,7 +287,12 @@ void Navigation::onPerceptionCrashed() {
 }
 
 
-// | REFACTOR SUCH THAT WE CAN REMOVE THIS
+void Navigation::onManualOverride(const std_msgs::msg::Bool& msg) {
+    manualOverrideRequested.store(msg.data, std::memory_order_relaxed);
+}
+
+
+// TODO: REFACTOR SUCH THAT WE CAN REMOVE THIS
 std::string Navigation::toString(MissionState state) noexcept {
     switch (state) {
         case MissionState::IDLE:                return "IDLE";

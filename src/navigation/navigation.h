@@ -7,10 +7,11 @@
 #include <mutex>
 
 #include "rclcpp/rclcpp.hpp"
-#include "vision_msgs/msg/detection2_d_array.hpp"
 #include "std_msgs/msg/string.hpp"
-#include "px4_msgs/msg/trajectory_setpoint.hpp"
+#include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/u_int8.hpp"
+#include "px4_msgs/msg/trajectory_setpoint.hpp"
+#include "vision_msgs/msg/detection2_d_array.hpp"
 
 #include "logging.h"
 #include "controller/flight_commands.h"
@@ -106,7 +107,8 @@ private:
         rclcpp::Node::SharedPtr node;
 
         // Subscriptions
-        rclcpp::Subscription<vision_msgs::msg::Detection2DArray>::SharedPtr detectionSubscription;   // Fused detections from Perception
+        rclcpp::Subscription<vision_msgs::msg::Detection2DArray>::SharedPtr detectionSubscription;  // Fused detections from Perception
+        rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr manualOverrideSubscription;            // From the RC bridge
 
         // Publishers
         // ? Contract with Pixhawk: it subscribes to /navigation/setpoint and
@@ -168,7 +170,6 @@ private:
     MissionState state = MissionState::IDLE;                                            // guarded by controlMutex
     rclcpp::Time stateEntryTime{};                                                      // guarded by controlMutex
     
-    
     // ! We can remove this mutex IF AND ONLY IF every callback that touches 
     // ! `person`, `lastHeartbeatTime`, `state`, or `stateEntryTime` is a ROS 
     // ! callback created without an explicit callback group. As of now, that
@@ -177,6 +178,9 @@ private:
     // ? Helpers assume the caller holds it and do NOT lock internally since 
     // ? `std::mutex` is not recursive.
     // | std::mutex controlMutex;                                                            // ? Not mutable: locked from non-const methods which invoke const helpers
+
+    std::atomic_bool manualOverrideActive{false};                                       // orthogonal to MissionState
+    std::atomic_bool manualOverrideRequested{false};                                    // posted by callback, consumed by control step
 
     // * Default ctor
     explicit Navigation(M&& m) : m(std::move(m)) {}                                     // No default ctor exposed
@@ -191,6 +195,7 @@ private:
     void transitionTo(MissionState next);
     void onEnter(MissionState entered);   
     void onPerceptionCrashed();                                                         // Crash protocol: Perception is gone
+    void onManualOverride(const std_msgs::msg::Bool& msg);
     [[nodiscard]] static std::string toString(MissionState state) noexcept;
 
     // * Behaviors
