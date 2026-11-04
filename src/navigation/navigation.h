@@ -128,9 +128,6 @@ private:
         // ? NavigationParams). No YAML file; override at runtime with
         // ? `ros2 param set /navigation <name> <value>`.
         NavigationParams params;                                                        // ? Not const: loaded from the parameter server, may be retuned live
-    
-        // Watchdog
-        // const chrono::milliseconds watchdogPeriod;
     } m;
 
     // * Runtime state (written by callbacks/timer on different executor threads)
@@ -171,9 +168,15 @@ private:
     MissionState state = MissionState::IDLE;                                            // guarded by controlMutex
     rclcpp::Time stateEntryTime{};                                                      // guarded by controlMutex
     
+    
+    // ! We can remove this mutex IF AND ONLY IF every callback that touches 
+    // ! `person`, `lastHeartbeatTime`, `state`, or `stateEntryTime` is a ROS 
+    // ! callback created without an explicit callback group. As of now, that
+    // ! is true, but it is fragile. If any callback is ever moved to a Reentrant
+    // ! group, the invariant is broken and the mutex is mandatory. Defense-in-depth.
     // ? Helpers assume the caller holds it and do NOT lock internally since 
     // ? `std::mutex` is not recursive.
-    std::mutex controlMutex;                                                            // ? Not mutable: locked from non-const methods which invoke const helpers
+    // | std::mutex controlMutex;                                                            // ? Not mutable: locked from non-const methods which invoke const helpers
 
     // * Default ctor
     explicit Navigation(M&& m) : m(std::move(m)) {}                                     // No default ctor exposed
