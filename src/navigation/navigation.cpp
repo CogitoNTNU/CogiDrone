@@ -63,6 +63,11 @@ std::expected<std::unique_ptr<Navigation>, cogidrone::Error> Navigation::create(
 
 void Navigation::wire() noexcept {
     // * Subscriptions
+    // ! DO NOT pass an explicit callback group to ANY create_* call in this class.
+    // ! The node's default group is MutuallyExclusive, and every callback that
+    // ! omits the group joins it. That is what serializes `onDetections()` and
+    // ! `onWatchdogTick()` - see the invariant comment in navigation.h.
+    // ! Passing a ReentrantCallbackGroup here silently removes the guarantee.
     m.detectionSubscription = m.node->create_subscription<vision_msgs::msg::Detection2DArray>(
         "/perception/detections",
         rclcpp::QoS(10),
@@ -73,6 +78,20 @@ void Navigation::wire() noexcept {
 
     // TODO: Manual override channel - the mechanism (string commands? joy topic?
     //     : direct Drone-level call?) is a design decision, not yet made.
+    // ! WHEN IMPLEMENTING IT, DO NOT MUTATE RUNTIME STATE FROM THE CALLBACK.
+    // ? The override callback must only post a request - e.g. an
+    // ? `std::atomic_bool overrideRequested` or an atomic enum - and the control
+    // ? step (`onDetections` / `onWatchdogTick`) consumes it. Reasons:
+    // ?   1. If the callback is in the default group, it is serialized, so it
+    // ?      COULD mutate state directly - but it would become a second control
+    // ?      step that may transition state without a fresh frame, or run
+    // ?      `executeBehavior()` without updating `person`. That breaks the
+    // ?      "one control step per frame" invariant.
+    // ?   2. If the callback is ever moved to a Reentrant group (e.g. for
+    // ?      responsiveness), direct mutation is a data race. The flag approach
+    // ?      stays correct in both configurations.
+    // ?   3. A direct Drone-level call runs on whatever thread Drone calls from -
+    // ?      not an executor thread at all. Atomic is mandatory there.
 
     // TODO: Drone state (position/velocity/orientation) - the source is undecided.
     //     : Estimation is scrapped; candidates are subscribing to
@@ -100,6 +119,7 @@ void Navigation::wire() noexcept {
     // ? Not a control clock - the detection callback drives control. This timer
     // ? exists for one job: detect that NO frames are arriving, so the crash
     // ? protocol runs if Perception dies.
+    // ! Same rule as the subscription above: no explicit callback group.
     const auto WATCHDOG_PERIOD = std::chrono::milliseconds(
         static_cast<int>(m.params.detectionTimeout * 1000.0f / 4.0f)                    // 4 checks per timeout window
     );
@@ -135,7 +155,7 @@ void Navigation::onDetections(const vision_msgs::msg::Detection2DArray& msg) {
     // * Pick the most confident detection in the array
     const vision_msgs::msg::Detection2D* best = nullptr;
     for (const auto& detection : msg.detections) {
-        if (detection.results.empty()) continue;                                        // ? malformed entry
+        if (detection.results.empty()) continue;                                        // ? Malformed entry
         if (!best || detection.results.front().hypothesis.score
                    > best->results.front().hypothesis.score) {
             best = &detection;

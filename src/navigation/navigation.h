@@ -134,14 +134,37 @@ private:
     } m;
 
     // * Runtime state (written by callbacks/timer on different executor threads)
-    // ? Outside `M` for the same reason as in Pixhawk: `M` is what the object is
+    // ? Outside M for the same reason as in Pixhawk: M is what the object is
     // ? MADE OF (wiring, created once in create()/wire()); this block is what the
     // ? object EXPERIENCES - mutable state initialized to safe defaults and
     // ? mutated for the object's whole life by different executor threads.
-    
-    // ? One mutex guards ALL of it: the detection callback and the watchdog
-    // ? timer both run the state machine, so both touch `person`, `lastHeartbeatTime`,
-    // ? `state`, and `stateEntryTime`.
+    // ?
+    // ! THREAD-SAFETY INVARIANT - this block is protected by TWO mechanisms:
+    // ! 1. EXECUTOR SERIALIZATION (primary, implicit)
+    // ?    onDetections() (subscription) and onWatchdogTick() (timer) are both
+    // ?    created in wire() WITHOUT an explicit callback group. rclcpp therefore
+    // ?    assigns both to the node's DEFAULT callback group, which is created as
+    // ?    CallbackGroupType::MutuallyExclusive (rclcpp node_base.cpp). The
+    // ?    executor refuses to take a second entity from a group whose
+    // ?    can_be_taken_from atomic is false, and only resets it after the
+    // ?    callback returns (rclcpp executor.cpp). Therefore the two callbacks can
+    // ?    NEVER run concurrently - not under MultiThreadedExecutor, and not with
+    // ?    intra-process comms enabled (the intra-process waitable is added to the
+    // ?    SAME callback group - rclcpp node_topics.cpp).
+    // ! 2. controlMutex (secondary, explicit)
+    // ?    Defense-in-depth. If anyone ever passes an explicit ReentrantCallbackGroup
+    // ?    to either create_subscription() or create_wall_timer(), mechanism 1
+    // ?    silently disappears. The mutex keeps the code correct in that case.
+    // ?    Cost: one uncontended lock per frame (~20 ns) - negligible.
+    // ?
+    // ! RULES FOR ANY FUTURE CALLBACK (manual override, services, etc.):
+    // ?    - If it touches person, lastHeartbeatTime, state, or
+    // ?      stateEntryTime, it MUST either (a) be in the same MutuallyExclusive
+    // ?      group, or (b) take controlMutex.
+    // ?    - PREFER (c): do NOT touch this block at all. Post a request
+    // ?      (std::atomic flag / queue) and let the control step consume it.
+    // ?      This is the only option that stays correct if the callback is ever
+    // ?      moved to a Reentrant group. See the manual-override note in wire().
     PersonDetection person;                                                             // guarded by controlMutex
     rclcpp::Time lastHeartbeatTime{};                                                   // guarded by controlMutex - updated on EVERY frame
     
