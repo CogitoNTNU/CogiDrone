@@ -15,3 +15,9 @@ https://www.kaggle.com/datasets/redzapdos123/aerial-view-of-vehicles-and-humans-
 
 DroneSwarm:
 https://www.kaggle.com/datasets/arturkrush/drone-swarm-yolo-dataset
+
+Human detection dataset (closeup):
+https://www.kaggle.com/datasets/constantinwerner/human-detection-dataset/data?select=human+detection+dataset
+
+Human dataset:
+https://www.kaggle.com/datasets/fareselmenshawii/human-dataset/data?select=images

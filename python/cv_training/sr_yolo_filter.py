@@ -41,13 +41,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--source-dir",
         type=Path,
-        default=repository_python / "dataset" / "final_dataset",
+        default=repository_python / "dataset" / "search-and-rescue-2",
         help="Search-and-Rescue dataset directory.",
     )
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=repository_python / "dataset" / "sr_yolo_filtered-4",
+        default=repository_python / "dataset" / "sr_yolo_filtered",
         help="Directory receiving positive and annotated images.",
     )
     parser.add_argument(
