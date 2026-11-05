@@ -2,7 +2,6 @@
 
 #include <expected>
 #include <optional>
-#include <atomic>
 #include <memory>
 #include <string>
 // | #include <mutex>
@@ -25,7 +24,7 @@
 // ?    term, velocity/acceleration feedforward, jerk-limited trajectories. 
 // ?    We have none of these; you publish position setpoints.
 // ?  - Output rate independent of input rate - matters when the input is slow
-// ?    and the output must be fast. But Pixhawk already re-streams at 10 Hz,
+// ?    and the output must be fast. But FlightController already re-streams at 10 Hz,
 // ?    so the wire rate is decoupled from Navigation's rate regardless.
 // ?  - Deterministic state-machine cadence - matters if transitions must happen 
 // ?    at a known rate. They don't; they're time-based comparisons.
@@ -33,6 +32,22 @@
 // ? None apply. The tick is pure overhead: at 30 Hz with a 30 Hz camera, we're 
 // ? running the state machine twice per frame (once from the timer, once from 
 // ? the callback) for no benefit.
+
+
+// * Control state
+// ? The relationship between Navigation and PX4, derived from the two booleans
+// ? FlightController publishes (/pixhawk/armed and /pixhawk/offboard_active).
+// ? This is the "green light" in explicit form: three named states instead of
+// ? two booleans whose combination the reader has to derive.
+// ?
+// ?   WAITING_FOR_ARM        !armed                  - pilot has not armed yet
+// ?   PILOT_HAS_CONTROL      armed && !offboard      - pilot is flying
+// ?   NAVIGATION_HAS_CONTROL armed &&  offboard      - we are flying
+enum class ControlState {
+    WAITING_FOR_ARM,
+    PILOT_HAS_CONTROL,
+    NAVIGATION_HAS_CONTROL,
+};
 
 
 // * Mission states
@@ -47,7 +62,7 @@ enum class MissionState {
     PERSON_LOST,                                                                        // Lost sight of person, hovering/searching
     // | OBSTACLE_AVOIDANCE,                                                                 // TODO: requires Representation
     // | RETURNING,                                                                          // TODO: requires drone state + home reference
-    LANDING,                                                                            // Handed to Pixhawk::land()
+    LANDING,                                                                            // Handed to FlightController::land()
     // | EMERGENCY                                                                           // Hold position, await operator
 };
 
@@ -79,9 +94,6 @@ struct NavigationParams {
     float detectionTimeout          = 2.0f;                                             // seconds
     float minDetectionConfidence    = 0.7f;
     float trackConfirmTime          = 1.0f;                                             // seconds of stable track before committing to FOLLOWING
-
-    // Control
-    //// float controlFrequency          = 30.0f;                                            // Hz
 };
 
 
@@ -93,11 +105,11 @@ private:
 
         // Subscriptions
         rclcpp::Subscription<vision_msgs::msg::Detection2DArray>::SharedPtr detectionSubscription;  // Fused detections from Perception
-        rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr offboardActiveSubscription;            // From Pixhawk
-        rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr armedSubscription;                     // From Pixhawk 
+        rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr offboardActiveSubscription;            // From FlightController
+        rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr armedSubscription;                     // From FlightController
 
         // Publishers
-        // ? Contract with Pixhawk: it subscribes to /navigation/setpoint and
+        // ? Contract with FlightController: it subscribes to /navigation/setpoint and
         // ? expects px4_msgs::msg::TrajectorySetpoint (NED frame, µs timestamp).
         // ? This publisher IS the navigation->control interface.
         rclcpp::Publisher<px4_msgs::msg::TrajectorySetpoint>::SharedPtr setpointPublisher;
@@ -119,41 +131,42 @@ private:
     } m;
 
     // * Runtime state (written by callbacks/timer on different executor threads)
-    // ? Outside M for the same reason as in Pixhawk: M is what the object is
+    // ? Outside M for the same reason as in FlightController: M is what the object is
     // ? MADE OF (wiring, created once in create()/wire()); this block is what the
     // ? object EXPERIENCES - mutable state initialized to safe defaults and
     // ? mutated for the object's whole life by different executor threads.
     // ?
     // ! THREAD-SAFETY INVARIANT - currently upheld by EXECUTOR SERIALIZATION only.
-    // ? onDetections() (subscription), onWatchdogTick() (timer), and
-    // ? onManualOverride() (subscription) are all created in wire() WITHOUT an
-    // ? explicit callback group. rclcpp therefore assigns all three to the node's
-    // ? DEFAULT callback group, which is CallbackGroupType::MutuallyExclusive
-    // ? (rclcpp node_base.cpp). The executor refuses to take a second entity from
-    // ? a group whose can_be_taken_from atomic is false, and only resets it after
-    // ? the callback returns (rclcpp executor.cpp). Therefore no two callbacks can
-    // ? run concurrently - not under MultiThreadedExecutor, and not with
-    // ? intra-process comms enabled (the intra-process waitable is added to the
-    // ? SAME callback group - rclcpp node_topics.cpp).
+    // ? onDetections() (subscription), onWatchdogTick() (timer), onArmed()
+    // ? (subscription), and onOffboardActive() (subscription) are all created in
+    // ? wire() WITHOUT an explicit callback group. rclcpp therefore assigns all
+    // ? four to the node's DEFAULT callback group, which is
+    // ? CallbackGroupType::MutuallyExclusive (rclcpp node_base.cpp). The executor
+    // ? refuses to take a second entity from a group whose can_be_taken_from
+    // ? atomic is false, and only resets it after the callback returns (rclcpp
+    // ? executor.cpp). Therefore no two callbacks can run concurrently - not
+    // ? under MultiThreadedExecutor, and not with intra-process comms enabled
+    // ? (the intra-process waitable is added to the SAME callback group -
+    // ? rclcpp node_topics.cpp).
     // ?
     // ! RULES FOR ANY FUTURE CALLBACK:
-    // ?    - If it touches person, lastHeartbeatTime, state, or stateEntryTime,
-    // ?      it MUST be created without an explicit callback group (i.e. join the
-    // ?      default MutuallyExclusive group).
+    // ?    - If it touches person, lastHeartbeatTime, state, stateEntryTime,
+    // ?      armed, offboardActive, or controlState, it MUST be created without
+    // ?      an explicit callback group (i.e. join the default MutuallyExclusive
+    // ?      group).
     // ?    - PREFER posting a request (std::atomic) and letting the control step
     // ?      consume it. That stays correct even if the callback is later moved
-    // ?      to a Reentrant group. See onManualOverride().
+    // ?      to a Reentrant group. See onArmed() / onOffboardActive().
     // ?
     // ! REINSTATING controlMutex (if the invariant is ever broken):
     // ?    1. Uncomment `#include <mutex>` at the top of this file.
     // ?    2. Uncomment `std::mutex controlMutex;` below.
     // ?    3. Uncomment `std::lock_guard lock(controlMutex);` at the top of
-    // ?       onDetections() and onWatchdogTick().
+    // ?       onDetections(), onWatchdogTick(), onArmed(), and onOffboardActive().
     // ?    4. Do NOT lock inside the helpers (detectionIsValid, personIsLost,
-    // ?       perceptionIsDead) - std::mutex is not recursive. They assume the
-    // ?       caller holds it.
-    // ?    5. Do NOT lock in onManualOverride() - it only writes an atomic.
-    // ?    6. Re-verify: every path that reads/writes the members below must be
+    // ?       perceptionIsDead, deriveControlState) - std::mutex is not recursive.
+    // ?       They assume the caller holds it.
+    // ?    5. Re-verify: every path that reads/writes the members below must be
     // ?       reachable only from a lock-holding callback.
     PersonDetection person;                                                             // guarded by controlMutex (if reinstated)
     rclcpp::Time lastHeartbeatTime{};                                                   // guarded by controlMutex (if reinstated) - updated on EVERY frame
@@ -164,47 +177,39 @@ private:
     // ? No mutex today: the executor serializes all callbacks (see invariant above).
     // ? To reinstate, uncomment the line below and follow the guide above.
     // | std::mutex controlMutex;
-    
-    // ? Only the control step touches it (`consumeManualOverride`, `executeBehavior`,
-    // ? `evaluateTransitions`, `publishStatus`). Both entry points are serialized by 
-    // ? the executor. A plain bool is correct and more precise, but if we ever expose 
-    // ? `bool isOverridden() const` to Drone, this must become atomic.
-    // ? 
-    // ? FAIL-SAFE INITIALIZATION: both start `true` (pilot has control) so that
-    // ? Navigation publishes NOTHING until Pixhawk explicitly reports that PX4
-    // ? is in offboard mode. This matters if Navigation restarts mid-flight:
-    // ? without it, Navigation would immediately publish its default hover
-    // ? setpoint (origin at targetHeight) and the drone would fly there.
-    // ? With `transient_local` on both sides, Pixhawk's last published value is
-    // ? latched and delivered on subscribe, so the real state arrives within
-    // ? one `vehicle_status` period (~500 ms).
-    // ! BOTH must be `true`. Initializing only `manualOverrideActive` would be
-    // ! undone on the first control step: `consumeManualOverride()` compares
-    // ! against `manualOverrideRequested`, which defaults to `false`.
-    // ?
-    // ? The two halves of the green light. Both must be true for Navigation to
-    // ? fly. Written by onArmed() / onOffboardActive(), read by every control step.
+
+    // ? The two raw inputs from FlightController. Written by onArmed() /
+    // ? onOffboardActive(), read by deriveControlState().
     bool armed = false;
     bool offboardActive = false;
-    
+
+    // ? The derived green light. Recomputed by updateControlState() whenever
+    // ? either raw input changes. Every control step reads this, never the raw
+    // ? booleans, so the three-way decision is made in exactly one place.
+    ControlState controlState = ControlState::WAITING_FOR_ARM;
+
     // * Default ctor
     explicit Navigation(M&& m) : m(std::move(m)) {}                                     // No default ctor exposed
     void wire() noexcept;                                                               // Wire the node's subscriptions and publishers to the member methods
 
     // * Callbacks
     void onDetections(const vision_msgs::msg::Detection2DArray& msg);                   // Drives control on every frame
-    void onArmed(const std_msgs::msg::Bool& msg);
-    void onOffboardActive(const std_msgs::msg::Bool& msg);
+    void onArmed(const std_msgs::msg::Bool& msg);                                       // From FlightController
+    void onOffboardActive(const std_msgs::msg::Bool& msg);                              // From FlightController
     void onWatchdogTick();                                                              // Fires only when Perception goes silent
-    //// void onManualOverride(const std_msgs::msg::Bool& msg);                              // Callback to request manual override
 
-    // * Control
+    // * Control state
+    [[nodiscard]] ControlState deriveControlState() const noexcept;                     // Pure: armed + offboardActive -> ControlState
+    void updateControlState();                                                          // Recompute + dispatch to the matching handler
+    void onWaitingForArm();                                                             // `!armed`: mission over, return to IDLE
+    void onPilotTookControl();                                                          // `armed && !offboard`: freeze, keep state
+    void onNavigationTookControl();                                                     // `armed && offboard`: start or resume
+
+    // * Mission state machine
     [[nodiscard]] std::optional<MissionState> evaluateTransitions();                    // Returns the next state if a transition is due
     void transitionTo(MissionState next);
     void onEnter(MissionState entered);   
     void onPerceptionCrashed();                                                         // Crash protocol: Perception is gone
-    //// void consumeManualOverride();                                                       // Applies a pending request (control step only)
-    void updateControlState();
 
     // * Behaviors
     // ? A behavior's job: decide the next position setpoint and hand it to
@@ -214,7 +219,7 @@ private:
     void hoverBehavior();                                                               // Implemented: hold position setpoint
     // TODO: followBehavior() - target selection behind the person. Blocked on:
     //     1. Person world position (needs fused detections w/ depth from Perception)
-    //     2. Drone state source (estimation scrapped; PX4 local position vs Pixhawk republish - undecided)
+    //     2. Drone state source (estimation scrapped; PX4 local position vs FlightController republish - undecided)
     //// void followBehavior();
     
     // TODO: searchBehavior() - search pattern is a design choice (orbit? lawn-mower? hold+rotate?)
@@ -236,11 +241,11 @@ private:
     [[nodiscard]] bool detectionIsValid() const;
     [[nodiscard]] bool personIsLost() const;
     [[nodiscard]] bool perceptionIsDead() const;
-    [[nodiscard]] bool hasControl() const noexcept { return armed && offboardActive; }
 
 
     // * Helpers
     [[nodiscard]] static std::string toString(MissionState state) noexcept;
+    [[nodiscard]] static std::string toString(ControlState state) noexcept;
 
 
 public:

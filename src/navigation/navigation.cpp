@@ -28,14 +28,6 @@ std::expected<std::unique_ptr<Navigation>, cogidrone::Error> Navigation::create(
     params.detectionTimeout       = node->declare_parameter("detection_timeout", params.detectionTimeout);
     params.minDetectionConfidence = node->declare_parameter("min_detection_confidence", params.minDetectionConfidence);
     params.trackConfirmTime       = node->declare_parameter("track_confirm_time", params.trackConfirmTime);
-    //// params.controlFrequency       = node->declare_parameter("control_frequency", params.controlFrequency);
-    
-    //// // Ensure controlFrequency is positive to avoid division by zero when calculating the timer period
-    //// if (params.controlFrequency <= 0.0f) {
-    ////     return std::unexpected(cogidrone::Error{
-    ////         .message = "Navigation parameter `controlFrequency` must be positive!"sv
-    ////     });
-    //// }
 
     cogidrone::log(LOGGING_LEVEL::INFO, "Navigation parameters initialized successfully"sv);
 
@@ -45,6 +37,7 @@ std::expected<std::unique_ptr<Navigation>, cogidrone::Error> Navigation::create(
             .node = std::move(node),
             .detectionSubscription = nullptr,                                           // ? will be wired later
             .offboardActiveSubscription = nullptr,                                      // ? will be wired later
+            .armedSubscription = nullptr,                                               // ? will be wired later
             .setpointPublisher = nullptr,                                               // ? will be wired later
             .flightCommandPublisher = nullptr,                                          // ? will be wired later
             .missionStatusPublisher = nullptr,                                          // ? will be wired later
@@ -70,8 +63,9 @@ void Navigation::wire() noexcept {
     // * Subscriptions
     // ! DO NOT pass an explicit callback group to ANY create_* call in this class.
     // ! The node's default group is MutuallyExclusive, and every callback that
-    // ! omits the group joins it. That is what serializes `onDetections()` and
-    // ! `onWatchdogTick()` - see the invariant comment in navigation.h.
+    // ! omits the group joins it. That is what serializes onDetections(),
+    // ! onWatchdogTick(), onArmed(), and onOffboardActive() - see the invariant
+    // ! comment in navigation.h.
     // ! Passing a ReentrantCallbackGroup here silently removes the guarantee.
     m.detectionSubscription = m.node->create_subscription<vision_msgs::msg::Detection2DArray>(
         "/perception/detections",
@@ -82,31 +76,19 @@ void Navigation::wire() noexcept {
     );
 
 
-    // * Manual override
-    // ? `Bool` is a LEVEL: true = pilot has control, false = Navigation has control.
-    // ? The publisher is the RC bridge (not yet implemented) that mirrors the
-    // ? pilot's mode switch onto ROS.
-    // ! QoS CONTRACT: this subscriber uses TRANSIENT_LOCAL so a late-joining
-    // ! Navigation learns the current switch state. The RC bridge MUST publish
-    // ! with `rclcpp::QoS(1).transient_local()` too - a VOLATILE publisher will
-    // ! NOT match this subscription (DDS durability is requested <= offered), and
-    // ! the override would silently never arrive.
+    // * Control inputs from FlightController
+    // ? `Bool` is a LEVEL, not an event: true = the condition holds right now.
+    // ? Both topics are published by FlightController from vehicle_status, so
+    // ? they are authoritative - they cover the RC switch, QGC mode changes,
+    // ? and failsafes alike.
+    // ! QoS CONTRACT: these subscribers use TRANSIENT_LOCAL so a late-joining
+    // ! Navigation learns the current state immediately. FlightController MUST
+    // ! publish with `rclcpp::QoS(1).transient_local()` too - a VOLATILE
+    // ! publisher will NOT match these subscriptions (DDS durability is
+    // ! requested <= offered), and the state would silently never arrive.
     // ! TRANSIENT_LOCAL also requires RELIABLE reliability (rclcpp::QoS default).
-    // ?
+    // !
     // ! No explicit callback group - same invariant as the other callbacks.
-    // ? The override callback must only post a request - e.g. an
-    // ? `std::atomic_bool overrideRequested` or an atomic enum - and the control
-    // ? step (`onDetections` / `onWatchdogTick`) consumes it. Reasons:
-    // ?   1. If the callback is in the default group, it is serialized, so it
-    // ?      COULD mutate state directly - but it would become a second control
-    // ?      step that may transition state without a fresh frame, or run
-    // ?      `executeBehavior()` without updating `person`. That breaks the
-    // ?      "one control step per frame" invariant.
-    // ?   2. If the callback is ever moved to a Reentrant group (e.g. for
-    // ?      responsiveness), direct mutation is a data race. The flag approach
-    // ?      stays correct in both configurations.
-    // ?   3. A direct Drone-level call runs on whatever thread Drone calls from -
-    // ?      not an executor thread at all. Atomic is mandatory there.
     m.offboardActiveSubscription = m.node->create_subscription<std_msgs::msg::Bool>(
         "/pixhawk/offboard_active",
         rclcpp::QoS(1).transient_local(),                                               // ? Latch the last state for late-joining Navigation
@@ -117,13 +99,15 @@ void Navigation::wire() noexcept {
 
     m.armedSubscription = m.node->create_subscription<std_msgs::msg::Bool>(
         "/pixhawk/armed",
-        rclcpp::QoS(1).transient_local(),
-        [this](const std_msgs::msg::Bool& msg) { this->onArmed(msg); }
+        rclcpp::QoS(1).transient_local(),                                               // ? Latch the last state for late-joining Navigation
+        [this](const std_msgs::msg::Bool& msg) { 
+            this->onArmed(msg); 
+        }
     );
 
     // TODO: Drone state (position/velocity/orientation) - the source is undecided.
     //     : Estimation is scrapped; candidates are subscribing to
-    //     : /fmu/out/vehicle_local_position directly, or Pixhawk republishing its
+    //     : /fmu/out/vehicle_local_position directly, or FlightController republishing its
     //     : lastLocalPos on a navigation-owned topic. Until decided, Navigation
     //     : has NO drone state and only issues absolute home-relative setpoints.
 
@@ -166,15 +150,11 @@ void Navigation::wire() noexcept {
 
 
 // * Callbacks
-// ? No lock: the executor serializes this callback with onWatchdogTick() and
-// ? onManualOverride() via the node's default MutuallyExclusive group.
-// ? If controlMutex is reinstated, uncomment the lock_guard below.
+// ? No lock: the executor serializes this callback with onWatchdogTick(),
+// ? onArmed(), and onOffboardActive() via the node's default MutuallyExclusive
+// ? group. If controlMutex is reinstated, uncomment the lock_guard below.
 void Navigation::onDetections(const vision_msgs::msg::Detection2DArray& msg) {
     // | std::lock_guard lock(controlMutex);
-
-    //// // ? Apply any pending override FIRST - it must take effect even if the rest
-    //// // ? of the control step is skipped.
-    //// consumeManualOverride();
 
     // ? Heartbeat: Perception is alive, regardless of whether a person was found.
     lastHeartbeatTime = m.node->now();
@@ -187,7 +167,7 @@ void Navigation::onDetections(const vision_msgs::msg::Detection2DArray& msg) {
     // !      * make Perception publish only person detections on `/perception/detections`.
     // ! 
     // !    This is a cross-subsystem contract - decide it explicitly rather than relying 
-    // !    on "Perception only sends persons".S
+    // !    on "Perception only sends persons".
     const vision_msgs::msg::Detection2D* best = nullptr;
     for (const auto& detection : msg.detections) {
         if (detection.results.empty()) continue;                                        // ? Malformed entry
@@ -208,10 +188,12 @@ void Navigation::onDetections(const vision_msgs::msg::Detection2DArray& msg) {
         // TODO: person.position = ... (world-frame, from fused detections)
     }
     
-    // ? No control: keep `person` fresh so the mission resumes with current
-    // ? data, but do not run the state machine or behaviors.
-    if (!hasControl()) return;
-
+    // ? Only run the mission when we are the pilot. In every other control
+    // ? state we keep `person` fresh (above) so the mission resumes with
+    // ? current data, but we do not transition or publish setpoints.
+    if (controlState != ControlState::NAVIGATION_HAS_CONTROL) return;
+    
+    // * Drive the state machine and behavior on every frame
     if (auto next = evaluateTransitions()) {
         transitionTo(*next);
         publishStatus();
@@ -226,7 +208,7 @@ void Navigation::onWatchdogTick() {
     // | std::lock_guard lock(controlMutex);
 
     // ? No control: Perception silence is not our problem.
-    if (!hasControl()) return;
+    if (controlState != ControlState::NAVIGATION_HAS_CONTROL) return;
 
     // ? The detection callback normally drives the state machine. This timer
     // ? only acts when NO frames arrive at all - i.e. Perception is dead, not
@@ -236,44 +218,96 @@ void Navigation::onWatchdogTick() {
     onPerceptionCrashed();
 }
 
-//// // Callback to request manual override
-//// void Navigation::onManualOverride(const std_msgs::msg::Bool& msg) {
-////     manualOverrideRequested.store(msg.data, std::memory_order_relaxed);
-//// }
-
+// ? No lock: same reason as onDetections().
+// ? If controlMutex is reinstated, uncomment the lock_guard below.
 void Navigation::onArmed(const std_msgs::msg::Bool& msg) {
-    if (msg.data == armed) return;
+    // | std::lock_guard lock(controlMutex);
+
+    if (msg.data == armed) return;                                                      // ? Level, not event: ignore repeats
     armed = msg.data;
     updateControlState();
 }
 
+// ? No lock: same reason as onDetections().
+// ? If controlMutex is reinstated, uncomment the lock_guard below.
 void Navigation::onOffboardActive(const std_msgs::msg::Bool& msg) {
-    if (msg.data == offboardActive) return;
+    // | std::lock_guard lock(controlMutex);
+
+    if (msg.data == offboardActive) return;                                             // ? Level, not event: ignore repeats
     offboardActive = msg.data;
     updateControlState();
 }
 
+
+// * Control state
+ControlState Navigation::deriveControlState() const noexcept {
+    // ? Pure function of the two raw inputs. No side effects, no logging.
+    if (!armed)         return ControlState::WAITING_FOR_ARM;
+    if (!offboardActive) return ControlState::PILOT_HAS_CONTROL;
+    return ControlState::NAVIGATION_HAS_CONTROL;
+}
+
 void Navigation::updateControlState() {
-    // ? Called from both callbacks. The executor serializes them, so no lock.
-    //
-    // ? Three cases:
-    // ?   !armed                  -> IDLE (mission not started, or over)
-    // ?   armed && !offboard      -> frozen, keep state (pilot flying)
-    // ?   armed && offboard       -> running (start if IDLE)
-    if (!armed) {
-        if (state != MissionState::IDLE) {
-            RCLCPP_INFO(m.node->get_logger(), "Disarmed - mission over, returning to IDLE");
-            transitionTo(MissionState::IDLE);
-        }
-    } else if (hasControl() && state == MissionState::IDLE) {
-        // ? New control session: reset the dwell timer so a long pause does not
-        // ? instantly satisfy trackConfirmTime on the first frame.
-        stateEntryTime = m.node->now();
-        RCLCPP_INFO(m.node->get_logger(), "Armed + offboard - mission starting");
-        transitionTo(MissionState::SEARCHING);
+    // ? Called from onArmed() and onOffboardActive(). The executor serializes
+    // ? them, so no lock.
+    const ControlState next = deriveControlState();
+    if (next == controlState) return;                                                   // ? Nothing changed
+
+    const ControlState previous = controlState;
+    controlState = next;
+
+    RCLCPP_INFO(m.node->get_logger(), "Control state: %s -> %s",
+        toString(previous).c_str(), toString(next).c_str());
+
+    // ? Dispatch to the handler for the NEW state. Each handler is responsible
+    // ? for exactly one transition, so the policy is visible at the call site
+    // ? instead of buried in an if-chain.
+    switch (next) {
+        case ControlState::WAITING_FOR_ARM:        onWaitingForArm();        break;
+        case ControlState::PILOT_HAS_CONTROL:      onPilotTookControl();     break;
+        case ControlState::NAVIGATION_HAS_CONTROL: onNavigationTookControl(); break;
     }
 
     publishStatus();
+}
+
+void Navigation::onWaitingForArm() {
+    // ? Disarmed: the mission is over (or never started). Return to IDLE so
+    // ? the next arm starts a fresh mission from SEARCHING.
+    if (state != MissionState::IDLE) {
+        RCLCPP_INFO(m.node->get_logger(), "Disarmed - mission over, returning to IDLE");
+        transitionTo(MissionState::IDLE);
+    }
+}
+
+void Navigation::onPilotTookControl() {
+    // ? Pilot is flying. Freeze the mission: keep `state` so we resume where
+    // ? we left off when control returns.
+    // ? Restart the dwell timer: evidence gathered before the override is
+    // ? stale. Without this, a long override would instantly satisfy
+    // ? trackConfirmTime on the first frame after release.
+    // ? NOTE: `person.timestamp` is deliberately NOT reset. If the person
+    // ? was absent during the override, personIsLost() is immediately true
+    // ? and FOLLOWING -> PERSON_LOST fires on the first frame. That is
+    // ? correct since: the person really is lost.
+    stateEntryTime = m.node->now();
+    RCLCPP_WARN(m.node->get_logger(), "Pilot has control - mission suspended (state: %s)",
+        toString(state).c_str());
+}
+
+void Navigation::onNavigationTookControl() {
+    // ? We are flying. If the mission has not started, start it. Otherwise
+    // ? resume from the preserved state.
+    // ? Restart the dwell timer for the same reason as onPilotTookControl().
+    stateEntryTime = m.node->now();
+
+    if (state == MissionState::IDLE) {
+        RCLCPP_INFO(m.node->get_logger(), "Armed + offboard - mission starting");
+        transitionTo(MissionState::SEARCHING);
+    } else {
+        RCLCPP_INFO(m.node->get_logger(), "Navigation has control - resuming mission (state: %s)",
+            toString(state).c_str());
+    }
 }
 
 
@@ -285,10 +319,13 @@ std::optional<MissionState> Navigation::evaluateTransitions() {
 
     switch (state) {
         case MissionState::IDLE:
-            // No-op
-            // ? Unreachable in practice: onDetections() returns early when
-            // ? !hasControl(), and IDLE only exists when !hasControl().
-            // ? The IDLE -> SEARCHING transition happens in updateControlState().
+            // ? Unreachable: this function is only called from onDetections()
+            // ? after the NAVIGATION_HAS_CONTROL gate, and IDLE only exists
+            // ? when we do NOT have control. The IDLE -> SEARCHING transition
+            // ? happens in onNavigationTookControl().
+            // ! If this fires, the control-state gate is broken.
+            RCLCPP_ERROR(m.node->get_logger(),
+                "evaluateTransitions() called in IDLE - control-state gate is broken");
             break;
 
         case MissionState::SEARCHING:
@@ -318,8 +355,8 @@ std::optional<MissionState> Navigation::evaluateTransitions() {
             // TODO: timeout -> RETURNING (return-home strategy is a design choice)
             break;
 
-        default:
-            break;                                                                      // LANDING/EMERGENCY are exited via explicit commands only
+        case MissionState::LANDING:
+            break;                                                                      // Terminal until FlightController reports disarmed
     }
 
     return std::nullopt;
@@ -362,7 +399,7 @@ void Navigation::onPerceptionCrashed() {
     transitionTo(MissionState::PERSON_LOST);
     publishStatus();
 
-    // ? Deliberately NO setpoint publish: Pixhawk re-streams the last one, so
+    // ? Deliberately NO setpoint publish: FlightController re-streams the last one, so
     // ? the drone holds its last commanded position. Calling hoverBehavior()
     // ? here would command the ORIGIN (see its comment), which is not "hold".
     // 
@@ -371,54 +408,18 @@ void Navigation::onPerceptionCrashed() {
 }
 
 
-//// void Navigation::consumeManualOverride() {
-////     // ? Control step only. Level comparison, NOT exchange(false): the override
-////     // ? is a state ("pilot has control"), not an event. exchange() would lose
-////     // ? repeated identical values.
-////     const bool REQUESTED = manualOverrideRequested.load(std::memory_order_relaxed);
-////     if (REQUESTED == manualOverrideActive) return;
-//// 
-////     manualOverrideActive = REQUESTED;
-//// 
-////     if (manualOverrideActive) {
-////         RCLCPP_WARN(m.node->get_logger(),
-////                     "Manual override ENGAGED - suspending mission (state: %s)",
-////                     toString(state).c_str());
-////     } else {
-////         // ? Restart the dwell timer: evidence gathered before the override is
-////         // ? stale. Without this, a long override would instantly satisfy
-////         // ? trackConfirmTime on the first frame after release.
-////         // ? NOTE: `person.timestamp` is deliberately NOT reset. If the person
-////         // ? was absent during the override, personIsLost() is immediately true
-////         // ? and FOLLOWING -> PERSON_LOST fires on the first frame. That is
-////         // ? correct since: the person really is lost.
-////         stateEntryTime = m.node->now();
-////         RCLCPP_INFO(m.node->get_logger(),
-////                     "Manual override RELEASED - resuming mission (state: %s)",
-////                     toString(state).c_str());
-////     }
-//// 
-////     publishStatus();
-//// }
-
-
 
 // * Behaviors
 void Navigation::executeBehavior() {
     // ! Caller must hold controlMutex if mutex is reinstated - do NOT lock here!
     // ? No lock: called only from onDetections(), which is serialized by the executor. 
 
-    //// // ? Manual override: publish NOTHING. PX4 is not in offboard mode and would
-    //// // ? ignore us, but publishing would still overwrite Pixhawk's stored
-    //// // ? `currentSetpoint` - so on release the drone would jump to a stale
-    //// // ? mission target. Silence is correct.
-    //// if (manualOverrideActive) return;
-
     switch (state) {
         case MissionState::IDLE:
-            // ? Publish NOTHING. FlightController re-streams the frozen setpoint
-            // ? from WAITING_EKF, which is the position at startup. The drone
-            // ? sits still until the pilot arms.
+            // ? Unreachable for the same reason as in evaluateTransitions().
+            // ! If this fires, the control-state gate is broken.
+            RCLCPP_ERROR(m.node->get_logger(),
+                "executeBehavior() called in IDLE - control-state gate is broken");
             break;
 
         case MissionState::SEARCHING:
@@ -430,7 +431,7 @@ void Navigation::executeBehavior() {
             break;
 
         case MissionState::PERSON_LOST:
-            // ? Hold: do NOT publish a new setpoint. Pixhawk re-streams the last
+            // ? Hold: do NOT publish a new setpoint. FlightController re-streams the last
             // ? one, so the drone holds its last commanded position. True "hold
             // ? current position" needs a drone state source - see wire() TODO.
             break;
@@ -441,7 +442,7 @@ void Navigation::executeBehavior() {
             break;
 
         case MissionState::LANDING:
-            // ? LANDING is owned by Pixhawk. No new commands here.
+            // ? LANDING is owned by FlightController. No new commands here.
             break;
     }
 }
@@ -530,7 +531,7 @@ void Navigation::publishSetpoint(const cogidrone::Vec3& positionNed, float yaw) 
     auto sp = std::make_unique<px4_msgs::msg::TrajectorySetpoint>();                    // ? unique_ptr publish: zero-copy intra-process
     sp->position = {positionNed.x, positionNed.y, positionNed.z};
     sp->yaw = yaw;
-    sp->timestamp = m.node->now().nanoseconds() / 1000;                                 // µs, stamped at publish: always fresh for Pixhawk's stream
+    sp->timestamp = m.node->now().nanoseconds() / 1000;                                 // µs, stamped at publish: always fresh for FlightController's stream
 
     m.setpointPublisher->publish(std::move(sp));
 }
@@ -542,10 +543,22 @@ void Navigation::publishFlightCommand(cogidrone::FlightCommand command) {
 }
 
 void Navigation::publishStatus() {
-    std::string status; {
-             if (!armed)            status = "IDLE";
-        else if (!offboardActive)   status = "MANUALLY_OVERRIDDEN";
-        else                        status = toString(state);
+    // ? The status string is a function of the control state, not the mission
+    // ? state alone. Three cases, one per ControlState:
+    // ?   WAITING_FOR_ARM        -> "IDLE"                (not flying yet)
+    // ?   PILOT_HAS_CONTROL      -> "MANUALLY_OVERRIDDEN" (pilot is flying)
+    // ?   NAVIGATION_HAS_CONTROL -> toString(state)       (we are flying)
+    std::string status;
+    switch (controlState) {
+        case ControlState::WAITING_FOR_ARM:
+            status = "IDLE";
+            break;
+        case ControlState::PILOT_HAS_CONTROL:
+            status = "MANUALLY_OVERRIDDEN";
+            break;
+        case ControlState::NAVIGATION_HAS_CONTROL:
+            status = toString(state);
+            break;
     }
 
     auto msg = std::make_unique<std_msgs::msg::String>();                               // ? unique_ptr publish: zero-copy intra-process
@@ -597,11 +610,16 @@ std::string Navigation::toString(MissionState state) noexcept {
         case MissionState::PERSON_DETECTED:     return "PERSON_DETECTED";
         case MissionState::FOLLOWING:           return "FOLLOWING";
         case MissionState::PERSON_LOST:         return "PERSON_LOST";
-        // | case MissionState::OBSTACLE_AVOIDANCE:  return "OBSTACLE_AVOIDANCE";
-        // | case MissionState::RETURNING:           return "RETURNING";
         case MissionState::LANDING:             return "LANDING";
-        // | case MissionState::EMERGENCY:           return "EMERGENCY";
         default:                                return "UNKNOWN";
     }
 }
 
+std::string Navigation::toString(ControlState state) noexcept {
+    switch (state) {
+        case ControlState::WAITING_FOR_ARM:        return "WAITING_FOR_ARM";
+        case ControlState::PILOT_HAS_CONTROL:      return "PILOT_HAS_CONTROL";
+        case ControlState::NAVIGATION_HAS_CONTROL: return "NAVIGATION_HAS_CONTROL";
+        default:                                   return "UNKNOWN";
+    }
+}
