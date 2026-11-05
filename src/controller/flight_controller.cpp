@@ -220,9 +220,9 @@ void FlightController::streamTick() {
                     1.f, 
                     /* PX4_CUSTOM_MAIN_MODE_OFFBOARD = */ 6.f
                 );
+                cogidrone::log(LOGGING_LEVEL::INFO, "Offboard requested - waiting for PX4 (pilot must select Offboard on the RC switch)");
                 state = State::REQUESTING_CONTROL;
             }
-            cogidrone::log(LOGGING_LEVEL::INFO, "Offboard requested - waiting for PX4 (pilot must select Offboard on the RC switch)");
             break;
 
         case State::REQUESTING_CONTROL:
@@ -235,7 +235,7 @@ void FlightController::streamTick() {
             publishSetpoint();
 
             if (offboardActive) {
-                cogidrone::log(LOGGING_LEVEL::INFO, "PX4 entered offboard - waiting for pilot to arm");
+                cogidrone::log(LOGGING_LEVEL::INFO, "PX4 entered offboard");
                 state = State::CONTROL_GRANTED;
             }
             break;
@@ -278,6 +278,11 @@ void FlightController::streamTick() {
             if (!armed) {                                                               // transition to DISARMED only after PX4 has landed and disarmed itself
                 cogidrone::log(LOGGING_LEVEL::INFO, "Landed and disarmed");
                 state = State::DISARMED;                                                // terminal safe state; timer idles
+            } else if (!offboardActive) {
+                // ? Pilot took over during the landing. PX4 owns the descent now,
+                // ? and Navigation must stop believing it is the pilot.
+                cogidrone::log(LOGGING_LEVEL::WARNING, "PX4 left offboard during landing - pilot has control");
+                state = State::CONTROL_REVOKED;
             }
             break;
 

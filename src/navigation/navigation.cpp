@@ -291,8 +291,15 @@ void Navigation::onPilotTookControl() {
     // ? and FOLLOWING -> PERSON_LOST fires on the first frame. That is
     // ? correct since: the person really is lost.
     stateEntryTime = m.node->now();
-    RCLCPP_WARN(m.node->get_logger(), "Pilot has control - mission suspended (state: %s)",
-        toString(state).c_str());
+
+    if (state == MissionState::IDLE) {
+        RCLCPP_INFO(m.node->get_logger(), "Pilot has control - mission not started");
+    } 
+    
+    else {
+        RCLCPP_WARN(m.node->get_logger(), "Pilot has control - mission suspended (state: %s)",
+            toString(state).c_str());
+    }
 }
 
 void Navigation::onNavigationTookControl() {

@@ -2,7 +2,6 @@
 
 #include <expected>
 #include <optional>
-#include <atomic>
 #include <memory>
 #include <mutex>
 
