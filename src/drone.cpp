@@ -84,6 +84,7 @@ void Drone::start() {
     
     executor.add_node(m.perception->node());
     executor.add_node(m.navigation->node());
+    executor.add_node(m.flightController->node());
     
     cogidrone::log(LOGGING_LEVEL::INFO, "Nodes added successfully, spinning executor...");
     

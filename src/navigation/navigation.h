@@ -40,15 +40,15 @@
 // ? that don't exist yet (drone state source, obstacle map, fused detections)
 // ? are declared but their behaviors are stubs.
 enum class MissionState {
-    IDLE,                                                                               // Waiting for mission start
+    IDLE,                                                                               // Waiting for control
     SEARCHING,                                                                          // Looking for person
     PERSON_DETECTED,                                                                    // Person found, confirming track
     FOLLOWING,                                                                          // Actively following person
     PERSON_LOST,                                                                        // Lost sight of person, hovering/searching
-    OBSTACLE_AVOIDANCE,                                                                 // TODO: requires Representation
-    RETURNING,                                                                          // TODO: requires drone state + home reference
+    // | OBSTACLE_AVOIDANCE,                                                                 // TODO: requires Representation
+    // | RETURNING,                                                                          // TODO: requires drone state + home reference
     LANDING,                                                                            // Handed to Pixhawk::land()
-    EMERGENCY                                                                           // Hold position, await operator
+    // | EMERGENCY                                                                           // Hold position, await operator
 };
 
 
@@ -81,7 +81,7 @@ struct NavigationParams {
     float trackConfirmTime          = 1.0f;                                             // seconds of stable track before committing to FOLLOWING
 
     // Control
-    float controlFrequency          = 30.0f;                                            // Hz
+    //// float controlFrequency          = 30.0f;                                            // Hz
 };
 
 
@@ -93,7 +93,8 @@ private:
 
         // Subscriptions
         rclcpp::Subscription<vision_msgs::msg::Detection2DArray>::SharedPtr detectionSubscription;  // Fused detections from Perception
-        rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr manualOverrideSubscription;            // From the RC bridge
+        rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr offboardActiveSubscription;            // From Pixhawk
+        rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr armedSubscription;                     // From Pixhawk 
 
         // Publishers
         // ? Contract with Pixhawk: it subscribes to /navigation/setpoint and
@@ -168,8 +169,23 @@ private:
     // ? `evaluateTransitions`, `publishStatus`). Both entry points are serialized by 
     // ? the executor. A plain bool is correct and more precise, but if we ever expose 
     // ? `bool isOverridden() const` to Drone, this must become atomic.
-    bool manualOverrideActive = false;                                                  // Orthogonal to MissionState, owned by the control step
-    std::atomic_bool manualOverrideRequested{false};                                    // written by callback, consumed by control step
+    // ? 
+    // ? FAIL-SAFE INITIALIZATION: both start `true` (pilot has control) so that
+    // ? Navigation publishes NOTHING until Pixhawk explicitly reports that PX4
+    // ? is in offboard mode. This matters if Navigation restarts mid-flight:
+    // ? without it, Navigation would immediately publish its default hover
+    // ? setpoint (origin at targetHeight) and the drone would fly there.
+    // ? With `transient_local` on both sides, Pixhawk's last published value is
+    // ? latched and delivered on subscribe, so the real state arrives within
+    // ? one `vehicle_status` period (~500 ms).
+    // ! BOTH must be `true`. Initializing only `manualOverrideActive` would be
+    // ! undone on the first control step: `consumeManualOverride()` compares
+    // ! against `manualOverrideRequested`, which defaults to `false`.
+    // ?
+    // ? The two halves of the green light. Both must be true for Navigation to
+    // ? fly. Written by onArmed() / onOffboardActive(), read by every control step.
+    bool armed = false;
+    bool offboardActive = false;
     
     // * Default ctor
     explicit Navigation(M&& m) : m(std::move(m)) {}                                     // No default ctor exposed
@@ -177,16 +193,18 @@ private:
 
     // * Callbacks
     void onDetections(const vision_msgs::msg::Detection2DArray& msg);                   // Drives control on every frame
+    void onArmed(const std_msgs::msg::Bool& msg);
+    void onOffboardActive(const std_msgs::msg::Bool& msg);
     void onWatchdogTick();                                                              // Fires only when Perception goes silent
-    void onManualOverride(const std_msgs::msg::Bool& msg);
-
+    //// void onManualOverride(const std_msgs::msg::Bool& msg);                              // Callback to request manual override
 
     // * Control
     [[nodiscard]] std::optional<MissionState> evaluateTransitions();                    // Returns the next state if a transition is due
     void transitionTo(MissionState next);
     void onEnter(MissionState entered);   
     void onPerceptionCrashed();                                                         // Crash protocol: Perception is gone
-    void consumeManualOverride();                                                       // Applies a pending request (control step only)
+    //// void consumeManualOverride();                                                       // Applies a pending request (control step only)
+    void updateControlState();
 
     // * Behaviors
     // ? A behavior's job: decide the next position setpoint and hand it to
@@ -218,6 +236,7 @@ private:
     [[nodiscard]] bool detectionIsValid() const;
     [[nodiscard]] bool personIsLost() const;
     [[nodiscard]] bool perceptionIsDead() const;
+    [[nodiscard]] bool hasControl() const noexcept { return armed && offboardActive; }
 
 
     // * Helpers

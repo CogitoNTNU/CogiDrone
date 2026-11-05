@@ -62,7 +62,7 @@ void Navigation::onEnter(MissionState entered) {
 ### Pixhawk side
 
 ```cpp
-// pixhawk.h
+// flight_controller.h
 #include "controller/flight_command.h"
 ...
 rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr navigationCommandSubscription;
@@ -70,7 +70,7 @@ void onNavigationCommand(const std_msgs::msg::UInt8& msg);
 ```
 
 ```cpp
-// pixhawk.cpp
+// flight_controller.cpp
 void Pixhawk::onNavigationCommand(const std_msgs::msg::UInt8& msg) {
     const auto command = static_cast<cogidrone::FlightCommand>(msg.data);
 

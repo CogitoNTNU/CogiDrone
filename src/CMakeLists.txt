@@ -38,7 +38,7 @@ add_executable(cogidrone
     navigation/navigation.cpp
 
     # Controllers
-    controller/pixhawk.cpp
+    controller/flight_controller.cpp
 
     # Helpers
     logging.cpp

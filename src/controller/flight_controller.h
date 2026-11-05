@@ -1,13 +1,14 @@
 #pragma once
 
 #include <expected>
+#include <optional>
 #include <atomic>
 #include <memory>
 #include <mutex>
 
 #include "rclcpp/rclcpp.hpp"
-// #include "std_msgs/msg/string.hpp"
 #include "std_msgs/msg/u_int8.hpp"
+#include "std_msgs/msg/bool.hpp"
 #include "px4_msgs/msg/offboard_control_mode.hpp"
 #include "px4_msgs/msg/trajectory_setpoint.hpp"
 #include "px4_msgs/msg/vehicle_command.hpp"
@@ -33,7 +34,8 @@ private:
         WAITING_EKF,                                                                    // ? Subscribed, waiting for valid local position
         STREAMING,                                                                      // ? Publishing setpoints, not yet in offboard
         OFFBOARD_REQUEST,                                                               // ? Mode switch sent, awaiting ack
-        FLYING,                                                                         // ? Armed + offboard active
+        OFFBOARD_ACTIVE,                                                                // ? Armed + offboard active
+        OFFBOARD_LOST,                                                                  // ? Offboard lost, but still armed
         LANDING,                                                                        // ? Land commanded
         DISARMED                                                                        // ? Terminal safe state
     };
@@ -48,6 +50,10 @@ private:
         rclcpp::Publisher<px4_msgs::msg::TrajectorySetpoint>::SharedPtr setpointPublisher;
         rclcpp::Publisher<px4_msgs::msg::VehicleCommand>::SharedPtr vehicleCommandPublisher;
 
+        // Control output (to Drone subsystems)
+        rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr offboardActivePublisher;
+        rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr armedPublisher;
+
         // Subscriptions (PX4 feedback)
         rclcpp::Subscription<px4_msgs::msg::VehicleLocalPosition>::SharedPtr localPositionSubscription;
         rclcpp::Subscription<px4_msgs::msg::VehicleStatus>::SharedPtr statusSubscription;
@@ -55,7 +61,7 @@ private:
         // Control input (from Navigation)
         rclcpp::Subscription<px4_msgs::msg::TrajectorySetpoint>::SharedPtr setpointInputSubscription;
         rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr navigationCommandSubscription;
-
+        
 
         // Heartbeat timer - the offboard stream
         rclcpp::TimerBase::SharedPtr streamTimer;
@@ -103,6 +109,13 @@ private:
 
     uint8_t streamTicks = 0;                                                            // ticks spent in STREAMING (mode-switch delay)
 
+    // | DEBUG
+    // ? `onStatus` only. Tracks the last published value per topic so we publish
+    // ? on change instead of on every `vehicle_status` (~2 Hz). `nullopt` means
+    // ? "nothing published yet" - the first message must always publish so the
+    // ? transient_local latch is populated for late-joining subscribers.
+    std::optional<bool> lastPublishedOffboardActive;
+    std::optional<bool> lastPublishedArmed;
 
     // * Ctors & dtor
     explicit Pixhawk(M&& m) : m(std::move(m)) {}

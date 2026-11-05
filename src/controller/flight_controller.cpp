@@ -1,4 +1,6 @@
-#include "pixhawk.h"
+#include "flight_controller.h"
+
+#include <cmath>
 
 
 Pixhawk::~Pixhawk() = default;
@@ -6,18 +8,18 @@ Pixhawk::~Pixhawk() = default;
 std::expected<std::unique_ptr<Pixhawk>, cogidrone::Error> Pixhawk::create() {
     // * ROS2
     auto node = std::make_shared<rclcpp::Node>(
-        "pixhawk",
+        "flight_controller",
         rclcpp::NodeOptions().use_intra_process_comms(true)
     );
     cogidrone::log(LOGGING_LEVEL::INFO, "ROS2 IPC node created successfully");
 
     // * Partial assembly
     auto p = std::unique_ptr<Pixhawk>(
-        new Pixhawk(M{                                                                  // ? Transfer ownership into unique_ptr as ctor is private
+        new Pixhawk(M{                                                         // ? Transfer ownership into unique_ptr as ctor is private
             .node = std::move(node),
             .offboardModePublisher = nullptr,                                           // ? will be wired in `Pixhawk::wire()`
             .setpointPublisher = nullptr,                                               // ? will be wired in `Pixhawk::wire()`
-            .vehicleCommandPublisher = nullptr,                                                // ? will be wired in `Pixhawk::wire()`
+            .vehicleCommandPublisher = nullptr,                                         // ? will be wired in `Pixhawk::wire()`
             .localPositionSubscription = nullptr,                                       // ? will be wired in `Pixhawk::wire()`
             .statusSubscription = nullptr,                                              // ? will be wired in `Pixhawk::wire()`
             .setpointInputSubscription = nullptr,                                       // ? will be wired in `Pixhawk::wire()`
@@ -39,6 +41,25 @@ void Pixhawk::wire() noexcept {
     m.offboardModePublisher = m.node->create_publisher<px4_msgs::msg::OffboardControlMode>("/fmu/in/offboard_control_mode", 10);
     m.setpointPublisher = m.node->create_publisher<px4_msgs::msg::TrajectorySetpoint>("/fmu/in/trajectory_setpoint", 10);
     m.vehicleCommandPublisher = m.node->create_publisher<px4_msgs::msg::VehicleCommand>("/fmu/in/vehicle_command", 10);
+
+    // Control output to Drone subsystems (intra-process, zero-copy)
+    // ? Publish the inverse of offboardActive: true = PX4 is NOT in offboard,
+    // ? i.e. Navigation is not the pilot. Authoritative - covers RC switch,
+    // ? QGC mode change, and failsafes alike.
+    // ! QoS MUST be transient_local to match Navigation's subscriber.
+    m.offboardActivePublisher = m.node->create_publisher<std_msgs::msg::Bool>(
+        "/pixhawk/offboard_active",
+        rclcpp::QoS(1).transient_local()
+    );
+
+    // ? Arming state, straight from vehicle_status.arming_state.
+    // ? Navigation uses this to distinguish "waiting for the pilot to arm"
+    // ? (IDLE) from "pilot is flying" (MANUALLY_OVERRIDDEN).
+    // ! Same QoS contract as above.
+    m.armedPublisher = m.node->create_publisher<std_msgs::msg::Bool>(
+        "/pixhawk/armed",
+        rclcpp::QoS(1).transient_local()
+    );
 
     // * Subscriptions
     // PX4 namespace: the bridge exposes uORB topics under /fmu/out/
@@ -66,7 +87,7 @@ void Pixhawk::wire() noexcept {
         }
     );
 
-    m.navigationCommandSubscription  = m.node->create_subscription<std_msgs::msg::UInt8>(
+    m.navigationCommandSubscription = m.node->create_subscription<std_msgs::msg::UInt8>(
         "/navigation/flight_command", 
         rclcpp::QoS(10),
         [this](const std_msgs::msg::UInt8& msg) { 
@@ -99,6 +120,28 @@ void Pixhawk::onStatus(const px4_msgs::msg::VehicleStatus& msg) {
     // ? re-reads). No compound invariants depend on both being in sync.
     offboardActive = (msg.nav_state == px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_OFFBOARD);
     armed = msg.arming_state == px4_msgs::msg::VehicleStatus::ARMING_STATE_ARMED;
+
+    // Offboard active
+    if (// ? Publish only on change,
+        *lastPublishedOffboardActive != offboardActive || 
+        // ? but ALWAYS on the first message so the `transient_local` 
+        // ? latch is populated for late-joining subscribers.
+        !lastPublishedOffboardActive.has_value()) 
+    {
+        lastPublishedOffboardActive = offboardActive;
+        m.offboardActivePublisher->publish(std_msgs::msg::Bool{}.set__data(offboardActive));
+    }
+
+    // Armed state
+    if (// ? Publish only on change,
+        !lastPublishedArmed.has_value() 
+        // ? but ALWAYS on the first message so the `transient_local` 
+        // ? latch is populated for late-joining subscribers.
+        || *lastPublishedArmed != armed) 
+    {
+        lastPublishedArmed = armed;
+        m.armedPublisher->publish(std_msgs::msg::Bool{}.set__data(armed));
+    }
 }
 
 void Pixhawk::onSetpointInput(const px4_msgs::msg::TrajectorySetpoint& msg) {
@@ -136,6 +179,29 @@ void Pixhawk::streamTick() {
 
         case State::WAITING_EKF:
             if (isPositionValid()) {                                                    // EKF has a position reference
+                // ? Freeze the setpoint at the current position BEFORE streaming.
+                // ? `currentSetpoint` is default-initialized to zeros, so without
+                // ? this the first streamed setpoint would be the origin - and if
+                // ? PX4 enters offboard, the drone would fly there. This matters
+                // ? most when Pixhawk restarts mid-flight.
+                px4_msgs::msg::VehicleLocalPosition pos; {
+                    std::lock_guard lock(posMutex);
+                    pos = lastLocalPos;
+                }
+                {
+                    std::lock_guard lock(setpointMutex);
+                    currentSetpoint.position = {pos.x, pos.y, pos.z};
+                    
+                    // ? Why freeze yaw too: if the pilot rotates the drone 180° and 
+                    // ? hands back control, the frozen setpoint carries the old yaw. 
+                    // ? PX4 would rotate the drone back before Navigation's first 
+                    // ? setpoint arrives. `VehicleLocalPosition.heading` is NAN when 
+                    // ? unknown, hence the `std::isfinite` guard. 
+                    if (std::isfinite(pos.heading)) {
+                        currentSetpoint.yaw = pos.heading;
+                    }
+                }
+
                 cogidrone::log(LOGGING_LEVEL::INFO, "EKF position valid - starting offboard stream");
                 state = State::STREAMING;
             }
@@ -153,29 +219,84 @@ void Pixhawk::streamTick() {
                 );
                 state = State::OFFBOARD_REQUEST;
             }
+            cogidrone::log(LOGGING_LEVEL::INFO, "Offboard requested - waiting for PX4 (pilot must select Offboard on the RC switch)");
             break;
 
         case State::OFFBOARD_REQUEST:
-            publishOffboardMode();                                                      // keep the heartbeat alive!
+            // ? Waits for PX4 to enter offboard mode. No timeout by design:
+            // ? the pilot's mode switch is the authority.
+            // ? We do NOT arm here. Arming is the pilot's explicit action via
+            // ? the RC arm switch (RC_MAP_ARM_SW in QGC). FlightController only
+            // ? observes `armed` and forwards it to Navigation.
+            publishOffboardMode();                                                      // Keep the heartbeat alive
             publishSetpoint();
+
             if (offboardActive) {
-                sendCommand(
-                    px4_msgs::msg::VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 
-                    1.f
-                );
-                state = State::FLYING;
+                cogidrone::log(LOGGING_LEVEL::INFO, "PX4 entered offboard - waiting for pilot to arm");
+                state = State::OFFBOARD_ACTIVE;
             }
             break;
 
-        case State::FLYING:                                                             // ? fallthrough
+        case State::OFFBOARD_ACTIVE:
+            if (!offboardActive) {
+                // ? Freeze the setpoint at the current position BEFORE publishing,
+                // ? so the very next streamed setpoint is "hold here", not the
+                // ? stale pre-override target.
+                px4_msgs::msg::VehicleLocalPosition pos; {
+                    std::lock_guard lock(posMutex);
+                    pos = lastLocalPos;
+                }
+                {
+                    std::lock_guard lock(setpointMutex);
+                    currentSetpoint.position = {pos.x, pos.y, pos.z};
+
+                    // ? Why freeze yaw too: if the pilot rotates the drone 180° and 
+                    // ? hands back control, the frozen setpoint carries the old yaw. 
+                    // ? PX4 would rotate the drone back before Navigation's first 
+                    // ? setpoint arrives. `VehicleLocalPosition.heading` is NAN when 
+                    // ? unknown, hence the `std::isfinite` guard. 
+                    if (std::isfinite(pos.heading)) {
+                        currentSetpoint.yaw = pos.heading;                              // ? Hold current heading too
+                    }
+                }
+
+                cogidrone::log(LOGGING_LEVEL::WARNING, "PX4 left offboard - pilot or failsafe has control");
+                state = State::OFFBOARD_LOST;
+            }
+
+            publishOffboardMode();                                                      // never stop streaming while flying
+            publishSetpoint();
+            break;
+
         case State::LANDING:
             publishOffboardMode();                                                      // never stop streaming while flying
             publishSetpoint();
-            
-            if (!armed && offboardActive == false && state == State::LANDING) {         // transition to DISARMED only after PX4 has landed and disarmed itself
+
+            if (!armed) {                                                               // transition to DISARMED only after PX4 has landed and disarmed itself
                 cogidrone::log(LOGGING_LEVEL::INFO, "Landed and disarmed");
                 state = State::DISARMED;                                                // terminal safe state; timer idles
             }
+            break;
+
+        case State::OFFBOARD_LOST:
+            // ? Keep streaming: PX4 requires an active setpoint stream to ACCEPT
+            // ? offboard mode. Do NOT re-request offboard - the pilot's switch owns
+            // ? that decision. When they flip back to Offboard, PX4 enters offboard
+            // ? itself and `offboardActive` becomes true again.
+            publishOffboardMode();
+            publishSetpoint();
+
+            // ? Disarm wins over re-entering offboard: if the pilot landed and
+            // ? disarmed, the mission is over regardless of switch position.
+            if (!armed) {
+                cogidrone::log(LOGGING_LEVEL::INFO, "Disarmed while offboard was lost - terminal");
+                state = State::DISARMED;
+            } 
+            else if (offboardActive) {
+                cogidrone::log(LOGGING_LEVEL::INFO, "PX4 re-entered offboard - Navigation has control");
+                state = State::OFFBOARD_ACTIVE;
+            }
+            
             break;
 
         case State::DISARMED:
@@ -244,7 +365,14 @@ void Pixhawk::sendCommand(uint16_t command, float param1, float param2) {
 // * Commands
 void Pixhawk::land() {
     std::lock_guard lock(stateMutex);
-    if (state != State::FLYING) return;                                                 // nothing to land
+
+    // ? Only meaningful when Navigation has control. In OFFBOARD_LOST the pilot
+    // ? is flying, so Navigation must not be able to command a landing. In
+    // ? LANDING it is already landing. In DISARMED there is nothing to land.
+    // ? If an emergency landing is ever needed while the pilot has control,
+    // ? that is a separate command with its own semantics (e.g. a kill switch
+    // ? or a PX4 failsafe action), not this one.
+    if (state != State::OFFBOARD_ACTIVE) return;                                        // nothing to land
 
     // ? NAV_LAND hands control to PX4's landing controller - it owns the
     // ? descent, touchdown detection, and disarm. We keep streaming setpoints

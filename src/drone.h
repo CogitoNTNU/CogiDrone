@@ -5,7 +5,7 @@
 
 #include "perception/perception.h"
 #include "navigation/navigation.h"
-#include "controller/pixhawk.h"
+#include "controller/flight_controller.h"
 #include "logging.h"
 
 
