@@ -24,7 +24,7 @@ private:
         std::unique_ptr<Perception> perception;
         nullptr_t representation;                                                       // TODO: Implement the Representation subsystem
         std::unique_ptr<Navigation> navigation;
-        std::unique_ptr<Pixhawk> flightController;
+        std::unique_ptr<FlightController> flightController;
     } m;
 
     // * Ctors & dtor

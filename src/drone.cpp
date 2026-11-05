@@ -48,8 +48,8 @@ Drone::initiate(int argc, const char* argv[]) {
     cogidrone::log(LOGGING_LEVEL::INFO, "Navigation subsystem created successfully");
 
     // * 3. Flight Controller
-    std::optional<std::unique_ptr<Pixhawk>> flightController; {
-        auto result = Pixhawk::create();
+    std::optional<std::unique_ptr<FlightController>> flightController; {
+        auto result = FlightController::create();
     
         if (!result) {
             return std::unexpected(result.error());
