@@ -21,21 +21,31 @@
 
 // * Flight Controller class
 /**
- * @brief The Pixhawk class represents the Pixhawk flight controller.
- * This class is responsible for communicating with the Pixhawk flight controller 
- * and managing its state; e.g.: Pixhawk.arm();
+ * @brief The FlightController class owns the link to PX4.
+ *
+ * It performs the offboard handshake (stream setpoints, request offboard,
+ * observe the result), forwards Navigation's setpoints to PX4 at 10 Hz, and
+ * publishes the two facts Navigation needs to decide whether it is the pilot:
+ *   - /pixhawk/armed           (from vehicle_status.arming_state)
+ *   - /pixhawk/offboard_active (from vehicle_status.nav_state)
+ *
+ * It does NOT arm. Arming is the pilot's explicit action via the RC arm switch
+ * (RC_MAP_ARM_SW in QGC). FlightController only observes and forwards.
  */
-class Pixhawk {
+class FlightController {
 private:
     // * State machine
-    // ? The Pixhawk class maintains a state machine to manage the drone's flight state.
+    // ? The FlightController class maintains a state machine to manage the
+    // ? drone's flight state. The names describe the relationship between this
+    // ? node and PX4, read top to bottom as a story:
+    // ?   start -> wait for position -> stream -> request -> granted -> revoked
     enum class State {
-        INIT,                                                                           // ? Created, not streaming yet
-        WAITING_EKF,                                                                    // ? Subscribed, waiting for valid local position
-        STREAMING,                                                                      // ? Publishing setpoints, not yet in offboard
-        OFFBOARD_REQUEST,                                                               // ? Mode switch sent, awaiting ack
-        OFFBOARD_ACTIVE,                                                                // ? Armed + offboard active
-        OFFBOARD_LOST,                                                                  // ? Offboard lost, but still armed
+        STARTING,                                                                       // ? Created, not streaming yet
+        WAITING_FOR_POSITION,                                                           // ? Subscribed, waiting for valid local position
+        STREAMING_SETPOINTS,                                                            // ? Publishing setpoints, not yet in offboard
+        REQUESTING_CONTROL,                                                             // ? Mode switch sent, awaiting ack
+        CONTROL_GRANTED,                                                                // ? PX4 is in offboard mode
+        CONTROL_REVOKED,                                                                // ? PX4 left offboard, but still armed
         LANDING,                                                                        // ? Land commanded
         DISARMED                                                                        // ? Terminal safe state
     };
@@ -79,7 +89,7 @@ private:
     // ?     - `offboardActive` / `armed` flip as PX4 reports status
     // ? 
     // ? None of these have a meaningful "assembled" value - they are
-    // ? initialized to safe defaults (INIT, false, zeroed setpoint) and then
+    // ? initialized to safe defaults (STARTING, false, zeroed setpoint) and then
     // ? mutated continuously for the object's whole life by different
     // ? executor threads. Keeping them out of `M` matters because:
     // ?     1. Readability: aggregate-init of `M` in create() reads as "here
@@ -95,7 +105,7 @@ private:
     // ?     4. Change isolation: re-wiring topics or swapping models touches
     // ?        `M`; adding a new piece of mutable state (e.g. a battery flag)
     // ?        touches this block. Two different change reasons -> two sections.
-    State state = State::INIT;
+    State state = State::STARTING;
     std::mutex stateMutex;
 
     px4_msgs::msg::TrajectorySetpoint currentSetpoint;                                  // guarded by m_setpointMutex
@@ -107,7 +117,7 @@ private:
     bool offboardActive = false;                                                        // from vehicle_status
     bool armed = false;
 
-    uint8_t streamTicks = 0;                                                            // ticks spent in STREAMING (mode-switch delay)
+    uint8_t streamTicks = 0;                                                            // ticks spent in STREAMING_SETPOINTS (mode-switch delay)
 
     // | DEBUG
     // ? `onStatus` only. Tracks the last published value per topic so we publish
@@ -118,7 +128,7 @@ private:
     std::optional<bool> lastPublishedArmed;
 
     // * Ctors & dtor
-    explicit Pixhawk(M&& m) : m(std::move(m)) {}
+    explicit FlightController(M&& m) : m(std::move(m)) {}
     void wire() noexcept;                                                               // Wire pubs/subs/timer
 
     // * Callbacks
@@ -136,14 +146,14 @@ private:
 
 public:
     // * Ctors & dtor
-    [[nodiscard]] static std::expected<std::unique_ptr<Pixhawk>, cogidrone::Error> create();
+    [[nodiscard]] static std::expected<std::unique_ptr<FlightController>, cogidrone::Error> create();
 
-    ~Pixhawk();
+    ~FlightController();
 
-    Pixhawk(Pixhawk&&) noexcept = delete;                                               // ? non-movable: `this` captured in callbacks
-    Pixhawk& operator=(Pixhawk&&) noexcept = delete;                                    // ? (same rationale as Perception)
-    Pixhawk(const Pixhawk&) = delete;
-    Pixhawk& operator=(const Pixhawk&) = delete;
+    FlightController(FlightController&&) noexcept = delete;                             // ? non-movable: `this` captured in callbacks
+    FlightController& operator=(FlightController&&) noexcept = delete;                  // ? (same rationale as Perception)
+    FlightController(const FlightController&) = delete;
+    FlightController& operator=(const FlightController&) = delete;
 
     // * Accessors
     [[nodiscard]] inline rclcpp::Node::SharedPtr node() const noexcept { return m.node; }
