@@ -4,6 +4,8 @@
 #include <string_view>
 #include <cstdint>
 
+#include "enum_names.h"
+
 
 // * Logging
 // Log enum
@@ -17,6 +19,21 @@ enum class LOGGING_LEVEL : std::uint8_t {
 
     __UNIQUE_LEVELS_COUNT                                                               // ? Sentinel value for the number of logging levels
 };
+
+[[nodiscard]] constexpr auto enumNames(LOGGING_LEVEL) noexcept {
+    return std::array{
+        std::string_view{"TRACE"},
+        std::string_view{"DEBUG"},
+        std::string_view{"INFO"},
+        std::string_view{"WARNING"},
+        std::string_view{"ERROR"},
+        std::string_view{"FATAL"},
+    };
+}
+
+[[nodiscard]] constexpr std::string_view toString(LOGGING_LEVEL level) noexcept {
+    return cogidrone::enumName(level);
+}
 
 void setLoggingLevel(const LOGGING_LEVEL level);
 
