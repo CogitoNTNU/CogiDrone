@@ -8,9 +8,7 @@ namespace cogidrone {
 // ? Carried on the wire as std_msgs/msg/UInt8; the enum lives here so both
 // ? sides share one definition and invalid values are unrepresentable in C++.
 enum class FlightCommand : uint8_t {
-    LAND,
-    START,
-    EMERGENCY,
+    LAND
 };
 
 } // namespace cogidrone

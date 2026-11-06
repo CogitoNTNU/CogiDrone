@@ -163,11 +163,6 @@ void FlightController::onNavigationCommand(const std_msgs::msg::UInt8& msg) {
             land();
             break;
 
-        case cogidrone::FlightCommand::START:
-        case cogidrone::FlightCommand::EMERGENCY:
-            // TODO: each needs a corresponding FlightController action (design decision)
-            break;
-
         default:
             cogidrone::log(LOGGING_LEVEL::WARNING, "Unknown flight command received");
             break;
