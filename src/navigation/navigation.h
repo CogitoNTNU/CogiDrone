@@ -71,7 +71,12 @@ enum class MissionState {
 struct PersonDetection {
     cogidrone::Vec3 position;                                                           // TODO: world-frame position (NED) - requires fused detections (depth + intrinsics) from Perception
     float confidence = 0.0f;                                                            // Detection confidence [0-1]
-    rclcpp::Time timestamp{};
+    // ! The clock type is load-bearing. `rclcpp::Time{}` defaults to
+    // ! RCL_SYSTEM_TIME, but `node->now()` returns RCL_ROS_TIME, and
+    // ! `rclcpp::Time::operator-` THROWS std::runtime_error when the two
+    // ! differ. Value 0 with RCL_ROS_TIME means "no detection has ever
+    // ! arrived", which is exactly what personIsLost() needs.
+    rclcpp::Time timestamp{0, RCL_ROS_TIME};
     bool valid = false;
 };
 
