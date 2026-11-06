@@ -112,8 +112,8 @@ void FlightController::wire() noexcept {
 
 // * Callbacks
 void FlightController::onLocalPosition(const px4_msgs::msg::VehicleLocalPosition& msg) {
-    std::lock_guard lock(posMutex);
-    lastLocalPos = msg;
+    std::lock_guard lock(positionMutex);
+    lastLocalPosition = msg;
 }
 
 void FlightController::onStatus(const px4_msgs::msg::VehicleStatus& msg) {
@@ -187,21 +187,21 @@ void FlightController::streamTick() {
                 // ? this the first streamed setpoint would be the origin - and if
                 // ? PX4 enters offboard, the drone would fly there. This matters
                 // ? most when FlightController restarts mid-flight.
-                px4_msgs::msg::VehicleLocalPosition pos; {
-                    std::lock_guard lock(posMutex);
-                    pos = lastLocalPos;
+                px4_msgs::msg::VehicleLocalPosition position; {
+                    std::lock_guard lock(positionMutex);
+                    position = lastLocalPosition;
                 }
                 {
                     std::lock_guard lock(setpointMutex);
-                    currentSetpoint.position = {pos.x, pos.y, pos.z};
+                    currentSetpoint.position = {position.x, position.y, position.z};
                     
                     // ? Why freeze yaw too: if the pilot rotates the drone 180° and 
                     // ? hands back control, the frozen setpoint carries the old yaw. 
                     // ? PX4 would rotate the drone back before Navigation's first 
                     // ? setpoint arrives. `VehicleLocalPosition.heading` is NAN when 
                     // ? unknown, hence the `std::isfinite` guard. 
-                    if (std::isfinite(pos.heading)) {
-                        currentSetpoint.yaw = pos.heading;
+                    if (std::isfinite(position.heading)) {
+                        currentSetpoint.yaw = position.heading;
                     }
                 }
 
@@ -245,21 +245,21 @@ void FlightController::streamTick() {
                 // ? Freeze the setpoint at the current position BEFORE publishing,
                 // ? so the very next streamed setpoint is "hold here", not the
                 // ? stale pre-override target.
-                px4_msgs::msg::VehicleLocalPosition pos; {
-                    std::lock_guard lock(posMutex);
-                    pos = lastLocalPos;
+                px4_msgs::msg::VehicleLocalPosition position; {
+                    std::lock_guard lock(positionMutex);
+                    position = lastLocalPosition;
                 }
                 {
                     std::lock_guard lock(setpointMutex);
-                    currentSetpoint.position = {pos.x, pos.y, pos.z};
+                    currentSetpoint.position = {position.x, position.y, position.z};
 
                     // ? Why freeze yaw too: if the pilot rotates the drone 180° and 
                     // ? hands back control, the frozen setpoint carries the old yaw. 
                     // ? PX4 would rotate the drone back before Navigation's first 
                     // ? setpoint arrives. `VehicleLocalPosition.heading` is NAN when 
                     // ? unknown, hence the `std::isfinite` guard. 
-                    if (std::isfinite(pos.heading)) {
-                        currentSetpoint.yaw = pos.heading;                              // ? Hold current heading too
+                    if (std::isfinite(position.heading)) {
+                        currentSetpoint.yaw = position.heading;                              // ? Hold current heading too
                     }
                 }
 
@@ -361,11 +361,11 @@ void FlightController::sendCommand(uint16_t command, float param1, float param2)
 }
 
 [[nodiscard]] bool FlightController::isPositionValid() const {
-    std::lock_guard lock(posMutex);
+    std::lock_guard lock(positionMutex);
     // ? EKF2 has a position reference: xy+z valid (GPS outdoors, VIO later).
     // ? Without this, PX4 refuses offboard/arming - gating here gives a
     // ? clean log message instead of a silent command rejection.
-    return lastLocalPos.xy_valid && lastLocalPos.z_valid;
+    return lastLocalPosition.xy_valid && lastLocalPosition.z_valid;
 }
 
 

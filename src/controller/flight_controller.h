@@ -82,9 +82,9 @@ private:
     // ? define what the object IS MADE OF (node, publishers, subscriptions,
     // ? timer). These members instead hold what the object EXPERIENCES - the
     // ? evolving condition of the drone:
-    // ?     - `state`            changes on every streamTick()
-    // ?     - `currentSetpoint`  changes every time Navigation publishes
-    // ?     - `lastLocalPos`     changes at PX4's feedback rate
+    // ?     - `state`              changes on every streamTick()
+    // ?     - `currentSetpoint`    changes every time Navigation publishes
+    // ?     - `lastLocalPosition`  changes at PX4's feedback rate
     // ?     - `offboardActive` / `armed` flip as PX4 reports status
     // ? 
     // ? None of these have a meaningful "assembled" value - they are
@@ -107,11 +107,11 @@ private:
     State state = State::STARTING;
     std::mutex stateMutex;
 
-    px4_msgs::msg::TrajectorySetpoint currentSetpoint;                                  // guarded by m_setpointMutex
+    px4_msgs::msg::TrajectorySetpoint currentSetpoint;                                  // guarded by setpointMutex
     std::mutex setpointMutex;
     
-    px4_msgs::msg::VehicleLocalPosition lastLocalPos;                                   // guarded by m_posMutex
-    mutable std::mutex posMutex;
+    px4_msgs::msg::VehicleLocalPosition lastLocalPosition;                              // guarded by positionMutex
+    mutable std::mutex positionMutex;
     
     bool offboardActive = false;                                                        // from vehicle_status
     bool armed = false;
