@@ -31,6 +31,6 @@ void cogidrone::log(
     }
 
     std::cerr << "[" << toString(LEVEL) << "] "
-            << location.file_name() << ":" << location.line() << " - "
-            << message << std::endl;
+              << location.file_name() << ":" << location.line() << " - "
+              << message << std::endl;
 }
