@@ -17,6 +17,7 @@
 #include "logging.h"
 #include "controller/flight_commands.h"
 #include "math/vec3.h"
+#include "enum_names.h"
 
 
 // * Design choice - Why we don't have a fixed-rate control loop
@@ -44,28 +45,59 @@
 // ?   WAITING_FOR_ARM        !armed                  - pilot has not armed yet
 // ?   PILOT_HAS_CONTROL      armed && !offboard      - pilot is flying
 // ?   NAVIGATION_HAS_CONTROL armed &&  offboard      - we are flying
+#define COGIDRONE_CONTROL_STATE_LIST(X)                                                 \
+    X(WAITING_FOR_ARM)                                                                  \
+    X(PILOT_HAS_CONTROL)                                                                \
+    X(NAVIGATION_HAS_CONTROL)
+
 enum class ControlState {
-    WAITING_FOR_ARM,
-    PILOT_HAS_CONTROL,
-    NAVIGATION_HAS_CONTROL,
+#define COGIDRONE_ENUM_MEMBER(name) name,
+    COGIDRONE_CONTROL_STATE_LIST(COGIDRONE_ENUM_MEMBER)
+#undef COGIDRONE_ENUM_MEMBER
 };
+
+[[nodiscard]] constexpr auto enumNames(ControlState) noexcept {
+    return std::array{
+#define COGIDRONE_ENUM_NAME(name) std::string_view{#name},
+        COGIDRONE_CONTROL_STATE_LIST(COGIDRONE_ENUM_NAME)
+#undef COGIDRONE_ENUM_NAME
+    };
+}
 
 
 // * Mission states
 // ? The full mission lifecycle. States whose behaviors depend on subsystems
-// ? that don't exist yet (drone state source, obstacle map, fused detections)
-// ? are declared but their behaviors are stubs.
+// ? that don't exist yet are declared but their behaviors are stubs.
+// ?   IDLE             - Waiting for control
+// ?   SEARCHING        - Looking for person
+// ?   PERSON_DETECTED  - Person found, confirming track
+// ?   FOLLOWING        - Actively following person
+// ?   PERSON_LOST      - Lost sight of person, hovering/searching
+// ?   LANDING          - Handed to FlightController::land()
+// | OBSTACLE_AVOIDANCE - TODO: requires Representation
+// | RETURNING          - TODO: requires drone state + home reference
+// | EMERGENCY          - Hold position, await operator
+#define COGIDRONE_MISSION_STATE_LIST(X)                                                 \
+    X(IDLE)                                                                             \
+    X(SEARCHING)                                                                        \
+    X(PERSON_DETECTED)                                                                  \
+    X(FOLLOWING)                                                                        \
+    X(PERSON_LOST)                                                                      \
+    X(LANDING)
+
 enum class MissionState {
-    IDLE,                                                                               // Waiting for control
-    SEARCHING,                                                                          // Looking for person
-    PERSON_DETECTED,                                                                    // Person found, confirming track
-    FOLLOWING,                                                                          // Actively following person
-    PERSON_LOST,                                                                        // Lost sight of person, hovering/searching
-    // | OBSTACLE_AVOIDANCE,                                                                 // TODO: requires Representation
-    // | RETURNING,                                                                          // TODO: requires drone state + home reference
-    LANDING,                                                                            // Handed to FlightController::land()
-    // | EMERGENCY                                                                           // Hold position, await operator
+#define COGIDRONE_ENUM_MEMBER(name) name,
+    COGIDRONE_MISSION_STATE_LIST(COGIDRONE_ENUM_MEMBER)
+#undef COGIDRONE_ENUM_MEMBER
 };
+
+[[nodiscard]] constexpr auto enumNames(MissionState) noexcept {
+    return std::array{
+#define COGIDRONE_ENUM_NAME(name) std::string_view{#name},
+        COGIDRONE_MISSION_STATE_LIST(COGIDRONE_ENUM_NAME)
+#undef COGIDRONE_ENUM_NAME
+    };
+}
 
 
 // * Data types
@@ -282,7 +314,8 @@ private:
     // * Helpers
     // NOTE: 
     // I wish Ubuntu 24.04 had GCC16 support as enum class reflection, which was
-    // introduced in C++26, generalizes these two functions into this beautiful code:
+    // introduced in C++26, generalizes this metaprogramming bullshit, along with
+    // all the other boilerplate crap into this piece of beautiful code:
     /*
         template <typename E> requires std::is_enum_v<E>
         constexpr std::string_view enumName(E value) {
@@ -292,9 +325,16 @@ private:
             return "UNKNOWN";
         }
     */
-    // but ofc it's out of fucking reach as of today.. thanks for coming to my TED talk
-    [[nodiscard]] static std::string toString(MissionState state) noexcept;
-    [[nodiscard]] static std::string toString(ControlState state) noexcept;
+    // but ofc it's out of fucking reach as of today.. so you'll have to do with
+    // this monstrocity below :) (Good fucking luck figuring out how the 
+    // `cogidrone::NamedEnum` concept + X-macro method works!)     
+    // 
+    // Thanks for coming to my TED talk
+    //   - Elias Alexander Wiklund Ottersbo
+    template <cogidrone::NamedEnum E>
+    [[nodiscard]] static constexpr std::string_view toString(E state) noexcept {
+        return cogidrone::enumName(state);
+    }
 
 
 public:

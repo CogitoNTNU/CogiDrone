@@ -5,6 +5,13 @@
 #include <cmath>
 
 
+// | Logging
+namespace {
+// ? `%.*s` takes the length explicitly - a string_view is not NUL-terminated.
+[[nodiscard]] constexpr int svLen(std::string_view sv) noexcept {
+    return static_cast<int>(sv.size());
+}
+} // namespace
 
 // * Ctors & dtor
 Navigation::~Navigation() = default;
@@ -276,8 +283,12 @@ void Navigation::updateControlState() {
     const ControlState previous = controlState;
     controlState = next;
 
-    RCLCPP_INFO(m.node->get_logger(), "Control state: %s -> %s",
-        toString(previous).c_str(), toString(next).c_str());
+    RCLCPP_INFO(m.node->get_logger(), "Control state: %.*s -> %.*s",
+        svLen(toString(previous)), 
+        toString(previous).data(), 
+        svLen(toString(next)), 
+        toString(next).data()
+    );
 
     // ? Dispatch to the handler for the NEW state. Each handler is responsible
     // ? for exactly one transition, so the policy is visible at the call site
@@ -317,8 +328,10 @@ void Navigation::onPilotTookControl() {
     } 
     
     else {
-        RCLCPP_WARN(m.node->get_logger(), "Pilot has control - mission suspended (state: %s)",
-            toString(state).c_str());
+        RCLCPP_WARN(m.node->get_logger(), "Pilot has control - mission suspended (state: %.*s)",
+            svLen(toString(state)), 
+            toString(state).data()
+        );
     }
 }
 
@@ -332,8 +345,10 @@ void Navigation::onNavigationTookControl() {
         RCLCPP_INFO(m.node->get_logger(), "Armed + offboard - mission starting");
         transitionTo(MissionState::SEARCHING);
     } else {
-        RCLCPP_INFO(m.node->get_logger(), "Navigation has control - resuming mission (state: %s)",
-            toString(state).c_str());
+        RCLCPP_INFO(m.node->get_logger(), "Navigation has control - resuming mission (state: %.*s)",
+            svLen(toString(state)), 
+            toString(state).data()
+        );
     }
 }
 
@@ -390,8 +405,12 @@ std::optional<MissionState> Navigation::evaluateTransitions() {
 }
 
 void Navigation::transitionTo(MissionState next) {
-    RCLCPP_INFO(m.node->get_logger(), "State transition: %s -> %s",
-        toString(state).c_str(), toString(next).c_str());
+    RCLCPP_INFO(m.node->get_logger(), "State transition: %.*s -> %.*s",
+        svLen(toString(state)), 
+        toString(state).data(), 
+        svLen(toString(next)), 
+        toString(next).data()
+    );
 
     state = next;
     stateEntryTime = m.node->now();
@@ -657,27 +676,4 @@ bool Navigation::dronePositionValid() const {
     // ? position reference (GPS outdoors, VIO later). Without it, `x`/`y`/`z`
     // ? are meaningless and any setpoint built from them is a guess.
     return dronePosition.xy_valid && dronePosition.z_valid;
-}
-
-
-// * Helpers
-std::string Navigation::toString(MissionState state) noexcept {
-    switch (state) {
-        case MissionState::IDLE:                return "IDLE";
-        case MissionState::SEARCHING:           return "SEARCHING";
-        case MissionState::PERSON_DETECTED:     return "PERSON_DETECTED";
-        case MissionState::FOLLOWING:           return "FOLLOWING";
-        case MissionState::PERSON_LOST:         return "PERSON_LOST";
-        case MissionState::LANDING:             return "LANDING";
-        default:                                return "UNKNOWN";
-    }
-}
-
-std::string Navigation::toString(ControlState state) noexcept {
-    switch (state) {
-        case ControlState::WAITING_FOR_ARM:        return "WAITING_FOR_ARM";
-        case ControlState::PILOT_HAS_CONTROL:      return "PILOT_HAS_CONTROL";
-        case ControlState::NAVIGATION_HAS_CONTROL: return "NAVIGATION_HAS_CONTROL";
-        default:                                   return "UNKNOWN";
-    }
 }
