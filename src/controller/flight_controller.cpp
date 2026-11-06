@@ -117,10 +117,12 @@ void FlightController::onLocalPosition(const px4_msgs::msg::VehicleLocalPosition
 }
 
 void FlightController::onStatus(const px4_msgs::msg::VehicleStatus& msg) {
+    // ! DOUBLE CHECK AFTER REFACTOR: (this should be more correct than forcing atomicity)
     // ? Written from the status callback thread, read from the timer thread.
     // ? Plain bools are fine here: each is independently-written telemetry,
     // ? read-only for decisions, and a torn/stale read is harmless (next tick
     // ? re-reads). No compound invariants depend on both being in sync.
+    navState = msg.nav_state;
     offboardActive = (msg.nav_state == px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_OFFBOARD);
     armed = msg.arming_state == px4_msgs::msg::VehicleStatus::ARMING_STATE_ARMED;
 
