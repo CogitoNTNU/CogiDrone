@@ -9,21 +9,6 @@
 namespace {
     // Logging level variable
     std::atomic<LOGGING_LEVEL> logLevel{LOGGING_LEVEL::WARNING};                        // ? Default: `WARNING`
-
-    // Output
-    constexpr auto toIndex(LOGGING_LEVEL level) noexcept {                              // Helper function to convert LOGGING_LEVEL to an index for the string array
-        return static_cast<std::size_t>(level);
-    }
-    
-    constexpr std::array<std::string_view, toIndex(LOGGING_LEVEL::__UNIQUE_LEVELS_COUNT)>       
-    LOGGING_LEVEL_STRINGS = {                                                           // Array of string representations for each logging level
-        "TRACE", 
-        "DEBUG", 
-        "INFO", 
-        "WARNING", 
-        "ERROR", 
-        "FATAL" 
-    };
 } // namespace
 
 /**
@@ -45,8 +30,7 @@ void cogidrone::log(
         return;                                                                         // Skip logging if the message level is below the current log level
     }
 
-    const auto levelStr = LOGGING_LEVEL_STRINGS[toIndex(LEVEL)];
-    std::cerr << "[" << levelStr << "] "
-              << location.file_name() << ":" << location.line() << " - "
-              << message << std::endl;
+    std::cerr << "[" << toString(LEVEL) << "] "
+            << location.file_name() << ":" << location.line() << " - "
+            << message << std::endl;
 }
