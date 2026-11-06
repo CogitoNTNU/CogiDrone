@@ -2,6 +2,8 @@
 
 #include <expected>
 #include <optional>
+#include <cstdint>
+#include <atomic>
 #include <memory>
 #include <mutex>
 
@@ -113,8 +115,15 @@ private:
     px4_msgs::msg::VehicleLocalPosition lastLocalPosition;                              // guarded by positionMutex
     mutable std::mutex positionMutex;
     
-    bool offboardActive = false;                                                        // from vehicle_status
-    bool armed = false;
+    // ! DOUBLE CHECK AFTER REFACTOR:
+    // ? Written by onStatus() (subscription thread), read by streamTick() (timer
+    // ? thread). `std::atomic` removes the data race; the default seq_cst
+    // ? ordering is free here because neither flag is ever read-modify-written.
+    // ? Each flag is independent telemetry - no decision depends on the two
+    // ? being observed in the same instant - so no stronger ordering is needed.
+    std::atomic<bool> offboardActive{false};                                            // from vehicle_status.nav_state
+    std::atomic<bool> armed{false};                                                     // from vehicle_status.arming_state
+    std::atomic<uint8_t> navState{0};                                                   // from vehicle_status.nav_state (raw, for px4IsLanding)
 
     uint8_t streamTicks = 0;                                                            // ticks spent in STREAMING_SETPOINTS (mode-switch delay)
 
