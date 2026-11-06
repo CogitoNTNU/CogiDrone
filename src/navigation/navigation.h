@@ -11,6 +11,7 @@
 #include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/u_int8.hpp"
 #include "px4_msgs/msg/trajectory_setpoint.hpp"
+#include "px4_msgs/msg/vehicle_local_position.hpp"
 #include "vision_msgs/msg/detection2_d_array.hpp"
 
 #include "logging.h"
@@ -112,6 +113,18 @@ private:
         rclcpp::Subscription<vision_msgs::msg::Detection2DArray>::SharedPtr detectionSubscription;  // Fused detections from Perception
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr offboardActiveSubscription;            // From FlightController
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr armedSubscription;                     // From FlightController
+        
+        // ! DOUBLE CHECK AFTER REFACTOR: (might be better to have FlightController 
+        // ! publish a reference or pointer of it's localPosition member instead 
+        // ! of having Navigation subscribe to PX4's local position directly)
+        // ? Navigation reads PX4's local position itself rather than going
+        // ? through FlightController. FlightController owns the COMMAND link
+        // ? (the offboard handshake); telemetry is a separate concern, and
+        // ? routing it through FlightController would add a topic and a
+        // ? publisher/subscriber pair for no benefit.
+        // ! QoS MUST be best_effort: PX4 publishes vehicle_local_position as
+        // ! best_effort, and a reliable subscriber will not match it.
+        rclcpp::Subscription<px4_msgs::msg::VehicleLocalPosition>::SharedPtr localPositionSubscription;
 
         // Publishers
         // ? Contract with FlightController: it subscribes to /navigation/setpoint and
@@ -156,9 +169,9 @@ private:
     // ?
     // ! RULES FOR ANY FUTURE CALLBACK:
     // ?    - If it touches person, lastHeartbeatTime, state, stateEntryTime,
-    // ?      armed, offboardActive, or controlState, it MUST be created without
-    // ?      an explicit callback group (i.e. join the default MutuallyExclusive
-    // ?      group).
+    // ?      armed, offboardActive, dronePosition, or controlState, it MUST be
+    // ?      created without an explicit callback group (i.e. join the default
+    // ?      MutuallyExclusive group).
     // ?    - PREFER posting a request (std::atomic) and letting the control step
     // ?      consume it. That stays correct even if the callback is later moved
     // ?      to a Reentrant group. See onArmed() / onOffboardActive().
@@ -183,6 +196,14 @@ private:
     // ? To reinstate, uncomment the line below and follow the guide above.
     // | std::mutex controlMutex;
 
+    // ! DOUBLE CHECK AFTER REFACTOR: (might be better to have FlightController 
+    // ! publish a reference or pointer of it's localPosition member instead 
+    // ! of having Navigation subscribe to PX4's local position directly)
+    // ? Latest PX4 local position (NED, home-relative). Written by
+    // ? onLocalPosition(), read by the behaviors. Same serialization argument
+    // ? as the rest of this block: the executor runs one callback at a time.
+    px4_msgs::msg::VehicleLocalPosition dronePosition;
+
     // ? The two raw inputs from FlightController. Written by onArmed() /
     // ? onOffboardActive(), read by deriveControlState().
     bool armed = false;
@@ -193,6 +214,8 @@ private:
     // ? booleans, so the three-way decision is made in exactly one place.
     ControlState controlState = ControlState::WAITING_FOR_ARM;
 
+
+
     // * Default ctor
     explicit Navigation(M&& m) : m(std::move(m)) {}                                     // No default ctor exposed
     void wire() noexcept;                                                               // Wire the node's subscriptions and publishers to the member methods
@@ -201,6 +224,10 @@ private:
     void onDetections(const vision_msgs::msg::Detection2DArray& msg);                   // Drives control on every frame
     void onArmed(const std_msgs::msg::Bool& msg);                                       // From FlightController
     void onOffboardActive(const std_msgs::msg::Bool& msg);                              // From FlightController
+    // ! DOUBLE CHECK AFTER REFACTOR: (might be better to have FlightController 
+    // ! publish a reference or pointer of it's localPosition member instead 
+    // ! of having Navigation subscribe to PX4's local position directly)
+    void onLocalPosition(const px4_msgs::msg::VehicleLocalPosition& msg);               // From PX4 via the uXRCE-DDS bridge
     void onWatchdogTick();                                                              // Fires only when Perception goes silent
 
     // * Control state
@@ -246,9 +273,26 @@ private:
     [[nodiscard]] bool detectionIsValid() const;
     [[nodiscard]] bool personIsLost() const;
     [[nodiscard]] bool perceptionIsDead() const;
+    // ! DOUBLE CHECK AFTER REFACTOR: (might be better to have FlightController 
+    // ! publish a reference or pointer of it's localPosition member instead 
+    // ! of having Navigation subscribe to PX4's local position directly)
+    [[nodiscard]] bool dronePositionValid() const;                                      // EKF has a usable position reference
 
 
     // * Helpers
+    // NOTE: 
+    // I wish Ubuntu 24.04 had GCC16 support as enum class reflection, which was
+    // introduced in C++26, generalizes these two functions into this beautiful code:
+    /*
+        template <typename E> requires std::is_enum_v<E>
+        constexpr std::string_view enumName(E value) {
+            template for (constexpr auto e : std::meta::enumerators_of(^^E)) {
+                if (value == [:e:]) return std::meta::identifier_of(e);
+            }
+            return "UNKNOWN";
+        }
+    */
+    // but ofc it's out of fucking reach as of today.. thanks for coming to my TED talk
     [[nodiscard]] static std::string toString(MissionState state) noexcept;
     [[nodiscard]] static std::string toString(ControlState state) noexcept;
 

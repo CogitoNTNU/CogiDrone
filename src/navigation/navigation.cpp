@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <string>
+#include <cmath>
 
 
 
@@ -105,11 +106,19 @@ void Navigation::wire() noexcept {
         }
     );
 
-    // TODO: Drone state (position/velocity/orientation) - the source is undecided.
-    //     : Estimation is scrapped; candidates are subscribing to
-    //     : /fmu/out/vehicle_local_position directly, or FlightController republishing its
-    //     : lastLocalPos on a navigation-owned topic. Until decided, Navigation
-    //     : has NO drone state and only issues absolute home-relative setpoints.
+    // ! DOUBLE CHECK AFTER REFACTOR: (might be better to have FlightController 
+    // ! publish a reference or pointer of it's localPosition member instead 
+    // ! of having Navigation subscribe to PX4's local position directly)
+    // ? Read straight from PX4. `best_effort` is mandatory: PX4 publishes this
+    // ? topic as best_effort, and a reliable subscriber would never match.
+    // ! No explicit callback group - same invariant as the other callbacks.
+    m.localPositionSubscription = m.node->create_subscription<px4_msgs::msg::VehicleLocalPosition>(
+        "/fmu/out/vehicle_local_position",
+        rclcpp::QoS(10).best_effort(),
+        [this](const px4_msgs::msg::VehicleLocalPosition& msg) {
+            this->onLocalPosition(msg);
+        }
+    );
 
     // * Publishers
     m.setpointPublisher = m.node->create_publisher<px4_msgs::msg::TrajectorySetpoint>(
@@ -204,22 +213,6 @@ void Navigation::onDetections(const vision_msgs::msg::Detection2DArray& msg) {
 
 // ? No lock: same reason as onDetections().
 // ? If controlMutex is reinstated, uncomment the lock_guard below.
-void Navigation::onWatchdogTick() {
-    // | std::lock_guard lock(controlMutex);
-
-    // ? No control: Perception silence is not our problem.
-    if (controlState != ControlState::NAVIGATION_HAS_CONTROL) return;
-
-    // ? The detection callback normally drives the state machine. This timer
-    // ? only acts when NO frames arrive at all - i.e. Perception is dead, not
-    // ? just "person not in frame".
-    if (!perceptionIsDead()) return;
-
-    onPerceptionCrashed();
-}
-
-// ? No lock: same reason as onDetections().
-// ? If controlMutex is reinstated, uncomment the lock_guard below.
 void Navigation::onArmed(const std_msgs::msg::Bool& msg) {
     // | std::lock_guard lock(controlMutex);
 
@@ -236,6 +229,33 @@ void Navigation::onOffboardActive(const std_msgs::msg::Bool& msg) {
     if (msg.data == offboardActive) return;                                             // ? Level, not event: ignore repeats
     offboardActive = msg.data;
     updateControlState();
+}
+
+// ! DOUBLE CHECK AFTER REFACTOR: (might be better to have FlightController 
+// ! publish a reference or pointer of it's localPosition member instead 
+// ! of having Navigation subscribe to PX4's local position directly)
+// ? No lock: same reason as onDetections().
+// ? If controlMutex is reinstated, uncomment the lock_guard below.
+void Navigation::onLocalPosition(const px4_msgs::msg::VehicleLocalPosition& msg) {
+    // | std::lock_guard lock(controlMutex);
+
+    dronePosition = msg;
+}
+
+// ? No lock: same reason as onDetections().
+// ? If controlMutex is reinstated, uncomment the lock_guard below.
+void Navigation::onWatchdogTick() {
+    // | std::lock_guard lock(controlMutex);
+
+    // ? No control: Perception silence is not our problem.
+    if (controlState != ControlState::NAVIGATION_HAS_CONTROL) return;
+
+    // ? The detection callback normally drives the state machine. This timer
+    // ? only acts when NO frames arrive at all - i.e. Perception is dead, not
+    // ? just "person not in frame".
+    if (!perceptionIsDead()) return;
+
+    onPerceptionCrashed();
 }
 
 
@@ -454,13 +474,31 @@ void Navigation::executeBehavior() {
     }
 }
 
+// ! DOUBLE CHECK AFTER REFACTOR: (might be better to have FlightController 
+// ! publish a reference or pointer of it's localPosition member instead 
+// ! of having Navigation subscribe to PX4's local position directly)
 void Navigation::hoverBehavior() {
-    // ? Hold a fixed home-relative hover setpoint.
-    // ? LIMITATION: without a drone state source we cannot "hold current position" - 
-    // ?           : we command the origin at targetHeight and rely on PX4's position
-    // ?           : controller to fly there and stay. Revisit once the drone state 
-    // ?           : source is decided.
-    publishSetpoint(cogidrone::Vec3{0.0f, 0.0f, -m.params.targetHeight}, 0.0f);         // NED: negative z = up
+    // ? Hold the CURRENT horizontal position at the target height. This is the
+    // ? only behavior that is safe to run with no person in frame: it never
+    // ? moves the drone laterally, so a stale or missing detection cannot cause
+    // ? a transit.
+    // ! Without a valid EKF position we do not know where "here" is. Publishing
+    // ! anything would command an absolute point in a frame we do not trust, so
+    // ! we publish nothing and let FlightController re-stream its frozen
+    // ! setpoint - which is "hold where you are".
+    if (!dronePositionValid()) return;
+
+    const cogidrone::Vec3 HOLD_POSITION_NED = {
+        dronePosition.x,
+        dronePosition.y,
+        -m.params.targetHeight                                                          // NED: negative z = up
+    };
+
+    // ? Preserve the current heading. `VehicleLocalPosition.heading` is NAN when
+    // ? unknown, hence the guard - a NAN yaw would be rejected by PX4.
+    const float YAW = std::isfinite(dronePosition.heading) ? dronePosition.heading : 0.0f;
+
+    publishSetpoint(HOLD_POSITION_NED, YAW);
 }
 
 //// void Navigation::followBehavior() {
@@ -606,6 +644,19 @@ bool Navigation::perceptionIsDead() const {
     // ? `lastHeartbeatTime` is updated on EVERY frame (including empty ones), so
     // ? this distinguishes "Perception stopped talking" from "person not in frame".
     return (m.node->now() - lastHeartbeatTime).seconds() > m.params.detectionTimeout;
+}
+
+// ! DOUBLE CHECK AFTER REFACTOR: (might be better to have FlightController 
+// ! publish a reference or pointer of it's localPosition member instead 
+// ! of having Navigation subscribe to PX4's local position directly)
+bool Navigation::dronePositionValid() const {
+    // ! Caller must hold controlMutex if mutex is reinstated - do NOT lock here!
+    // ? No lock: caller is serialized by the executor.
+
+    // ? Same predicate FlightController uses before it will stream: EKF2 has a
+    // ? position reference (GPS outdoors, VIO later). Without it, `x`/`y`/`z`
+    // ? are meaningless and any setpoint built from them is a guess.
+    return dronePosition.xy_valid && dronePosition.z_valid;
 }
 
 
