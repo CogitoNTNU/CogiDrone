@@ -42,6 +42,7 @@ std::expected<std::unique_ptr<Navigation>, cogidrone::Error> Navigation::create(
     // * Partial assembly
     auto n = std::unique_ptr<Navigation>(
         new Navigation(M{                                                               // ? Transfer ownership into unique_ptr as ctor is private
+            // ROS2
             .node = std::move(node),
             .detectionSubscription = nullptr,                                           // ? will be wired later
             .offboardActiveSubscription = nullptr,                                      // ? will be wired later
@@ -49,7 +50,9 @@ std::expected<std::unique_ptr<Navigation>, cogidrone::Error> Navigation::create(
             .setpointPublisher = nullptr,                                               // ? will be wired later
             .flightCommandPublisher = nullptr,                                          // ? will be wired later
             .missionStatusPublisher = nullptr,                                          // ? will be wired later
+            // Safety
             .watchdogTimer = nullptr,                                                   // ? will be wired later
+            // Parameters
             .params = std::move(params)
         })
     );
