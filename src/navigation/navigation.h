@@ -109,7 +109,11 @@ struct PersonDetection {
     // ! `rclcpp::Time::operator-` THROWS std::runtime_error when the two
     // ! differ. Value 0 with RCL_ROS_TIME means "no detection has ever
     // ! arrived", which is exactly what personIsLost() needs.
-    rclcpp::Time timestamp{0, RCL_ROS_TIME};
+    // ! Three arguments, not two: `Time{0, RCL_ROS_TIME}` is ambiguous between
+    // ! Time(int32_t, uint32_t, rcl_clock_type_t) and Time(int64_t, rcl_clock_type_t),
+    // ! because an unscoped enum converts to uint32_t. The 3-arg form is
+    // ! unambiguous by arity.
+    rclcpp::Time timestamp{0, 0, RCL_ROS_TIME};
     bool valid = false;
 };
 
