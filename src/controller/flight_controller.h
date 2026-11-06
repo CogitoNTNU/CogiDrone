@@ -146,11 +146,17 @@ private:
     void onNavigationCommand(const std_msgs::msg::UInt8& msg);                          // From Navigation
     void streamTick();                                                                  // 10 Hz: the offboard heartbeat + state machine step
 
-    // * Helpers
+    // * Publishing
     void publishOffboardMode();
     void publishSetpoint();
     void sendCommand(uint16_t command, float param1 = 0.f, float param2 = 0.f);
+
+    // * Helpers
+    void freezeSetpointAtCurrentPosition();   
+    
+    // * State queries
     [[nodiscard]] bool isPositionValid() const;
+    [[nodiscard]] bool px4IsLanding() const noexcept;                                   // PX4 is in AUTO_LAND or DESCEND
 
 public:
     // * Ctors & dtor

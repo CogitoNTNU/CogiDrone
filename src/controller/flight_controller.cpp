@@ -177,6 +177,12 @@ void FlightController::onNavigationCommand(const std_msgs::msg::UInt8& msg) {
 void FlightController::streamTick() {
     std::lock_guard lock(stateMutex);
 
+    // ? RULE: the streamed setpoint tracks the CURRENT position in every state
+    // ? except CONTROL_GRANTED (Navigation owns it) and LANDING (PX4 ignores
+    // ? it). This is what makes the handshake safe: whenever PX4 enters
+    // ? offboard, the setpoint already in flight is "here", never the origin
+    // ? and never a stale pre-override target.
+
     switch (state) {
         case State::STARTING:
             state = State::WAITING_FOR_POSITION;
@@ -184,37 +190,17 @@ void FlightController::streamTick() {
 
         case State::WAITING_FOR_POSITION:
             if (isPositionValid()) {                                                    // EKF has a position reference
-                // ? Freeze the setpoint at the current position BEFORE streaming.
-                // ? `currentSetpoint` is default-initialized to zeros, so without
-                // ? this the first streamed setpoint would be the origin - and if
-                // ? PX4 enters offboard, the drone would fly there. This matters
-                // ? most when FlightController restarts mid-flight.
-                px4_msgs::msg::VehicleLocalPosition pos; {
-                    std::lock_guard lock(positionMutex);
-                    pos = lastLocalPosition;
-                }
-                {
-                    std::lock_guard lock(setpointMutex);
-                    currentSetpoint.position = {pos.x, pos.y, pos.z};
-                    
-                    // ? Why freeze yaw too: if the pilot rotates the drone 180° and 
-                    // ? hands back control, the frozen setpoint carries the old yaw. 
-                    // ? PX4 would rotate the drone back before Navigation's first 
-                    // ? setpoint arrives. `VehicleLocalPosition.heading` is NAN when 
-                    // ? unknown, hence the `std::isfinite` guard. 
-                    if (std::isfinite(pos.heading)) {
-                        currentSetpoint.yaw = pos.heading;
-                    }
-                }
-
+                freezeSetpointAtCurrentPosition();
                 cogidrone::log(LOGGING_LEVEL::INFO, "EKF position valid - starting offboard stream");
                 state = State::STREAMING_SETPOINTS;
             }
             break;
 
         case State::STREAMING_SETPOINTS:
+            freezeSetpointAtCurrentPosition();                                          // ? track: the pilot may be flying in Position mode
             publishOffboardMode();
             publishSetpoint();
+
             // After ~1s of streaming (count ticks), request offboard mode
             if (++streamTicks > 10) {
                 sendCommand(
@@ -222,6 +208,7 @@ void FlightController::streamTick() {
                     1.f, 
                     /* PX4_CUSTOM_MAIN_MODE_OFFBOARD = */ 6.f
                 );
+
                 cogidrone::log(LOGGING_LEVEL::INFO, "Offboard requested - waiting for PX4 (pilot must select Offboard on the RC switch)");
                 state = State::REQUESTING_CONTROL;
             }
@@ -233,6 +220,7 @@ void FlightController::streamTick() {
             // ? We do NOT arm here. Arming is the pilot's explicit action via
             // ? the RC arm switch (RC_MAP_ARM_SW in QGC). FlightController only
             // ? observes `armed` and forwards it to Navigation.
+            freezeSetpointAtCurrentPosition();                                          // ? track until PX4 actually takes the setpoint
             publishOffboardMode();                                                      // Keep the heartbeat alive
             publishSetpoint();
 
@@ -243,28 +231,9 @@ void FlightController::streamTick() {
             break;
 
         case State::CONTROL_GRANTED:
+            // ? Navigation owns the setpoint here - do NOT freeze.
             if (!offboardActive) {
-                // ? Freeze the setpoint at the current position BEFORE publishing,
-                // ? so the very next streamed setpoint is "hold here", not the
-                // ? stale pre-override target.
-                px4_msgs::msg::VehicleLocalPosition pos; {
-                    std::lock_guard lock(positionMutex);
-                    pos = lastLocalPosition;
-                }
-                {
-                    std::lock_guard lock(setpointMutex);
-                    currentSetpoint.position = {pos.x, pos.y, pos.z};
-
-                    // ? Why freeze yaw too: if the pilot rotates the drone 180° and 
-                    // ? hands back control, the frozen setpoint carries the old yaw. 
-                    // ? PX4 would rotate the drone back before Navigation's first 
-                    // ? setpoint arrives. `VehicleLocalPosition.heading` is NAN when 
-                    // ? unknown, hence the `std::isfinite` guard. 
-                    if (std::isfinite(pos.heading)) {
-                        currentSetpoint.yaw = pos.heading;                              // ? Hold current heading too
-                    }
-                }
-
+                freezeSetpointAtCurrentPosition();                                      // ? make this tick's publish "hold here", not the stale target
                 cogidrone::log(LOGGING_LEVEL::WARNING, "PX4 left offboard - pilot or failsafe has control");
                 state = State::CONTROL_REVOKED;
             }
@@ -279,10 +248,13 @@ void FlightController::streamTick() {
 
             if (!armed) {                                                               // transition to DISARMED only after PX4 has landed and disarmed itself
                 cogidrone::log(LOGGING_LEVEL::INFO, "Landed and disarmed");
-                state = State::DISARMED;                                                // terminal safe state; timer idles
-            } else if (!offboardActive) {
-                // ? Pilot took over during the landing. PX4 owns the descent now,
-                // ? and Navigation must stop believing it is the pilot.
+                state = State::DISARMED;
+            } else if (!px4IsLanding() && !offboardActive) {
+                // ? PX4 left offboard for a reason OTHER than our own land
+                // ? command - the pilot (or a failsafe) has taken over. Without
+                // ? the px4IsLanding() guard this branch fires on the very first
+                // ? tick after NAV_LAND, because PX4 switches to AUTO_LAND and
+                // ? therefore leaves offboard by design.
                 cogidrone::log(LOGGING_LEVEL::WARNING, "PX4 left offboard during landing - pilot has control");
                 state = State::CONTROL_REVOKED;
             }
@@ -293,6 +265,7 @@ void FlightController::streamTick() {
             // ? offboard mode. Do NOT re-request offboard - the pilot's switch owns
             // ? that decision. When they flip back to Offboard, PX4 enters offboard
             // ? itself and `offboardActive` becomes true again.
+            freezeSetpointAtCurrentPosition();                                          // ? track: the pilot may have flown somewhere else
             publishOffboardMode();
             publishSetpoint();
 
@@ -310,13 +283,22 @@ void FlightController::streamTick() {
             break;
 
         case State::DISARMED:
-            break;                                                                      // terminal safe state
+            // ? Terminal only until the pilot arms again. Without this, a second
+            // ? flight would require restarting the process: PX4 refuses offboard
+            // ? mode unless a setpoint stream is already running, and nothing
+            // ? else restarts the stream.
+            if (armed) {
+                cogidrone::log(LOGGING_LEVEL::INFO, "Re-armed - restarting offboard stream");
+                streamTicks = 0;                                                        // ? restart the 1 s pre-stream delay
+                state = State::WAITING_FOR_POSITION;                                    // ? re-freeze at the current position
+            }
+            break;
     }
 }
 
 
 
-// * Helpers
+// * Publishing
 void FlightController::publishOffboardMode() {
     px4_msgs::msg::OffboardControlMode mode{};
     
@@ -362,12 +344,44 @@ void FlightController::sendCommand(uint16_t command, float param1, float param2)
     m.vehicleCommandPublisher->publish(cmd);
 }
 
+// * Helpers
+void FlightController::freezeSetpointAtCurrentPosition() {
+    // ? Snapshot the position under its own lock, then the setpoint under its
+    // ? own. Never both at once: onLocalPosition() takes positionMutex only and
+    // ? onSetpointInput() takes setpointMutex only, so there is no lock-order
+    // ? inversion - but holding two locks is still more than this needs.
+    px4_msgs::msg::VehicleLocalPosition pos; {
+        std::lock_guard lock(positionMutex);
+        pos = lastLocalPosition;
+    }
+
+    std::lock_guard lock(setpointMutex);
+    currentSetpoint.position = {pos.x, pos.y, pos.z};
+
+    // ? Why freeze yaw too: if the pilot rotates the drone 180° and hands back
+    // ? control, a setpoint carrying the old yaw would make PX4 rotate the
+    // ? drone back before Navigation's first setpoint arrives.
+    // ? `VehicleLocalPosition.heading` is NAN when unknown, hence the guard.
+    if (std::isfinite(pos.heading)) {
+        currentSetpoint.yaw = pos.heading;
+    }
+}
+
 [[nodiscard]] bool FlightController::isPositionValid() const {
     std::lock_guard lock(positionMutex);
     // ? EKF2 has a position reference: xy+z valid (GPS outdoors, VIO later).
     // ? Without this, PX4 refuses offboard/arming - gating here gives a
     // ? clean log message instead of a silent command rejection.
     return lastLocalPosition.xy_valid && lastLocalPosition.z_valid;
+}
+
+[[nodiscard]] bool FlightController::px4IsLanding() const noexcept {
+    // ? AUTO_LAND is what NAV_LAND selects. DESCEND is what PX4 falls back to
+    // ? when it lands without a position reference. Both mean "PX4 is flying
+    // ? the descent", not "the pilot took over".
+    const uint8_t nav = navState.load(std::memory_order_relaxed);
+    return nav == px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_AUTO_LAND
+        || nav == px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_DESCEND;
 }
 
 
