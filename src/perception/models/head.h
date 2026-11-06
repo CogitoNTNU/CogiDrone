@@ -34,9 +34,11 @@ public:
     // TODO: Implement a detect method that takes a frame and returns detections
     // Pure computation: frame in, detections out
     // [[nodiscard]] std::vector</* type */> detect(const /* type */& frame);
-    [[nodiscard]] bool detect(auto frame) {
+    // ! `const auto&`, not `auto`: an abbreviated template parameter deduced by
+    // ! value copies the whole sensor_msgs::Image (a 900 KB vector at 640x480x3)
+    // ! on every call. The real signature will be `const Frame&`.
+    [[nodiscard]] bool detect(const auto& frame) {
         (void)frame;                                                                    // Suppress unused parameter warning
-        bool DEBUG = true;
-        return DEBUG;
+        return true;                                                                    // | DEBUG: Stub implementation
     }
 };

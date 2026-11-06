@@ -32,12 +32,14 @@ public:
     DepthAnything(const DepthAnything&) = delete;                                       // still non-copyable (one engine)
     DepthAnything& operator=(const DepthAnything&) = delete;
 
-    // TODO: Implement a distance method that takes a frame and returns distances
+    // TODO: Implement a distance method that takes a frame and returns detections
     // Pure computation: frame in, distances out
     // [[nodiscard]] std::vector</* type */> distance(const /* type */& frame);
-    [[nodiscard]] bool distance(auto frame) {
+    // ! `const auto&`, not `auto`: an abbreviated template parameter deduced by
+    // ! value copies the whole sensor_msgs::Image (a 900 KB vector at 640x480x3)
+    // ! on every call. The real signature will be `const Frame&`.
+    [[nodiscard]] bool distance(const auto& frame) {
         (void)frame;                                                                    // Suppress unused parameter warning
-        bool DEBUG = true;
-        return DEBUG;
+        return true;                                                                    // | DEBUG: Stub implementation
     }
 };
