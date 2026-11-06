@@ -389,9 +389,9 @@ void FlightController::freezeSetpointAtCurrentPosition() {
     // ? AUTO_LAND is what NAV_LAND selects. DESCEND is what PX4 falls back to
     // ? when it lands without a position reference. Both mean "PX4 is flying
     // ? the descent", not "the pilot took over".
-    const uint8_t nav = navState.load(std::memory_order_relaxed);
-    return nav == px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_AUTO_LAND
-        || nav == px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_DESCEND;
+    const uint8_t NAV = navState.load(std::memory_order_relaxed);
+    return NAV == px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_AUTO_LAND
+        || NAV == px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_DESCEND;
 }
 
 
