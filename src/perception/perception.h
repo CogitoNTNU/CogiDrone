@@ -43,8 +43,15 @@ private:
     void onFrame(const sensor_msgs::msg::Image& msg);                                   // Callback for camera images
 
     // * Helpers
-    [[nodiscard]] std::unique_ptr<Model::FusedDetections> fuse(/* const ref something */);
-
+    // ? Two stages, deliberately separate:
+    // ?   fuse()             - pure, no ROS types. Bundles every model's output
+    // ?                        for one frame. Testable without a ROS graph.
+    // ?   toDetectionArray() - the ROS boundary. Converts the bundle into the
+    // ?                        wire format Navigation consumes.
+    [[nodiscard]] Model::FusedDetections fuse(/* const ref something */) const;
+    [[nodiscard]] std::unique_ptr<vision_msgs::msg::Detection2DArray> 
+    toDetectionArray(const Model::FusedDetections& fused) const;
+    
 public:
     // * Ctors & dtor
     [[nodiscard]] static std::expected<std::unique_ptr<Perception>, cogidrone::Error> create();

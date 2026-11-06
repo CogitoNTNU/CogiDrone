@@ -80,24 +80,44 @@ void Perception::wire() noexcept {
     );
 }
 
+// * Callbacks
 void Perception::onFrame(const sensor_msgs::msg::Image& msg) {
     // TODO: Implement a toFrame function to convert the image to the correct frame for each model
-    auto people = m.personModel.detect(/* toFrame */(msg));
-    auto heads = m.headModel.detect(/* toFrame */(msg));
-    auto distances = m.depthAnythingModel.distance(/* toFrame */(msg));
+    const auto PEOPLE    = m.personModel.detect(/* toFrame */(msg));
+    const auto HEADS     = m.headModel.detect(/* toFrame */(msg));
+    const auto DISTANCES = m.depthAnythingModel.distance(/* toFrame */(msg));
 
     // ? These fused detections are NOT ment to be published yet. FusedDetections should just bundle every
     // ? models' output together for each frame (each fusedDetection contains all people, all heads, and
     // ? the depth heatmap image). We then have to calculate the 3D position of each detected person and head
     // ? using the depth heatmap image, AND THEN publish the final fused detections. IMPORTANT: PERCEPTION
     // ? SHOULD PUBLISH AN EMPTY DETECTION IF NO PEOPLE ARE DETECTED.
-    auto fusedDetections = /*Model::*/ fuse(/* people, heads, distances */);
+    const auto FUSED = fuse(/* PEOPLE, HEADS, DISTANCES */);
 
-    // TODO: This publish call SHOULD work seamlessly once the above mentioned TODOs are implemented
-    /* m.targetPublisher->publish(std::move(fusedDetections)); */
+    // ! Publish UNCONDITIONALLY. An empty array is the "no person in this frame"
+    // ! signal Navigation's Policy A depends on, AND the heartbeat that keeps
+    // ! Navigation's watchdog from declaring Perception dead. Skipping the
+    // ! publish when nothing was found is indistinguishable from a crash.
+    m.targetPublisher->publish(toDetectionArray(FUSED));
 }
 
+// * Helpers
+[[nodiscard]] Model::FusedDetections Perception::fuse(/* const ref something */) const {
+    // TODO: real fusion once the models return detections instead of `bool`.
+    return Model::FusedDetections{};
+}
 
-[[nodiscard]] std::unique_ptr<Model::FusedDetections> Perception::fuse(/* const ref something */) {
-    return std::make_unique<Model::FusedDetections>();
+[[nodiscard]] std::unique_ptr<vision_msgs::msg::Detection2DArray>
+Perception::toDetectionArray(const Model::FusedDetections& fused) const {
+    auto out = std::make_unique<vision_msgs::msg::Detection2DArray>();                  // ? unique_ptr publish: zero-copy intra-process
+
+    // TODO: for each fused person, append a Detection2D with:
+    //     :   results[0].hypothesis.class_id = "person"
+    //     :   results[0].hypothesis.score    = confidence
+    //     :   results[0].pose.pose.position  = camera-frame XYZ (needs depth + intrinsics)
+    //     :   bbox                           = pixel box
+    // ? Until then this returns an empty array, which is the correct
+    // ? "no person detected" message - not a placeholder.
+    (void)fused;
+    return out;
 }
