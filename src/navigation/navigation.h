@@ -301,12 +301,7 @@ private:
     //     : This is a design choice, we could also have a mix of: orbit, lawn-mower, 
     //     : and hold+rotate.
     void searchBehavior();
-    
-    // TODO: followBehavior() - target selection behind the person. Blocked on:
-    //     1. Person world position (needs fused detections w/ depth from Perception)
-    //     2. Drone state source (estimation scrapped; PX4 local position vs FlightController republish - undecided)
-    //// void followBehavior();
-    
+    void followBehavior();
 
     // TODO: obstacle avoidance - blocked on Representation producing an obstacle map
 

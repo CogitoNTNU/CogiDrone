@@ -469,6 +469,26 @@ void Navigation::onPerceptionCrashed() {
 
 
 // * Behaviors
+/**
+ * @brief Executes the behavior associated with the current mission state.
+ *
+ * Dispatches to the appropriate behavior function (e.g. `hoverBehavior()`, 
+ * `searchBehavior()`, `followBehavior()`) based on the active MissionState. 
+ * Called from `onDetections()` after `evaluateTransitions()` has settled 
+ * the state.
+ *
+ * @note Caller must hold `controlMutex` if the mutex is reinstated - do NOT
+ *       lock here. This function is only invoked from `onDetections()`,
+ *       which is serialized by the executor.
+ *
+ * @warning Reaching the `IDLE` case indicates the control-state gate is
+ *          broken and is logged as an error.
+ *
+ * @see `evaluateTransitions()`
+ * @see `hoverBehavior()`
+ * @see `searchBehavior()`
+ * @see `followBehavior()`
+ */
 void Navigation::executeBehavior() {
     // ! Caller must hold controlMutex if mutex is reinstated - do NOT lock here!
     // ? No lock: called only from onDetections(), which is serialized by the executor. 
@@ -503,8 +523,7 @@ void Navigation::executeBehavior() {
             break;
 
         case MissionState::FOLLOWING:
-            // TODO: followBehavior() - blocked on fused detections + drone state.
-            hoverBehavior();
+            followBehavior();
             break;
 
         case MissionState::LANDING:
@@ -555,37 +574,53 @@ void Navigation::searchBehavior() {
 
     // ? Absolute yaw from the state entry time, not an accumulated delta: no
     // ? drift, and the rate is independent of the frame rate.
-    const float elapsed = static_cast<float>((m.node->now() - stateEntryTime).seconds());
-    const float yaw = cogidrone::normalizeAngle(searchStartYaw + m.params.searchYawRate * elapsed);
+    const float ELAPSED = static_cast<float>((m.node->now() - stateEntryTime).seconds());
+    const float YAW = cogidrone::normalizeAngle(searchStartYaw + m.params.searchYawRate * ELAPSED);
 
     publishSetpoint(
         cogidrone::Vec3{dronePosition.x, dronePosition.y, -m.params.targetHeight},
-        yaw
+        YAW
     );
 }
 
-//// void Navigation::followBehavior() {
-////     if (!detectionIsValid()) return;
-//// 
-////     // * Target: a point behind the person at the follow distance
-////     const Vec3 target = followTarget();
-//// 
-////     // * Velocity towards the target (P-controller, clamped)
-////     Vec3 velocity = velocityTowards(target);
-//// 
-////     // * Yaw to face the person
-////     const float yawError = desiredYawTowards(m.personWorldPosition) - m.drone.yaw;
-////     float yawRate = m.params.yawPGain * normalizeAngle(yawError);
-//// 
-////     // * Safety
-////     if (!commandIsSafe(velocity)) {
-////         velocity = Vec3{};
-////         yawRate = 0.0f;
-////     }
-//// 
-////     publishVelocity(velocity, yawRate);
-//// }
-//// 
+
+void Navigation::followBehavior() {
+    // ? No valid detection: hold. evaluateTransitions() moves us to PERSON_LOST
+    // ? once the hysteresis window expires; until then, holding is correct.
+    if (!detectionIsValid() || !dronePositionValid()) {
+        hoverBehavior();
+        return;
+    }
+
+    // ? "Behind" is the direction from the person back towards the drone, so the
+    // ? drone never flies through the person to reach a point on the far side.
+    const cogidrone::Vec3 TO_DRONE{
+        dronePosition.x - person.position.x,
+        dronePosition.y - person.position.y,
+        0.0f                                                                            // ? horizontal only: height is set explicitly below
+    };
+
+    // ? Degenerate case: drone and person at the same XY. `normalized()` returns
+    // ? zero, which would put the target on top of the person. Hold instead of
+    // ? guessing a direction.
+    if (TO_DRONE.norm() < 1e-3f) {
+        hoverBehavior();
+        return;
+    }
+
+    const cogidrone::Vec3 AWAY = TO_DRONE.normalized();
+    const cogidrone::Vec3 TARGET{
+        person.position.x + AWAY.x * m.params.targetFollowDistance,
+        person.position.y + AWAY.y * m.params.targetFollowDistance,
+        -m.params.targetHeight                                                          // NED: negative z = up
+    };
+
+    // ? Face the person, not the target: the camera must stay on them.
+    const float YAW = std::atan2(person.position.y - dronePosition.y,
+                                 person.position.x - dronePosition.x);
+
+    publishSetpoint(TARGET, YAW);
+}
 
 
 
@@ -682,7 +717,17 @@ bool Navigation::detectionIsValid() const {
     const double sinceDetection = (m.node->now() - person.timestamp).seconds();
     if (sinceDetection > m.params.detectionTimeout) return false;
 
-    // TODO: Distance bounds check - requires world position + drone state.
+    // ? Distance bounds: beyond maxFollowDistance the person is not a follow
+    // ? target, and inside minFollowDistance the standoff point would be behind
+    // ? the drone. Both are "not a valid target", not "lost" - the hysteresis in
+    // ? personIsLost() still governs the state transition.
+    if (dronePositionValid()) {
+        const float DX = person.position.x - dronePosition.x;
+        const float DY = person.position.y - dronePosition.y;
+        const float DISTANCE = std::sqrt(DX * DX + DY * DY);
+        if (DISTANCE > m.params.maxFollowDistance) return false;
+    }
+
     return true;
 }
 
