@@ -117,11 +117,26 @@ void FlightController::onLocalPosition(const px4_msgs::msg::VehicleLocalPosition
 }
 
 void FlightController::onStatus(const px4_msgs::msg::VehicleStatus& msg) {
-    // ! DOUBLE CHECK AFTER REFACTOR: (this should be more correct than forcing atomicity)
     // ? Written from the status callback thread, read from the timer thread.
-    // ? Plain bools are fine here: each is independently-written telemetry,
-    // ? read-only for decisions, and a torn/stale read is harmless (next tick
-    // ? re-reads). No compound invariants depend on both being in sync.
+    // ? Even though plain bools are fine here, as each is independently-written 
+    // ? telemetry, read-only for decisions, and a torn/stale read is harmless 
+    // ? (next tick re-reads). No compound invariants even depend on both being 
+    // ? in sync, yet we still force atomicity. If we don't, we'll lose TSan, which 
+    // ? is one of the few tools that catches concurrency bugs before they fly. 
+    // ? With a data race present, TSan reports on every run, which means we 
+    // ? either stop running it or stop reading its output. For a flight controller, 
+    // ? that is a real loss - and it costs nothing to avoid. Furthermore, "Harmless" 
+    // ? is a property of today's compiler, not of the code. The standard says a data 
+    // ? race is undefined behaviour. The compiler owes you nothing - including "it 
+    // ? works at -O2". Today `streamTick()` re-reads the member on every call, so 
+    // ? a stale register copy cannot survive. The moment someone inlines `streamTick()` 
+    // ? into a loop, or adds `while (!armed) {}`, or the compiler gets more aggressive, 
+    // ? the read can be hoisted and the state machine stops seeing updates. We would 
+    // ? debug that as a logic bug, not as a race. Lastly, tearing is not the risk - 
+    // ? staleness is. It's correct that a bool cannot tear on ARM64, since byte access 
+    // ? is atomic at the hardware level. But tearing was never the argument. The 
+    // ? argument is that the compiler may serve a stale value from a register, and 
+    // ? the standard permits it to do anything at all.
     navState = msg.nav_state;
     offboardActive = (msg.nav_state == px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_OFFBOARD);
     armed = msg.arming_state == px4_msgs::msg::VehicleStatus::ARMING_STATE_ARMED;

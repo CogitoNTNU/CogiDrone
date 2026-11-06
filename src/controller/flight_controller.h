@@ -115,7 +115,6 @@ private:
     px4_msgs::msg::VehicleLocalPosition lastLocalPosition;                              // guarded by positionMutex
     mutable std::mutex positionMutex;
     
-    // ! DOUBLE CHECK AFTER REFACTOR:
     // ? Written by onStatus() (subscription thread), read by streamTick() (timer
     // ? thread). `std::atomic` removes the data race; the default seq_cst
     // ? ordering is free here because neither flag is ever read-modify-written.
