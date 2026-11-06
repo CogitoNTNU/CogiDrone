@@ -187,21 +187,21 @@ void FlightController::streamTick() {
                 // ? this the first streamed setpoint would be the origin - and if
                 // ? PX4 enters offboard, the drone would fly there. This matters
                 // ? most when FlightController restarts mid-flight.
-                px4_msgs::msg::VehicleLocalPosition position; {
+                px4_msgs::msg::VehicleLocalPosition pos; {
                     std::lock_guard lock(positionMutex);
-                    position = lastLocalPosition;
+                    pos = lastLocalPosition;
                 }
                 {
                     std::lock_guard lock(setpointMutex);
-                    currentSetpoint.position = {position.x, position.y, position.z};
+                    currentSetpoint.position = {pos.x, pos.y, pos.z};
                     
                     // ? Why freeze yaw too: if the pilot rotates the drone 180° and 
                     // ? hands back control, the frozen setpoint carries the old yaw. 
                     // ? PX4 would rotate the drone back before Navigation's first 
                     // ? setpoint arrives. `VehicleLocalPosition.heading` is NAN when 
                     // ? unknown, hence the `std::isfinite` guard. 
-                    if (std::isfinite(position.heading)) {
-                        currentSetpoint.yaw = position.heading;
+                    if (std::isfinite(pos.heading)) {
+                        currentSetpoint.yaw = pos.heading;
                     }
                 }
 
@@ -245,21 +245,21 @@ void FlightController::streamTick() {
                 // ? Freeze the setpoint at the current position BEFORE publishing,
                 // ? so the very next streamed setpoint is "hold here", not the
                 // ? stale pre-override target.
-                px4_msgs::msg::VehicleLocalPosition position; {
+                px4_msgs::msg::VehicleLocalPosition pos; {
                     std::lock_guard lock(positionMutex);
-                    position = lastLocalPosition;
+                    pos = lastLocalPosition;
                 }
                 {
                     std::lock_guard lock(setpointMutex);
-                    currentSetpoint.position = {position.x, position.y, position.z};
+                    currentSetpoint.position = {pos.x, pos.y, pos.z};
 
                     // ? Why freeze yaw too: if the pilot rotates the drone 180° and 
                     // ? hands back control, the frozen setpoint carries the old yaw. 
                     // ? PX4 would rotate the drone back before Navigation's first 
                     // ? setpoint arrives. `VehicleLocalPosition.heading` is NAN when 
                     // ? unknown, hence the `std::isfinite` guard. 
-                    if (std::isfinite(position.heading)) {
-                        currentSetpoint.yaw = position.heading;                              // ? Hold current heading too
+                    if (std::isfinite(pos.heading)) {
+                        currentSetpoint.yaw = pos.heading;                              // ? Hold current heading too
                     }
                 }
 
