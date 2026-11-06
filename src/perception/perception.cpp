@@ -66,7 +66,7 @@ std::expected<std::unique_ptr<Perception>, cogidrone::Error> Perception::create(
 
 void Perception::wire() noexcept {
     m.imageSubscription = m.node->create_subscription<sensor_msgs::msg::Image>(
-        "/camera/image", 
+        "/camera/camera/image", 
         rclcpp::SensorDataQoS(),
         [this](const sensor_msgs::msg::Image& msg) {                                    // ! This ONLY works if the Perception object is non-movable. Since the rvalue
             this->onFrame(msg);                                                         // ! from the Perception::create() function is moved, capturing `this` here
