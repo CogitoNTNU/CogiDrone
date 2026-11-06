@@ -424,9 +424,19 @@ void Navigation::transitionTo(MissionState next) {
 void Navigation::onEnter(MissionState entered) {
     // ? Edge-triggered outputs: exactly once per transition, never per tick.
     switch (entered) {
+        case MissionState::SEARCHING:
+            // TODO: Rework the current searchBehavior to utilize the representation's map of
+            //     : the environment. The current searchBehavior is a simple rotate-in-place.
+            //     : This is a design choice, we could also have a mix of: orbit, lawn-mower, 
+            //     : and hold+rotate.
+            // ? Start the sweep from wherever the drone already points.
+            searchStartYaw = std::isfinite(dronePosition.heading) ? dronePosition.heading : 0.0f;
+            break;
+
         case MissionState::LANDING:
             publishFlightCommand(cogidrone::FlightCommand::LAND);
             break;
+
         default:
             break;                                                                      // No entry action
     }
@@ -472,6 +482,13 @@ void Navigation::executeBehavior() {
             break;
 
         case MissionState::SEARCHING:
+            // TODO: Rework the current searchBehavior to utilize the representation's map of
+            //     : the environment. The current searchBehavior is a simple rotate-in-place.
+            //     : This is a design choice, we could also have a mix of: orbit, lawn-mower, 
+            //     : and hold+rotate.
+            searchBehavior();
+            break;
+
         case MissionState::PERSON_DETECTED:
         // | case MissionState::OBSTACLE_AVOIDANCE:                                          // TODO: blocked on Representation
         // | case MissionState::RETURNING:                                                   // TODO: blocked on drone state source
@@ -523,6 +540,30 @@ void Navigation::hoverBehavior() {
     publishSetpoint(HOLD_POSITION_NED, YAW);
 }
 
+
+// TODO: Rework the current searchBehavior to utilize the representation's map of
+//     : the environment. The current searchBehavior is a simple rotate-in-place.
+//     : This is a design choice, we could also have a mix of: orbit, lawn-mower, 
+//     : and hold+rotate.
+void Navigation::searchBehavior() {
+    // ? Hold position and rotate slowly. The simplest search that actually
+    // ? changes what the camera sees: a stationary drone with a fixed heading
+    // ? can only ever see one view.
+    // ! A lawn-mower or orbit pattern needs a search area, which needs a map
+    // ! (Representation). Until then, rotating in place is the honest option.
+    if (!dronePositionValid()) return;
+
+    // ? Absolute yaw from the state entry time, not an accumulated delta: no
+    // ? drift, and the rate is independent of the frame rate.
+    const float elapsed = static_cast<float>((m.node->now() - stateEntryTime).seconds());
+    const float yaw = cogidrone::normalizeAngle(searchStartYaw + m.params.searchYawRate * elapsed);
+
+    publishSetpoint(
+        cogidrone::Vec3{dronePosition.x, dronePosition.y, -m.params.targetHeight},
+        yaw
+    );
+}
+
 //// void Navigation::followBehavior() {
 ////     if (!detectionIsValid()) return;
 //// 
@@ -545,10 +586,6 @@ void Navigation::hoverBehavior() {
 ////     publishVelocity(velocity, yawRate);
 //// }
 //// 
-//// void Navigation::searchBehavior() {
-////     // ? Simple search: hover and rotate slowly
-////     publishVelocity(Vec3{}, 0.3f);
-//// }
 
 
 

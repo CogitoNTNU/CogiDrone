@@ -121,6 +121,13 @@ struct PersonDetection {
 // ? `ros2 param set` after startup changes the parameter server but NOT
 // ? `m.params`. Add the callback if live retuning is ever needed.
 struct NavigationParams {
+    // Searching
+    // TODO: Rework the current searchBehavior to utilize the representation's map of
+    //     : the environment. The current searchBehavior is a simple rotate-in-place.
+    //     : This is a design choice, we could also have a mix of: orbit, lawn-mower, 
+    //     : and hold+rotate.
+    float searchYawRate             = 0.3f;                                             // rad/s
+
     // Following
     float targetFollowDistance      = 4.0f;                                             // meters
     float targetHeight              = 2.5f;                                             // meters above ground
@@ -236,6 +243,14 @@ private:
     // ? as the rest of this block: the executor runs one callback at a time.
     px4_msgs::msg::VehicleLocalPosition dronePosition;
 
+    // TODO: Rework the current searchBehavior to utilize the representation's map of
+    //     : the environment. The current searchBehavior is a simple rotate-in-place.
+    //     : This is a design choice, we could also have a mix of: orbit, lawn-mower, 
+    //     : and hold+rotate.
+    // ? Heading the search sweep started from. Captured on entry to SEARCHING so
+    // ? the sweep never snaps the drone round to a fixed heading.
+    float searchStartYaw = 0.0f;
+
     // ? The two raw inputs from FlightController. Written by onArmed() /
     // ? onOffboardActive(), read by deriveControlState().
     bool armed = false;
@@ -281,13 +296,18 @@ private:
     // ? never commands velocities or motor-level anything.
     void executeBehavior();                                                             // Dispatch on `state`
     void hoverBehavior();                                                               // Implemented: hold position setpoint
+    // TODO: Rework the current searchBehavior to utilize the representation's map of
+    //     : the environment. The current searchBehavior is a simple rotate-in-place.
+    //     : This is a design choice, we could also have a mix of: orbit, lawn-mower, 
+    //     : and hold+rotate.
+    void searchBehavior();
+    
     // TODO: followBehavior() - target selection behind the person. Blocked on:
     //     1. Person world position (needs fused detections w/ depth from Perception)
     //     2. Drone state source (estimation scrapped; PX4 local position vs FlightController republish - undecided)
     //// void followBehavior();
     
-    // TODO: searchBehavior() - search pattern is a design choice (orbit? lawn-mower? hold+rotate?)
-    //// void searchBehavior();
+
     // TODO: obstacle avoidance - blocked on Representation producing an obstacle map
 
     // * Navigation math
