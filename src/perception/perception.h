@@ -1,7 +1,7 @@
 #pragma once
 
-#include <memory>
 #include <expected>
+#include <memory>
 
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/image.hpp"
@@ -17,14 +17,29 @@
 
 
 
+// ! DOUBLE CHECK AFTER REFACTOR: (might be possible to have this as a string_view)
+// ? Loaded ONCE in create() from the parameter server (defaults from
+// ? PerceptionParams). Override at startup with
+// ? `ros2 param set /perception image_topic <topic>` BEFORE the node spins.
+// ? NOT retuned live: there is no add_on_set_parameters_callback.
+struct PerceptionParams {
+    // ? realsense2_camera's default colour stream. Change this for a bag, a
+    // ? second camera, or SITL - the topic name is deployment-specific, which
+    // ? is exactly why it is a parameter and not a constant.
+    std::string imageTopic = "/camera/camera/color/image_raw";
+};
+
+
 class Perception {
 private:   
     struct M {                                                                          // Assembly struct
         // ROS node
         rclcpp::Node::SharedPtr node;
 
-        // Subscriptions and publishers
+        // Subscriptions
         rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr imageSubscription;     // Subscription for camera images
+        
+        // Publishers
         // TODO: Update the publisher to publish fused detections - for this, I'll have to do some research
         // rclcpp::Publisher<cogidrone::msg::FusedDetections>::SharedPtr targetPublisher;
         rclcpp::Publisher<vision_msgs::msg::Detection2DArray>::SharedPtr targetPublisher;
@@ -33,6 +48,9 @@ private:
         Person         personModel;
         Head           headModel;
         DepthAnything  depthAnythingModel;
+
+        // Parameters
+        PerceptionParams params;                                                        // ? Loaded once in create(); not retuned at runtime
     } m;
 
     // * Default ctor

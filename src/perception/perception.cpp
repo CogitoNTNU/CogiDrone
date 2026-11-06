@@ -3,7 +3,6 @@
 #include <string_view>
 
 
-
 Perception::~Perception() = default;
 
 std::expected<std::unique_ptr<Perception>, cogidrone::Error> Perception::create() {
@@ -34,6 +33,13 @@ std::expected<std::unique_ptr<Perception>, cogidrone::Error> Perception::create(
     cogidrone::log(LOGGING_LEVEL::INFO, "ROS2 IPC node created successfully");
 
 
+    // * Parameters (non-failable: defaults live in PerceptionParams)
+    PerceptionParams params;
+    params.imageTopic = node->declare_parameter("image_topic", params.imageTopic);
+
+    cogidrone::log(LOGGING_LEVEL::INFO, "Perception parameters initialized successfully");
+
+
     // ! NOTE:
     // ! As much as this pains me, I have to initialize a perception object here to avoid insane workarounds regarding 
     // ! the lambda capture of the subscription callback. This is because the subscription callback needs to capture the 
@@ -47,11 +53,12 @@ std::expected<std::unique_ptr<Perception>, cogidrone::Error> Perception::create(
             .node = std::move(node),
             .imageSubscription = nullptr,                                               // ? will be wired later
             .targetPublisher = nullptr,                                                 // ? will be wired later
-            
             // Models
             .personModel = std::move(*personModel),
             .headModel = std::move(*headModel),
-            .depthAnythingModel = std::move(*depthAnythingModel)
+            .depthAnythingModel = std::move(*depthAnythingModel),
+            // Parameters
+            .params = std::move(params)
         })
     );
     cogidrone::log(LOGGING_LEVEL::INFO, "Perception object partially constructed");
@@ -66,7 +73,7 @@ std::expected<std::unique_ptr<Perception>, cogidrone::Error> Perception::create(
 
 void Perception::wire() noexcept {
     m.imageSubscription = m.node->create_subscription<sensor_msgs::msg::Image>(
-        "/camera/camera/image", 
+        m.params.imageTopic,
         rclcpp::SensorDataQoS(),
         [this](const sensor_msgs::msg::Image& msg) {                                    // ! This ONLY works if the Perception object is non-movable. Since the rvalue
             this->onFrame(msg);                                                         // ! from the Perception::create() function is moved, capturing `this` here
