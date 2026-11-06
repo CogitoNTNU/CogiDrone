@@ -31,6 +31,10 @@ enum class LOGGING_LEVEL : std::uint8_t {
     };
 }
 
+// | DEBUG
+// ? Fires if an enumerator is added without a name (or vice versa).
+static_assert(enumNames(LOGGING_LEVEL{}).size() == static_cast<std::size_t>(LOGGING_LEVEL::__UNIQUE_LEVELS_COUNT));
+
 [[nodiscard]] constexpr std::string_view toString(LOGGING_LEVEL level) noexcept {
     return cogidrone::enumName(level);
 }
