@@ -179,14 +179,14 @@ void Navigation::onDetections(const vision_msgs::msg::Detection2DArray& msg) {
     lastHeartbeatTime = m.node->now();
 
     // * Pick the most confident detection in the array
-    // ! [4.3]: `onDetections()` ignores `hypothesis.class_id`
-    // !    It picks the highest score regardless of class. If Perception ever publishes
-    // !    heads and persons in the same array, Navigation may follow a head. Either:
-    // !      * filter by `hypothesis.class_id` (requires a shared class-id convention), or
-    // !      * make Perception publish only person detections on `/perception/detections`.
-    // ! 
-    // !    This is a cross-subsystem contract - decide it explicitly rather than relying 
-    // !    on "Perception only sends persons".
+    // ? CONTRACT: `/perception/detections` carries PERSON detections only.
+    // ? Perception owns the filtering; Navigation takes the highest score and
+    // ? does not inspect `hypothesis.class_id`. This is a deliberate choice over
+    // ? string-matching a class id in the hot loop: the topic name is the
+    // ? contract, and a second class gets a second topic (e.g.
+    // ? `/perception/heads`), not a second branch here.
+    // ! If Perception ever publishes mixed classes on this topic, this loop will
+    // ! follow a head. Change the topic, not this loop.
     const vision_msgs::msg::Detection2D* best = nullptr;
     for (const auto& detection : msg.detections) {
         if (detection.results.empty()) continue;                                        // ? Malformed entry

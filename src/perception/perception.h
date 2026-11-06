@@ -42,6 +42,11 @@ private:
         // Publishers
         // TODO: Update the publisher to publish fused detections - for this, I'll have to do some research
         // rclcpp::Publisher<cogidrone::msg::FusedDetections>::SharedPtr targetPublisher;
+        // ! DOUBLE CHECK AFTER REFACTOR: (we want to publish fused detections, which are
+        // ! detections in which all 3 model outputs are used to create a  single detection) 
+        // ? CONTRACT: this topic carries PERSON detections only. Navigation takes
+        // ? the highest score without inspecting `class_id`, so anything else
+        // ? published here will be followed. Heads go on their own topic.
         rclcpp::Publisher<vision_msgs::msg::Detection2DArray>::SharedPtr targetPublisher;
                 
         // Models
