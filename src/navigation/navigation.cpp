@@ -272,6 +272,18 @@ void Navigation::onWatchdogTick() {
 // * Control state
 ControlState Navigation::deriveControlState() const noexcept {
     // ? Pure function of the two raw inputs. No side effects, no logging.
+    // ?
+    // ! LATENT BUG - becomes live the moment LANDING is reachable.
+    // ? PX4 leaves offboard BY DESIGN when it lands: NAV_LAND selects
+    // ? AUTO_LAND, which is not OFFBOARD, so `offboardActive` goes false
+    // ? during our own descent. This function would then report
+    // ? PILOT_HAS_CONTROL, and every autonomous landing would log a phantom
+    // ? pilot takeover and publish MANUALLY_OVERRIDDEN while the drone
+    // ? descends under its own control.
+    // ? Fix when LANDING is wired: insert
+    // ?     if (state == MissionState::LANDING) return ControlState::NAVIGATION_HAS_CONTROL;
+    // ? between the `armed` and `offboardActive` checks. The mission state is
+    // ? a third input, and it is load-bearing.
     if (!armed)         return ControlState::WAITING_FOR_ARM;
     if (!offboardActive) return ControlState::PILOT_HAS_CONTROL;
     return ControlState::NAVIGATION_HAS_CONTROL;
@@ -391,13 +403,22 @@ std::optional<MissionState> Navigation::evaluateTransitions() {
         case MissionState::FOLLOWING:
             if (personIsLost()) 
                 return MissionState::PERSON_LOST;
+            // ? No transition out of FOLLOWING on success. The mission's next
+            // ? step is DROPPING, which does not exist - see the mission-plan
+            // ? comment in navigation.h. FOLLOWING is therefore terminal: the
+            // ? drone follows until the pilot takes over or disarms.
+            // TODO: DROPPING transition - blocked on the payload release hardware
             // TODO: OBSTACLE_AVOIDANCE transition - blocked on Representation
             break;
 
         case MissionState::PERSON_LOST:
             if (detectionIsValid()) 
                 return MissionState::PERSON_DETECTED;
-            // TODO: timeout -> RETURNING (return-home strategy is a design choice)
+            // ? Deliberately no timeout. The mission's recovery action is
+            // ? RETURNING, which does not exist yet, and landing is not the
+            // ? mission's end - returning is. Holding here is the honest
+            // ? behaviour: the drone stays where it last saw the person.
+            // TODO: timeout -> RETURNING - blocked on the home-reference decision
             break;
 
         case MissionState::LANDING:
@@ -434,6 +455,9 @@ void Navigation::onEnter(MissionState entered) {
             break;
 
         case MissionState::LANDING:
+            // ! Currently unreachable - see the mission-plan comment in
+            // ! `navigation.h`. This is the abort path, kept wired so that
+            // ! `RETURNING` -> `LANDING` works the day `RETURNING` exists.
             publishFlightCommand(cogidrone::FlightCommand::LAND);
             break;
 
@@ -458,12 +482,16 @@ void Navigation::onPerceptionCrashed() {
     transitionTo(MissionState::PERSON_LOST);
     publishStatus();
 
-    // ? Deliberately NO setpoint publish: FlightController re-streams the last one, so
-    // ? the drone holds its last commanded position. Calling hoverBehavior()
-    // ? here would command the ORIGIN (see its comment), which is not "hold".
-    // 
-    // TODO: If PERSON_LOST persists for N seconds, publish FlightCommand::LAND.
-    //     : That is the decisive safe action once you decide the timeout.
+    // ? Deliberately NO setpoint publish: FlightController re-streams the last
+    // ? one, so PX4 actively holds the last commanded position. See the
+    // ? PERSON_LOST case in executeBehavior() for why that beats hoverBehavior().
+    // ?
+    // ? No timeout to LAND here either. Perception dying does not end the
+    // ? mission - it suspends it. The recovery action is RETURNING, which does
+    // ? not exist yet (see the mission-plan comment in navigation.h). Landing on
+    // ? a Perception failure would be a mission abort, and aborting is the
+    // ? pilot's call, not a timer's.
+    // TODO: timeout -> RETURNING - blocked on the home-reference decision
 }
 
 
@@ -517,9 +545,13 @@ void Navigation::executeBehavior() {
             break;
 
         case MissionState::PERSON_LOST:
-            // ? Hold: do NOT publish a new setpoint. FlightController re-streams the last
-            // ? one, so the drone holds its last commanded position. True "hold
-            // ? current position" needs a drone state source - see wire() TODO.
+            // ? Hold: do NOT publish a new setpoint. FlightController re-streams
+            // ? the last one, so PX4 actively holds the last COMMANDED position.
+            // ? Deliberate over hoverBehavior(), which would hold the CURRENT
+            // ? position: if the person vanished mid-transit, the last commanded
+            // ? point is where the drone was already heading, and completing
+            // ? that transit is a gentler correction than stopping short of it.
+            // ? Both are safe; this one is smoother.
             break;
 
         case MissionState::FOLLOWING:
@@ -527,6 +559,10 @@ void Navigation::executeBehavior() {
             break;
 
         case MissionState::LANDING:
+            // ! Currently unreachable: nothing calls transitionTo(LANDING).
+            // ? Kept because it is the abort path, and because RETURNING will
+            // ? hand off to it once it exists. See the mission-plan comment in
+            // ? navigation.h.
             // ? LANDING is owned by FlightController. No new commands here.
             break;
     }

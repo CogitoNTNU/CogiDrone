@@ -65,18 +65,65 @@ enum class ControlState {
 }
 
 
+
 // * Mission states
-// ? The full mission lifecycle. States whose behaviors depend on subsystems
-// ? that don't exist yet are declared but their behaviors are stubs.
-// ?   IDLE             - Waiting for control
-// ?   SEARCHING        - Looking for person
-// ?   PERSON_DETECTED  - Person found, confirming track
-// ?   FOLLOWING        - Actively following person
-// ?   PERSON_LOST      - Lost sight of person, hovering/searching
-// ?   LANDING          - Handed to FlightController::land()
+// ? The mission this drone is built for, in order:
+// ?
+// ?   1. TAKEOFF         - implicit, see below
+// ?   2. SEARCHING       - rotate in place until a person is found
+// ?   3. PERSON_DETECTED - confirm the track before committing
+// ?   4. FOLLOWING       - stand off behind the person
+// ?   5. DROPPING        - release the payload            [MISSING: hardware]
+// ?   6. RETURNING       - fly back to the launch point   [MISSING: home ref]
+// ?   7. LANDING         - hand the descent to PX4
+// ?
+// ?   After 5 the mission branches: items remain -> back to 2, else -> 6.
+// ?
+// ? WHAT IS IMPLEMENTED TODAY
+// ?   IDLE, SEARCHING, PERSON_DETECTED, FOLLOWING, PERSON_LOST.
+// ?   TAKEOFF has no state because Navigation never commands the climb: the
+// ?   first setpoint from searchBehavior() is (current XY, -targetHeight), so
+// ?   PX4's position controller does the climb. A separate state would only
+// ?   duplicate what the setpoint already says.
+// !   Side effect worth knowing: the drone climbs AND rotates at the same
+// !   time, because searchBehavior() runs from the first frame. Harmless, but
+// !   it is not a clean vertical takeoff.
+// ?
+// ? WHY THE MISSION CANNOT END TODAY
+// ?   DROPPING is blocked on HARDWARE - there is no release mechanism on the
+// ?   airframe, so there is no command to send and no feedback to confirm it.
+// ?   RETURNING is blocked on a HOME REFERENCE decision - PX4's local frame is
+// ?   home-relative, so (0, 0) IS the launch point, but "return" also needs a
+// ?   policy for what to do if the path is blocked, which needs Representation.
+// ?
+// ?   Consequence, stated plainly: FOLLOWING is the TERMINAL state of the
+// ?   current implementation. The drone follows the person until the pilot
+// ?   takes over or disarms. That is the intended behaviour today, not a bug.
+// !   Do NOT add a timeout that lands the drone. Landing is not the mission's
+// !   end - returning is - and returning does not exist yet. A timer that
+// !   lands turns "we cannot finish" into "we give up", which is a different
+// !   mission with different consequences for the payload.
+// ?
+// ? WHAT TO DO WHEN THE HARDWARE ARRIVES
+// ?   1. Add DROPPING to the list below, between FOLLOWING and LANDING.
+// ?   2. Add dropBehavior(): command the release, then WAIT for confirmation.
+// ?      It must not publish a setpoint while the release fires - hold
+// ?      position, or the item lands somewhere else.
+// ?   3. Add RETURNING and returnBehavior(): command (0, 0, -targetHeight).
+// ?      The origin is the launch point in PX4's local frame, so the simple
+// ?      case needs no extra state.
+// ?   4. Add the item counter. It is the only thing that decides between
+// ?      "search again" and "return", and it is mission policy, not flight
+// ?      logic - consider a MissionPlanner that owns it and drives Navigation.
+// ?   5. Only then wire LANDING: RETURNING -> LANDING on arrival, and
+// ?      DROPPING -> SEARCHING when items remain.
+// ?   6. When LANDING becomes reachable, fix deriveControlState() FIRST - see
+// ?      the warning there. PX4 leaves offboard by design when it lands.
+// ?
+// ?   Until step 5, LANDING stays unreachable. It is kept in the enum because
+// ?   it is the abort path, and deleting it would mean re-adding it later.
 // | OBSTACLE_AVOIDANCE - TODO: requires Representation
-// | RETURNING          - TODO: requires drone state + home reference
-// | EMERGENCY          - Hold position, await operator
+// | EMERGENCY          - TODO: hold position, await operator
 #define COGIDRONE_MISSION_STATE_LIST(X)                                                 \
     X(IDLE)                                                                             \
     X(SEARCHING)                                                                        \
