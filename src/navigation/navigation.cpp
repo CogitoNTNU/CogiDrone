@@ -445,10 +445,9 @@ void Navigation::onEnter(MissionState entered) {
     // ? Edge-triggered outputs: exactly once per transition, never per tick.
     switch (entered) {
         case MissionState::SEARCHING:
-            // TODO: Rework the current searchBehavior to utilize the representation's map of
-            //     : the environment. The current searchBehavior is a simple rotate-in-place.
-            //     : This is a design choice, we could also have a mix of: orbit, lawn-mower, 
-            //     : and hold+rotate.
+            // TODO: [#23] Rework searchBehavior() to use Representation's map of the environment.
+            //     : The current searchBehavior is a simple rotate-in-place. This is a design
+            //     : choice, we could also have a mix of: orbit, lawn-mower, and hold+rotate.
             // ? Start the sweep from wherever the drone already points.
             searchStartYaw = std::isfinite(dronePosition.heading) ? dronePosition.heading : 0.0f;
             break;

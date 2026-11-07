@@ -103,6 +103,8 @@ else()
     target_compile_options(cogidrone PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
+# TODO: [#33] Remove if ament/colcon is never used. Kept as a fallback for a native
+#     : Jetson build with a sourced ROS environment.
 # if(DEFINED ENV{AMENT_PREFIX_PATH})
-#     ament_package()
+#     ament_target_dependencies(cogidrone px4_msgs)
 # endif()

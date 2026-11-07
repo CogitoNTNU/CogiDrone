@@ -22,7 +22,7 @@ private:
     // Members
     struct M {                                                                          // Assembly struct
         std::unique_ptr<Perception> perception;
-        nullptr_t representation;                                                       // TODO: Implement the Representation subsystem
+        std::nullptr_t representation;                                                  // TODO: [#18] Implement the Representation subsystem
         std::unique_ptr<Navigation> navigation;
         std::unique_ptr<FlightController> flightController;
     } m;

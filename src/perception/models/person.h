@@ -7,6 +7,7 @@
 class Person {
 private:
     struct M { 
+        // TODO: [#19] Implement actual members for the model
         /* 
         engine, 
         weights 
