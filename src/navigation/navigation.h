@@ -204,6 +204,9 @@ private:
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr offboardActiveSubscription;            // From FlightController
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr armedSubscription;                     // From FlightController
         
+        // ! DOUBLE CHECK AFTER REFACTOR: (might be better to have FlightController 
+        // ! publish a reference or pointer of it's localPosition member instead 
+        // ! of having Navigation subscribe to PX4's local position directly)
         // ? Navigation reads PX4's local position itself rather than going
         // ? through FlightController. FlightController owns the COMMAND link
         // ? (the offboard handshake); telemetry is a separate concern, and

@@ -241,9 +241,7 @@ void Navigation::onOffboardActive(const std_msgs::msg::Bool& msg) {
     updateControlState();
 }
 
-// ! DOUBLE CHECK AFTER REFACTOR: (might be better to have FlightController 
-// ! publish a reference or pointer of it's localPosition member instead 
-// ! of having Navigation subscribe to PX4's local position directly)
+
 // ? No lock: same reason as onDetections().
 // ? If controlMutex is reinstated, uncomment the lock_guard below.
 void Navigation::onLocalPosition(const px4_msgs::msg::VehicleLocalPosition& msg) {
@@ -784,9 +782,7 @@ bool Navigation::perceptionIsDead() const {
     return (m.node->now() - lastHeartbeatTime).seconds() > m.params.detectionTimeout;
 }
 
-// ! DOUBLE CHECK AFTER REFACTOR: (might be better to have FlightController 
-// ! publish a reference or pointer of it's localPosition member instead 
-// ! of having Navigation subscribe to PX4's local position directly)
+
 bool Navigation::dronePositionValid() const {
     // ! Caller must hold controlMutex if mutex is reinstated - do NOT lock here!
     // ? No lock: caller is serialized by the executor.
