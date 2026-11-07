@@ -14,6 +14,8 @@ set(_px4_lib_dir     ${CMAKE_SOURCE_DIR}/vendored/px4_msgs/lib)
 # Glob the lib dir (top of file, next to the include glob)
 file(GLOB _ros_lib_dirs ${CMAKE_SOURCE_DIR}/vendored/ros2/opt/ros/jazzy/lib)
 
+# TODO: [#33] Remove if ament/colcon is never used. Kept as a fallback for a native
+#     : Jetson build with a sourced ROS environment.
 # if(DEFINED ENV{AMENT_PREFIX_PATH})
 #     find_package(ament_cmake REQUIRED)
 #     find_package(px4_msgs REQUIRED)
@@ -33,6 +35,7 @@ add_executable(cogidrone
     perception/models/depth_anything.cpp
 
     # Representation
+    # TODO: [#18] Representation
 
     # Navigation
     navigation/navigation.cpp

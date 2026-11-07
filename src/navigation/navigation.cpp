@@ -204,7 +204,7 @@ void Navigation::onDetections(const vision_msgs::msg::Detection2DArray& msg) {
         person.timestamp = m.node->now();
         person.valid = true;
 
-        // TODO: person.position = ... (world-frame, from fused detections)
+        // TODO: [#21] person.position = ... (world-frame, from fused detections)
     }
     
     // ? Only run the mission when we are the pilot. In every other control
@@ -273,17 +273,17 @@ void Navigation::onWatchdogTick() {
 ControlState Navigation::deriveControlState() const noexcept {
     // ? Pure function of the two raw inputs. No side effects, no logging.
     // ?
-    // ! LATENT BUG - becomes live the moment LANDING is reachable.
-    // ? PX4 leaves offboard BY DESIGN when it lands: NAV_LAND selects
-    // ? AUTO_LAND, which is not OFFBOARD, so `offboardActive` goes false
-    // ? during our own descent. This function would then report
-    // ? PILOT_HAS_CONTROL, and every autonomous landing would log a phantom
-    // ? pilot takeover and publish MANUALLY_OVERRIDDEN while the drone
-    // ? descends under its own control.
-    // ? Fix when LANDING is wired: insert
-    // ?     if (state == MissionState::LANDING) return ControlState::NAVIGATION_HAS_CONTROL;
-    // ? between the `armed` and `offboardActive` checks. The mission state is
-    // ? a third input, and it is load-bearing.
+    // TODO: [#30] LATENT BUG - becomes live the moment LANDING is reachable.
+    //     : PX4 leaves offboard BY DESIGN when it lands: NAV_LAND selects
+    //     : AUTO_LAND, which is not OFFBOARD, so `offboardActive` goes false
+    //     : during our own descent. This function would then report
+    //     : PILOT_HAS_CONTROL, and every autonomous landing would log a phantom
+    //     : pilot takeover and publish MANUALLY_OVERRIDDEN while the drone
+    //     : descends under its own control.
+    //     : Fix when LANDING is wired: insert
+    //     :     if (state == MissionState::LANDING) return ControlState::NAVIGATION_HAS_CONTROL;
+    //     : between the `armed` and `offboardActive` checks. The mission state is
+    //     : a third input, and it is load-bearing.
     if (!armed)         return ControlState::WAITING_FOR_ARM;
     if (!offboardActive) return ControlState::PILOT_HAS_CONTROL;
     return ControlState::NAVIGATION_HAS_CONTROL;
@@ -389,7 +389,8 @@ std::optional<MissionState> Navigation::evaluateTransitions() {
             if (detectionIsValid()) 
                 return MissionState::PERSON_DETECTED;
                 
-            // TODO: add lawnmower search pattern (or other) to avoid staying in one place forever
+            // TODO: [#24] Add a ground-covering search pattern (lawn-mower, orbit, ...)
+            //     : so the drone does not stay in one place forever.
             break;
 
         case MissionState::PERSON_DETECTED:
@@ -407,8 +408,8 @@ std::optional<MissionState> Navigation::evaluateTransitions() {
             // ? step is DROPPING, which does not exist - see the mission-plan
             // ? comment in navigation.h. FOLLOWING is therefore terminal: the
             // ? drone follows until the pilot takes over or disarms.
-            // TODO: DROPPING transition - blocked on the payload release hardware
-            // TODO: OBSTACLE_AVOIDANCE transition - blocked on Representation
+            // TODO: [#25] DROPPING transition - blocked on the payload release hardware
+            // TODO: [#27] OBSTACLE_AVOIDANCE transition - blocked on Representation
             break;
 
         case MissionState::PERSON_LOST:
@@ -418,11 +419,11 @@ std::optional<MissionState> Navigation::evaluateTransitions() {
             // ? RETURNING, which does not exist yet, and landing is not the
             // ? mission's end - returning is. Holding here is the honest
             // ? behaviour: the drone stays where it last saw the person.
-            // TODO: timeout -> RETURNING - blocked on the home-reference decision
+            // TODO: [#26] timeout -> RETURNING - blocked on the home-reference decision
             break;
 
         case MissionState::LANDING:
-            break;                                                                      // Terminal until FlightController reports disarmed
+            break;                                                                      // TODO: [#29] Terminal until FlightController reports disarmed
     }
 
     return std::nullopt;
@@ -455,9 +456,9 @@ void Navigation::onEnter(MissionState entered) {
             break;
 
         case MissionState::LANDING:
-            // ! Currently unreachable - see the mission-plan comment in
-            // ! `navigation.h`. This is the abort path, kept wired so that
-            // ! `RETURNING` -> `LANDING` works the day `RETURNING` exists.
+            // TODO: [#29] Currently unreachable - see the mission-plan comment in
+            //      : `navigation.h`. This is the abort path, kept wired so that
+            //      : `RETURNING` -> `LANDING` works the day `RETURNING` exists.
             publishFlightCommand(cogidrone::FlightCommand::LAND);
             break;
 
@@ -491,7 +492,7 @@ void Navigation::onPerceptionCrashed() {
     // ? not exist yet (see the mission-plan comment in navigation.h). Landing on
     // ? a Perception failure would be a mission abort, and aborting is the
     // ? pilot's call, not a timer's.
-    // TODO: timeout -> RETURNING - blocked on the home-reference decision
+    // TODO: [#26] timeout -> RETURNING - blocked on the home-reference decision
 }
 
 
@@ -530,17 +531,16 @@ void Navigation::executeBehavior() {
             break;
 
         case MissionState::SEARCHING:
-            // TODO: Rework the current searchBehavior to utilize the representation's map of
-            //     : the environment. The current searchBehavior is a simple rotate-in-place.
-            //     : This is a design choice, we could also have a mix of: orbit, lawn-mower, 
-            //     : and hold+rotate.
+            // TODO: [#23] Rework searchBehavior() to use Representation's map of the environment.
+            //     : The current searchBehavior is a simple rotate-in-place. This is a design
+            //     : choice, we could also have a mix of: orbit, lawn-mower, and hold+rotate.
             searchBehavior();
             break;
 
         case MissionState::PERSON_DETECTED:
-        // | case MissionState::OBSTACLE_AVOIDANCE:                                          // TODO: blocked on Representation
-        // | case MissionState::RETURNING:                                                   // TODO: blocked on drone state source
-        // | case MissionState::EMERGENCY:
+        // | case MissionState::OBSTACLE_AVOIDANCE:                                          // TODO: [#27] blocked on Representation
+        // | case MissionState::RETURNING:                                                   // TODO: [#26] blocked on home-reference decision
+        // | case MissionState::EMERGENCY:                                                   // TODO: [#28] hold position, await operator
             hoverBehavior();
             break;
 
@@ -559,18 +559,16 @@ void Navigation::executeBehavior() {
             break;
 
         case MissionState::LANDING:
-            // ! Currently unreachable: nothing calls transitionTo(LANDING).
-            // ? Kept because it is the abort path, and because RETURNING will
-            // ? hand off to it once it exists. See the mission-plan comment in
-            // ? navigation.h.
+            // TODO: [#29] Currently unreachable - nothing calls transitionTo(LANDING).
+            //     : Kept because it is the abort path, and because RETURNING will
+            //     : hand off to it once it exists. See the mission-plan comment in
+            //     : navigation.h.
+            // ?
             // ? LANDING is owned by FlightController. No new commands here.
             break;
     }
 }
 
-// ! DOUBLE CHECK AFTER REFACTOR: (might be better to have FlightController 
-// ! publish a reference or pointer of it's localPosition member instead 
-// ! of having Navigation subscribe to PX4's local position directly)
 void Navigation::hoverBehavior() {
     // ? Hold the CURRENT horizontal position at the target height. This is the
     // ? only behavior that is safe to run with no person in frame: it never
@@ -596,10 +594,10 @@ void Navigation::hoverBehavior() {
 }
 
 
-// TODO: Rework the current searchBehavior to utilize the representation's map of
-//     : the environment. The current searchBehavior is a simple rotate-in-place.
-//     : This is a design choice, we could also have a mix of: orbit, lawn-mower, 
-//     : and hold+rotate.
+
+// TODO: [#23] Rework searchBehavior() to use Representation's map of the environment.
+//     : The current searchBehavior is a simple rotate-in-place. This is a design
+//     : choice, we could also have a mix of: orbit, lawn-mower, and hold+rotate.
 void Navigation::searchBehavior() {
     // ? Hold position and rotate slowly. The simplest search that actually
     // ? changes what the camera sees: a stationary drone with a fixed heading
@@ -692,8 +690,8 @@ void Navigation::followBehavior() {
 //// }
 //// 
 //// Vec3 Navigation::cameraToWorld(const Vec3& camera) const {
-////     // TODO: Apply the static camera mount extrinsic (camera -> body) once the rig is fixed;
-////     // for now the camera is assumed coincident with the body frame
+////     // TODO: [#32] Apply the static camera mount extrinsic (camera -> body) once the rig is fixed;
+////     //     : for now the camera is assumed coincident with the body frame
 ////     const Vec3 body = camera;
 //// 
 ////     // * Body -> world: rotate by the drone orientation, then translate by the drone position

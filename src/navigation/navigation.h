@@ -122,8 +122,9 @@ enum class ControlState {
 // ?
 // ?   Until step 5, LANDING stays unreachable. It is kept in the enum because
 // ?   it is the abort path, and deleting it would mean re-adding it later.
-// | OBSTACLE_AVOIDANCE - TODO: requires Representation
-// | EMERGENCY          - TODO: hold position, await operator
+// | OBSTACLE_AVOIDANCE     - TODO: [#27] requires Representation
+// | EMERGENCY              - TODO: [#28] hold position, await operator
+
 #define COGIDRONE_MISSION_STATE_LIST(X)                                                 \
     X(IDLE)                                                                             \
     X(SEARCHING)                                                                        \
@@ -149,7 +150,7 @@ enum class MissionState {
 
 // * Data types
 struct PersonDetection {
-    cogidrone::Vec3 position;                                                           // TODO: world-frame position (NED) - requires fused detections (depth + intrinsics) from Perception
+    cogidrone::Vec3 position;                                                           // TODO: [#21] world-frame position (NED) - requires fused detections (depth + intrinsics) from Perception
     float confidence = 0.0f;                                                            // Detection confidence [0-1]
     // ! The clock type is load-bearing. `rclcpp::Time{}` defaults to
     // ! RCL_SYSTEM_TIME, but `node->now()` returns RCL_ROS_TIME, and
@@ -173,10 +174,9 @@ struct PersonDetection {
 // ? `m.params`. Add the callback if live retuning is ever needed.
 struct NavigationParams {
     // Searching
-    // TODO: Rework the current searchBehavior to utilize the representation's map of
-    //     : the environment. The current searchBehavior is a simple rotate-in-place.
-    //     : This is a design choice, we could also have a mix of: orbit, lawn-mower, 
-    //     : and hold+rotate.
+    // TODO : [#23] Rework searchBehavior() to use Representation's map of the environment.
+    //      : The current searchBehavior is a simple rotate-in-place. This is a design
+    //      : choice, we could also have a mix of: orbit, lawn-mower, and hold+rotate.
     float searchYawRate             = 0.3f;                                             // rad/s
 
     // Following
@@ -204,9 +204,6 @@ private:
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr offboardActiveSubscription;            // From FlightController
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr armedSubscription;                     // From FlightController
         
-        // ! DOUBLE CHECK AFTER REFACTOR: (might be better to have FlightController 
-        // ! publish a reference or pointer of it's localPosition member instead 
-        // ! of having Navigation subscribe to PX4's local position directly)
         // ? Navigation reads PX4's local position itself rather than going
         // ? through FlightController. FlightController owns the COMMAND link
         // ? (the offboard handshake); telemetry is a separate concern, and
@@ -294,10 +291,10 @@ private:
     // ? as the rest of this block: the executor runs one callback at a time.
     px4_msgs::msg::VehicleLocalPosition dronePosition;
 
-    // TODO: Rework the current searchBehavior to utilize the representation's map of
-    //     : the environment. The current searchBehavior is a simple rotate-in-place.
-    //     : This is a design choice, we could also have a mix of: orbit, lawn-mower, 
-    //     : and hold+rotate.
+    // TODO: [#23] Rework searchBehavior() to use Representation's map of the environment.
+    //     : The current searchBehavior is a simple rotate-in-place. This is a design
+    //     : choice, we could also have a mix of: orbit, lawn-mower, and hold+rotate.
+    // ?
     // ? Heading the search sweep started from. Captured on entry to SEARCHING so
     // ? the sweep never snaps the drone round to a fixed heading.
     float searchStartYaw = 0.0f;
@@ -322,9 +319,6 @@ private:
     void onDetections(const vision_msgs::msg::Detection2DArray& msg);                   // Drives control on every frame
     void onArmed(const std_msgs::msg::Bool& msg);                                       // From FlightController
     void onOffboardActive(const std_msgs::msg::Bool& msg);                              // From FlightController
-    // ! DOUBLE CHECK AFTER REFACTOR: (might be better to have FlightController 
-    // ! publish a reference or pointer of it's localPosition member instead 
-    // ! of having Navigation subscribe to PX4's local position directly)
     void onLocalPosition(const px4_msgs::msg::VehicleLocalPosition& msg);               // From PX4 via the uXRCE-DDS bridge
     void onWatchdogTick();                                                              // Fires only when Perception goes silent
 
@@ -346,17 +340,17 @@ private:
     // ? publishSetpoint(). PX4 owns velocity/attitude control - Navigation
     // ? never commands velocities or motor-level anything.
     void executeBehavior();                                                             // Dispatch on `state`
-    void hoverBehavior();                                                               // Implemented: hold position setpoint
-    // TODO: Rework the current searchBehavior to utilize the representation's map of
-    //     : the environment. The current searchBehavior is a simple rotate-in-place.
-    //     : This is a design choice, we could also have a mix of: orbit, lawn-mower, 
-    //     : and hold+rotate.
+    void hoverBehavior();                                                               // Hold current XY at targetHeight
+    // TODO: [#23] Rework searchBehavior() to use Representation's map of the environment.
+    //     : The current searchBehavior is a simple rotate-in-place. This is a design
+    //     : choice, we could also have a mix of: orbit, lawn-mower, and hold+rotate.
     void searchBehavior();
     void followBehavior();
-
-    // TODO: obstacle avoidance - blocked on Representation producing an obstacle map
+    // TODO: [#27] Obstacle avoidance - blocked on Representation producing an obstacle map
+    
 
     // * Navigation math
+    // TODO: [#33] Dead prototypes - restore or delete. `cameraToWorld` is tracked by [#32].
     // // [[nodiscard]] Vec3 followTarget() const;                                            // Target position behind the person
     // // [[nodiscard]] Vec3 velocityTowards(const Vec3& target) const;                       // P-controller velocity command
     // // [[nodiscard]] float desiredYawTowards(const Vec3& target) const;                    // Yaw to face the target
@@ -371,9 +365,6 @@ private:
     [[nodiscard]] bool detectionIsValid() const;
     [[nodiscard]] bool personIsLost() const;
     [[nodiscard]] bool perceptionIsDead() const;
-    // ! DOUBLE CHECK AFTER REFACTOR: (might be better to have FlightController 
-    // ! publish a reference or pointer of it's localPosition member instead 
-    // ! of having Navigation subscribe to PX4's local position directly)
     [[nodiscard]] bool dronePositionValid() const;                                      // EKF has a usable position reference
 
 

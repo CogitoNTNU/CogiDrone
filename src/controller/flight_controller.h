@@ -139,7 +139,7 @@ private:
     void wire() noexcept;                                                               // Wire pubs/subs/timer
 
     // * Callbacks
-    void onLocalPosition(const px4_msgs::msg::VehicleLocalPosition& msg);
+    void onLocalPosition(const px4_msgs::msg::VehicleLocalPosition& msg);               // From PX4 via the uXRCE-DDS bridge
     void onStatus(const px4_msgs::msg::VehicleStatus& msg);
     void onSetpointInput(const px4_msgs::msg::TrajectorySetpoint& msg);                 // From Navigation
     void onNavigationCommand(const std_msgs::msg::UInt8& msg);                          // From Navigation

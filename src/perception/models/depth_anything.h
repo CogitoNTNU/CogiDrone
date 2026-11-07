@@ -7,11 +7,11 @@
 class DepthAnything {
 private:
     struct M { 
-        // TODO: Implement actual members for the model
+        // TODO: [#19] Implement actual members for the model
         /* 
         engine, 
         weights 
-        */
+        */ 
     } m;
 
     explicit DepthAnything(M&& m) : m(std::move(m)) {}
@@ -32,8 +32,8 @@ public:
     DepthAnything(const DepthAnything&) = delete;                                       // still non-copyable (one engine)
     DepthAnything& operator=(const DepthAnything&) = delete;
 
-    // TODO: Implement a distance method that takes a frame and returns detections
-    // Pure computation: frame in, distances out
+    // TODO: [#19] Implement a distance method that takes a frame and returns distances.
+    //     : Pure computation: frame in, distances out.
     // [[nodiscard]] std::vector</* type */> distance(const /* type */& frame);
     // ! `const auto&`, not `auto`: an abbreviated template parameter deduced by
     // ! value copies the whole sensor_msgs::Image (a 900 KB vector at 640x480x3)

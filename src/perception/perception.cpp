@@ -80,7 +80,7 @@ void Perception::wire() noexcept {
         }                                                                               // ! would therefore cause a dangling pointer as the `this` adress would be 
     );                                                                                  // ! invalid. Fix: make perception non-movable and owned via a unique_ptr
 
-    // TODO: Update the publisher to publish fused detections - for this, I'll have to do some research
+    // TODO: [#22] Decide the wire format - see the note on `M::targetPublisher`.
     m.targetPublisher = m.node->create_publisher<vision_msgs::msg::Detection2DArray>(
         "/perception/detections",
         rclcpp::QoS(10)
@@ -89,16 +89,19 @@ void Perception::wire() noexcept {
 
 // * Callbacks
 void Perception::onFrame(const sensor_msgs::msg::Image& msg) {
-    // TODO: Implement a toFrame function to convert the image to the correct frame for each model
+    // TODO: [#20] Implement a toFrame() conversion from sensor_msgs::Image to each
+    //     : model's expected input (resize, normalise, layout).
     const auto PEOPLE    = m.personModel.detect(/* toFrame */(msg));
     const auto HEADS     = m.headModel.detect(/* toFrame */(msg));
     const auto DISTANCES = m.depthAnythingModel.distance(/* toFrame */(msg));
 
-    // ? These fused detections are NOT ment to be published yet. FusedDetections should just bundle every
-    // ? models' output together for each frame (each fusedDetection contains all people, all heads, and
-    // ? the depth heatmap image). We then have to calculate the 3D position of each detected person and head
-    // ? using the depth heatmap image, AND THEN publish the final fused detections. IMPORTANT: PERCEPTION
-    // ? SHOULD PUBLISH AN EMPTY DETECTION IF NO PEOPLE ARE DETECTED.
+    // TODO: [#21] These fused detections are NOT meant to be published yet.
+    //     : FusedDetections should bundle every model's output for each frame
+    //     : (all people, all heads, and the depth heatmap). We then have to
+    //     : calculate the 3D position of each detected person and head using
+    //     : the depth heatmap, AND THEN publish the final fused detections.
+    //     : IMPORTANT: PERCEPTION SHOULD PUBLISH AN EMPTY DETECTION IF NO
+    //     : PEOPLE ARE DETECTED.
     const auto FUSED = fuse(/* PEOPLE, HEADS, DISTANCES */);
 
     // ! Publish UNCONDITIONALLY. An empty array is the "no person in this frame"
@@ -110,7 +113,7 @@ void Perception::onFrame(const sensor_msgs::msg::Image& msg) {
 
 // * Helpers
 [[nodiscard]] Model::FusedDetections Perception::fuse(/* const ref something */) const {
-    // TODO: real fusion once the models return detections instead of `bool`.
+    // TODO: [#21] Real fusion once the models return detections instead of `bool`.
     return Model::FusedDetections{};
 }
 
@@ -118,11 +121,12 @@ void Perception::onFrame(const sensor_msgs::msg::Image& msg) {
 Perception::toDetectionArray(const Model::FusedDetections& fused) const {
     auto out = std::make_unique<vision_msgs::msg::Detection2DArray>();                  // ? unique_ptr publish: zero-copy intra-process
 
-    // TODO: for each fused person, append a Detection2D with:
+    // TODO: [#21] For each fused person, append a Detection2D with:
     //     :   results[0].hypothesis.class_id = "person"
     //     :   results[0].hypothesis.score    = confidence
     //     :   results[0].pose.pose.position  = camera-frame XYZ (needs depth + intrinsics)
     //     :   bbox                           = pixel box
+    // ?
     // ? Until then this returns an empty array, which is the correct
     // ? "no person detected" message - not a placeholder.
     (void)fused;

@@ -31,8 +31,8 @@ public:
     Head(const Head&) = delete;                                                         // still non-copyable (one engine)
     Head& operator=(const Head&) = delete;
 
-    // TODO: Implement a detect method that takes a frame and returns detections
-    // Pure computation: frame in, detections out
+    // TODO: [#19] Implement a detect method that takes a frame and returns detections.
+    //     : Pure computation: frame in, detections out.
     // [[nodiscard]] std::vector</* type */> detect(const /* type */& frame);
     // ! `const auto&`, not `auto`: an abbreviated template parameter deduced by
     // ! value copies the whole sensor_msgs::Image (a 900 KB vector at 640x480x3)

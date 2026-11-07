@@ -1,3 +1,4 @@
+// TODO: [#33] Entire file is commented out. Restore as a real test or delete.
 // #include "rclcpp/rclcpp.hpp"
 // #include "sensor_msgs/msg/image.hpp"
 // #include "std_msgs/msg/string.hpp"
@@ -58,11 +59,11 @@
 
 
 
-#include <iostream>
+// #include <iostream>
 
 
 
-int main() {
-    const double result = 238794.324;
-    std::cout << "The result is: " << result << "\n";
-}
+// int main() {
+//     const double result = 238794.324;
+//     std::cout << "The result is: " << result << "\n";
+// }

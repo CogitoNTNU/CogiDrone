@@ -13,12 +13,16 @@ namespace Model {
 // * Types
 // using property = float;
 
-// TODO: To be determined after talking to perception team lead
+// TODO: [#21] Shape to be determined with the perception team lead.
 // struct FusedDetections {
 //     std::vector<std::array<property, 4>> 
 //     float confidence;
 //     int classId;
 // };
+
+struct FusedDetections {
+    // | DEBUG
+};
 
 struct FusedDetections {
     // | DEBUG
@@ -30,7 +34,7 @@ template <typename T>
 [[nodiscard]] static std::expected<T, cogidrone::Error> load(
     std::string_view errorMsg,
     std::source_location loc = std::source_location::current()                          // ? Manually capture the location of the call site, not the location of this function
-) {
+) {|
     auto result = T::create();
     
     if (!result) {
@@ -40,7 +44,7 @@ template <typename T>
     return std::move(result).value();
 }
 
-// TODO: Determine if this function should be a member of the Perception class or a free function in the Model namespace
+// TODO: [#21] Decide whether fuse() is a Perception member or a Model free function.
 // [[nodiscard]] static std::unique_ptr<FusedDetections> fuse(/* const ref something */) {
 //     return std::make_unique<FusedDetections>();
 // }

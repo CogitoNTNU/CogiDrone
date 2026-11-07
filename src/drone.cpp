@@ -79,9 +79,9 @@ Drone::initiate(int argc, const char* argv[]) {
 
 // * Public interface
 void Drone::start() {
-    // TODO: Ensure that this is the correct place and design choice for starting the Drone object
+    // TODO: [#31] Decide whether Drone::start() is the right place to own the executor
     rclcpp::executors::MultiThreadedExecutor executor;                                  // Local
-    
+
     executor.add_node(m.perception->node());
     executor.add_node(m.navigation->node());
     executor.add_node(m.flightController->node());
