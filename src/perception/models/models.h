@@ -24,17 +24,13 @@ struct FusedDetections {
     // | DEBUG
 };
 
-struct FusedDetections {
-    // | DEBUG
-};
-
 
 // * Functions
 template <typename T>
 [[nodiscard]] static std::expected<T, cogidrone::Error> load(
     std::string_view errorMsg,
     std::source_location loc = std::source_location::current()                          // ? Manually capture the location of the call site, not the location of this function
-) {|
+) {
     auto result = T::create();
     
     if (!result) {
