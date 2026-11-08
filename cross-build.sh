@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== CogiDrone ARM64 Docker Build ==="
+echo "=== CogiDrone ARM64 Docker Cross Build ==="
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 IMAGE_NAME="cogidrone-arm64-build"

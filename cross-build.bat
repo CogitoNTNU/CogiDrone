@@ -1,7 +1,7 @@
 @echo off
 setlocal
 
-echo === CogiDrone ARM64 Build ===
+echo === CogiDrone ARM64 Cross Build ===
 echo.
 
 REM Find configuration file relative to this script
