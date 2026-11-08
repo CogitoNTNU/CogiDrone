@@ -1,0 +1,40 @@
+{
+  "os":  "Windows-11-10.0.26200-SP0",
+  "python":  "CPython 3.12.9",
+  "startedAt":  "2026-10-01T15:35:27.771365Z",
+  "program":  "c:\\Waffle\\Projects\\Cogito\\CogiDrone\\python\\cv_training\\training.py",
+  "codePath":  "python\\cv_training\\training.py",
+  "codePathLocal":  "python\\cv_training\\training.py",
+  "git":  {
+    "remote":  "https://github.com/CogitoNTNU/CogiDrone",
+    "commit":  "298fe07051f7e7f4db823def4321e1b40649d5c8"
+  },
+  "email":  "muh.muwaffaq@gmail.com",
+  "root":  "C:\\Waffle\\Projects\\Cogito\\CogiDrone",
+  "host":  "WaffleMcTUF",
+  "executable":  "C:\\Waffle\\Projects\\Cogito\\CogiDrone\\.venv\\Scripts\\python.exe",
+  "cpu_count":  8,
+  "cpu_count_logical":  12,
+  "gpu":  "NVIDIA GeForce RTX 3060 Laptop GPU",
+  "gpu_count":  1,
+  "disk":  {
+    "/":  {
+      "total":  "999044747264",
+      "used":  "804328230912"
+    }
+  },
+  "memory":  {
+    "total":  "16782389248"
+  },
+  "gpu_nvidia":  [
+    {
+      "name":  "NVIDIA GeForce RTX 3060 Laptop GPU",
+      "memoryTotal":  "6442450944",
+      "cudaCores":  3840,
+      "architecture":  "Ampere",
+      "uuid":  "GPU-dbe368f0-fe2a-d600-b524-27c5c15d5c79"
+    }
+  ],
+  "cudaVersion":  "12.7",
+  "writerId":  "la1gfwdi9cc8cuvx8dutxyfzq1ygwa79"
+}

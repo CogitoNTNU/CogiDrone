@@ -1,3 +1,10 @@
+#Datasets
+python/dataset/
+
+#runs
+runs/
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -267,4 +274,13 @@ Thumbs.db
 toolchain.windows.config
 
 # 3rd party libraries
+# third-party/
+!third-party
 !vendored/**
+
+# ROS 2 / simulation
+ros2_ws/install/
+ros2_ws/log/
+rosbags/
+*.mcap
+*.db3
