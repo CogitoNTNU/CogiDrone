@@ -1,6 +1,8 @@
 #include "perception/models/person.h"
 
 
+// TODO: Organize magic numbers and strings
+
 namespace {
 // ? Must match the training data.yaml order EXACTLY. A reordered table does not
 // ? fail - it silently relabels every detection.
