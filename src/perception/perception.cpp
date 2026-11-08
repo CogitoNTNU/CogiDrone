@@ -176,6 +176,10 @@ cv::Mat Perception::toFrame(const sensor_msgs::msg::Image& msg) const {
 }
 
 Model::FusedDetections Perception::fuse(const cv::Mat& frame) {
+    // TODO: [#41] Reduce function call overhead by passing a preallocated  
+    //     : output vector to fill, or a pointer to the output buffer. 
+    // TODO: [#42] Address magic numbers/strings
+    // TODO: [#43] Use `emplace_back()` instead of `push_back()` to avoid a copy.
     Model::FusedDetections fused;
 
     // * 1. Persons on the full frame
@@ -244,6 +248,8 @@ Model::FusedDetections Perception::fuse(const cv::Mat& frame) {
 
 std::unique_ptr<vision_msgs::msg::Detection2DArray>
 Perception::toDetectionArray(const Model::FusedDetections& fused) const {
+    // TODO: [#42] Address magic numbers/strings
+    // TODO: [#43] Use `emplace_back()` instead of `push_back()` to avoid a copy.
     auto out = std::make_unique<vision_msgs::msg::Detection2DArray>();              // ? unique_ptr publish: zero-copy intra-process
 
     for (const Model::Detection& person : fused.persons) {
