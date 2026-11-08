@@ -2,7 +2,7 @@
 
 #include <string_view>
 
-
+ 
 Perception::~Perception() = default;
 
 std::expected<std::unique_ptr<Perception>, cogidrone::Error> Perception::create() {
