@@ -2,10 +2,10 @@
 # * CogiDrone - Jetson native build
 # ? Runs ON the Jetson. Builds the C++ binary and, when needed, the TensorRT
 # ? engine plans from the ONNX exports.
-# !
-# ! NOT the cross-compile path. `build.cross.sh` (or the `linux-arm64` preset)
-# ! is for building on a workstation to catch compile errors. This script
-# ! assumes aarch64 + JetPack, because TensorRT and CUDA are only present there.
+# ?
+# ! NOT the cross-compile path. The `linux-arm64` preset is for building on a
+# ! workstation to catch compile errors. This script assumes aarch64 + JetPack,
+# ! because TensorRT and CUDA are only present there.
 set -euo pipefail
 
 
@@ -40,7 +40,7 @@ BUILD_DIR="build/jetson"
 BINARY="$BUILD_DIR/src/cogidrone"
 MODELS_DIR="models"
 
-# ? The two models the follow mission needs. DepthAnything is deferred ([#38]).
+# ? The two models the follow mission needs. DepthAnything is deferred ([#40]).
 PERSON_ONNX="$MODELS_DIR/best.onnx"
 PERSON_ENGINE="$MODELS_DIR/best.engine"
 HEAD_ONNX="$MODELS_DIR/medium.onnx"
