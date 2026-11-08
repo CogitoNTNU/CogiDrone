@@ -2,44 +2,52 @@
 
 #include <expected>
 #include <memory>
+#include <string>
+#include <vector>
+
+#include <opencv2/core.hpp>
+
+#include "perception/models/models.h"
+#include "perception/models/yolo.h"
 
 
+// * Head model
+// ? Fine-tuned YOLO (models/medium.pt -> medium.onnx -> medium.engine) that
+// ? detects HEADS.
+// !
+// ! It runs on a PERSON CROP, not the full frame. That is deliberate: a head is
+// ? ~23 cm wide, so at 15 m it is a handful of pixels in a 640-wide frame. On a
+// ? crop it occupies a much larger fraction of the input, which is why the head
+// ? distance is the accurate one and the body distance is only a fallback.
+// !
+// ! KNOWN LIMIT: reliable to ~15 m. Beyond that the head is too few pixels for
+// ! the model to find, and the body estimate takes over. See prøblems.txt.
 class Head {
 private:
-    struct M { 
-        // TODO: [#19] Implement actual members for the model
-        /* 
-        engine, 
-        weights 
-        */
+    struct M {                                                                      // Assembly struct
+        Yolo yolo;
     } m;
 
     explicit Head(M&& m) : m(std::move(m)) {}
 
 public:
-    enum class InitError { 
-        ModelLoadFailed 
+    enum class InitError {
+        ModelLoadFailed,
     };
 
-    // Simplified factory: returns by value so head is movable, because it's a value type
-    // and the engine handle is moved, not copied. This makes it unobservable.
     [[nodiscard]] static std::expected<Head, InitError> create();
 
-    ~Head() = default;                                                                  // members clean up (engine handle)
+    ~Head() = default;                                                              // members clean up (TensorRT engine)
 
-    Head(Head&&) noexcept = default;                                                    // movable - engine handle transfers
-    Head& operator=(Head&&) noexcept = default;                                 
-    Head(const Head&) = delete;                                                         // still non-copyable (one engine)
+    Head(Head&&) noexcept = default;                                                // movable - engine transfers
+    Head& operator=(Head&&) noexcept = default;
+    Head(const Head&) = delete;                                                     // still non-copyable (one engine)
     Head& operator=(const Head&) = delete;
 
-    // TODO: [#19] Implement a detect method that takes a frame and returns detections.
-    //     : Pure computation: frame in, detections out.
-    // [[nodiscard]] std::vector</* type */> detect(const /* type */& frame);
-    // ! `const auto&`, not `auto`: an abbreviated template parameter deduced by
-    // ! value copies the whole sensor_msgs::Image (a 900 KB vector at 640x480x3)
-    // ! on every call. The real signature will be `const Frame&`.
-    [[nodiscard]] bool detect(const auto& frame) {
-        (void)frame;                                                                    // Suppress unused parameter warning
-        return true;                                                                    // | DEBUG: Stub implementation
-    }
+    // * Inference
+    // ! DOUBLE CHECK: return type
+    // ? `personCrop` is the person's bounding box, already cropped from the
+    // ? frame. Returns head boxes in the CROP's pixel coordinates - the caller
+    // ? must add the crop origin to map them back to the frame.
+    [[nodiscard]] std::vector<Model::Detection> detect(const cv::Mat& personCrop);
 };
