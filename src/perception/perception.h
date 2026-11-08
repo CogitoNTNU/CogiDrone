@@ -53,7 +53,6 @@ private:
         // ? A custom message becomes worth it only when we need something this
         // ? cannot express - a track ID, a covariance, or a typed pose enum.
         rclcpp::Publisher<vision_msgs::msg::Detection2DArray>::SharedPtr targetPublisher;
-        rclcpp::Publisher<vision_msgs::msg::Detection2DArray>::SharedPtr targetPublisher;
                 
         // Models
         Person         personModel;
