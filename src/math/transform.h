@@ -85,4 +85,30 @@ struct Transform {
     return bodyPositionWorld + rotate(bodyToWorld, cameraToBody(cameraPoint));
 }
 
+
+// * Compile-time proof
+// ? These are the two facts the whole camera->world chain rests on. If either
+// ? breaks, every detection is placed in the wrong frame and the drone follows
+// ? a ghost. A static_assert catches that at build time instead of in the air.
+// ?
+// ?   camera +z (forward)  ->  body +x (forward)
+// ?   camera +x (right)    ->  body +y (right)
+static_assert([] {
+    constexpr Vec3 FORWARD = cameraToWorld(
+        Vec3{0.0f, 0.0f, 1.0f},                                                     // camera: 1 m forward
+        Quat{},                                                                     // identity attitude
+        Vec3{}                                                                      // at the origin
+    );
+    return FORWARD.x == 1.0f && FORWARD.y == 0.0f && FORWARD.z == 0.0f;
+}(), "camera +z must map to body +x (forward)");
+
+static_assert([] {
+    constexpr Vec3 RIGHT = cameraToWorld(
+        Vec3{1.0f, 0.0f, 0.0f},                                                     // camera: 1 m right
+        Quat{},
+        Vec3{}
+    );
+    return RIGHT.x == 0.0f && RIGHT.y == 1.0f && RIGHT.z == 0.0f;
+}(), "camera +x must map to body +y (right)");
+
 } // namespace cogidrone

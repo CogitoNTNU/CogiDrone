@@ -20,6 +20,18 @@ struct Vec3 {
     [[nodiscard]] inline constexpr Vec3 operator-(const Vec3& o) const noexcept { return {x - o.x, y - o.y, z - o.z}; }
     [[nodiscard]] inline constexpr Vec3 operator*(float s) const noexcept { return {x*s, y*s, z*s}; }
     
+    // ? `std::sqrt()` IS constexpr as of ARM GCC 15.
+    // File: "arm-gnu-toolchain-15.3.rel1-mingw-w64-x86_64-aarch64-none-linux-gnu\aarch64-none-linux-gnu\include\c++\15.3.1\cmath"
+    /*
+        inline _GLIBCXX_CONSTEXPR float
+        sqrt(float __x)
+        { return __builtin_sqrtf(__x); }
+
+        inline _GLIBCXX_CONSTEXPR long double
+        sqrt(long double __x)
+        { return __builtin_sqrtl(__x); }
+   */
+    // ? We can therefore keep these functions as constexpr.
     [[nodiscard]] inline constexpr float norm() const noexcept { return std::sqrt(x*x + y*y + z*z); }
     [[nodiscard]] inline constexpr Vec3 normalized() const noexcept {                   // ? zero-safe
         const float N = norm();
