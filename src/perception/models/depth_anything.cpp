@@ -3,23 +3,14 @@
 
 
 std::expected<DepthAnything, DepthAnything::InitError> DepthAnything::create() {
-    // ! Fallible work FIRST: load engine, build context
+    // ! Fallible work FIRST: load the TensorRT plan
 
-    // TODO: [#19] Load the engine and weights, then fail if either is unavailable:
-    //     : if (!engine_ok) return std::unexpected(InitError::ModelLoadFailed);
+    // TODO: [#40] Load the engine and fail if it is unavailable:
+    //     : auto engine = TrtEngine::create("models/depth_anything_v2_small.engine",
+    //     :                                "pixel_values", "predicted_depth");
+    //     : if (!engine) return std::unexpected(InitError::ModelLoadFailed);
 
     return DepthAnything(M{ 
-        /* 
-        engine, 
-        weights 
-        */ 
+        .engine = nullptr                                                            // ? will be wired in [#40]
     });
 }
-
-// ??:
-// // DepthAnything::~DepthAnything() = default;                                                                // members clean up (engine handle)
-
-// std::vector<DepthAnything::Detection> DepthAnything::distance(const Frame& frame) {
-//     // preprocess -> infer -> decode
-//     return {};
-// }
