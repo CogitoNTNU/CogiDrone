@@ -32,6 +32,16 @@ struct Quat {
     float x = 0.0f;
     float y = 0.0f;
     float z = 0.0f;
+
+    // ? Hamilton product. Composition order: (a * b) applies b first, then a.
+    [[nodiscard]] inline constexpr Quat operator*(const Quat& o) const noexcept {
+        return Quat{
+            w * o.w - x * o.x - y * o.y - z * o.z,
+            w * o.x + x * o.w + y * o.z - z * o.y,
+            w * o.y - x * o.z + y * o.w + z * o.x,
+            w * o.z + x * o.y - y * o.x + z * o.w
+        };
+    }
 };
 
 
@@ -52,15 +62,6 @@ struct Quat {
     };
 }
 
-[[nodiscard]] inline constexpr Quat quaterionMultiply(const Quat& a, const Quat& b) noexcept {
-    // ? Hamilton product. Composition order: (a * b) applies b first, then a.
-    return Quat{
-        a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z,
-        a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
-        a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
-        a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w
-    };
-}
 
 [[nodiscard]] inline constexpr float yawOf(const Quat& q) noexcept {                    // ZYX yaw extraction
     return std::atan2(2.0f * (q.w * q.z + q.x * q.y),
