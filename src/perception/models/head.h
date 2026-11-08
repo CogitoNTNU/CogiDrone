@@ -14,12 +14,12 @@
 // * Head model
 // ? Fine-tuned YOLO (models/medium.pt -> medium.onnx -> medium.engine) that
 // ? detects HEADS.
-// !
+// ?
 // ! It runs on a PERSON CROP, not the full frame. That is deliberate: a head is
 // ? ~23 cm wide, so at 15 m it is a handful of pixels in a 640-wide frame. On a
 // ? crop it occupies a much larger fraction of the input, which is why the head
 // ? distance is the accurate one and the body distance is only a fallback.
-// !
+// ?
 // ! KNOWN LIMIT: reliable to ~15 m. Beyond that the head is too few pixels for
 // ! the model to find, and the body estimate takes over. See prøblems.txt.
 class Head {
@@ -46,6 +46,8 @@ public:
 
     // * Inference
     // ! DOUBLE CHECK: return type
+    // TODO: [#41] Reduce copy overhead by passing a preallocated
+    //     : output vector to fill, or a pointer to the output buffer.
     // ? `personCrop` is the person's bounding box, already cropped from the
     // ? frame. Returns head boxes in the CROP's pixel coordinates - the caller
     // ? must add the crop origin to map them back to the frame.

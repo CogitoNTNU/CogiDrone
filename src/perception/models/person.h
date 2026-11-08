@@ -47,6 +47,8 @@ public:
 
     // * Inference
     // ! DOUBLE CHECK: return type
+    // TODO: [#41] Reduce copy overhead by passing a preallocated
+    //     : output vector to fill, or a pointer to the output buffer.
     // ? Returns person boxes in the ORIGINAL frame's pixel coordinates.
     // ? `positionCamera` is NOT filled here - distance needs the head pass,
     // ? which is Perception's job (see fuse()).

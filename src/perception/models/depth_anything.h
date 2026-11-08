@@ -11,11 +11,11 @@
 // ? Relative monocular depth. NOT used for person distance - the follow mission
 // ? uses pinhole geometry from the head/body box height, which is more accurate
 // ? and needs no third inference per frame.
-// !
+// ?
 // ! WHAT IT IS FOR: relative depth of NON-PERSON objects, which is the raw
 // ! material for Representation's obstacle map ([#18]). On a RealSense the
 // ! hardware depth stream replaces it entirely.
-// !
+// ?
 // ! DEFERRED: [#40]. The framework is in place so the wiring does not have to
 // ! change when the implementation lands - same pattern as `representation`
 // ! being a nullptr_t in Drone::M.

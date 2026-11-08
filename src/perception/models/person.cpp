@@ -34,6 +34,8 @@ std::expected<Person, Person::InitError> Person::create() {
 }
 
 // ! DOUBLE CHECK: optimize?
+// TODO: [#41] Reduce copy overhead by passing a preallocated
+//     : output vector to fill, or a pointer to the output buffer.
 std::vector<Model::Detection> Person::detect(const cv::Mat& frame) {
     return m.yolo.detect(frame);
 }

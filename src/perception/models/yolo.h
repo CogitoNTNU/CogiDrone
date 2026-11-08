@@ -17,7 +17,7 @@
 // ? Shared inference for the two YOLO models (person + head). Both are
 // ? ultralytics exports with the same output layout, so the letterbox, decode,
 // ? and NMS are shared; only the weights, class table, and thresholds differ.
-// !
+// ?
 // ! OUTPUT LAYOUT (ultralytics ONNX export, no objectness, no NMS):
 // !   [1, 4 + numClasses, numAnchors]   e.g. [1, 10, 8400] for 6 classes
 // !   rows 0..3   = cx, cy, w, h   (pixels, in the LETTERBOXED 640x640 space)
