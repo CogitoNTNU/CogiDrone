@@ -50,7 +50,9 @@ add_executable(cogidrone
     perception/models/person.cpp
     perception/models/head.cpp
     perception/models/depth_anything.cpp
+
     perception/models/trt_engine.cpp
+    perception/models/yolo.cpp
 
     # Representation
     # TODO: [#18] Representation
