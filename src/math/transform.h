@@ -20,7 +20,7 @@
 // ?
 // ? BODY -> WORLD is the drone's attitude, which PX4 reports as a quaternion
 // ? in vehicle_attitude.q (w, x, y, z), body FRD -> world NED.
-// !
+// ?
 // ! The camera->body rotation below assumes the camera points FORWARD and is
 // ! mounted upright. A downward-facing or tilted mount needs its own rotation -
 // ! that is the mount extrinsic tracked by [#32].
@@ -30,6 +30,7 @@ namespace cogidrone {
 // * Transform
 // ? A rigid transform: rotate, then translate. `rotation` maps child -> parent,
 // ? `translation` is the child's origin expressed in the parent frame.
+// ? `Transform{}` is the identity: Quat defaults to (1,0,0,0), Vec3 to zero.
 struct Transform {
     Quat rotation;                                                                  // child -> parent
     Vec3 translation;                                                               // child origin, in parent frame
@@ -56,15 +57,15 @@ struct Transform {
 
 
 // * Composition
-[[nodiscard]] inline Vec3 apply(const Transform& transform, const Vec3& point) noexcept {
+[[nodiscard]] inline constexpr Vec3 apply(const Transform& transform, const Vec3& point) noexcept {
     return rotate(transform.rotation, point) + transform.translation;
 }
 
 // ? `child` is expressed in `parent`'s frame. The result maps grandchild ->
 // ? grandparent.
-[[nodiscard]] inline Transform compose(const Transform& parent, const Transform& child) noexcept {
+[[nodiscard]] inline constexpr Transform compose(const Transform& parent, const Transform& child) noexcept {
     return Transform{
-        .rotation = quaterionMultiply(parent.rotation, child.rotation),
+        .rotation = parent.rotation * child.rotation,
         .translation = apply(parent, child.translation)
     };
 }
@@ -76,7 +77,7 @@ struct Transform {
 // ? call site.
 // ?
 // ?   world = dronePosition + R_bodyToWorld * R_cameraToBody * cameraPoint
-[[nodiscard]] inline Vec3 cameraToWorld(
+[[nodiscard]] inline constexpr Vec3 cameraToWorld(
     const Vec3& cameraPoint,
     const Quat& bodyToWorld,                                                        // vehicle_attitude.q
     const Vec3& bodyPositionWorld                                                   // VehicleLocalPosition x, y, z
