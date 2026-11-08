@@ -2,9 +2,13 @@
 
 #include <expected>
 #include <memory>
+#include <string>
+
+#include <opencv2/core.hpp>
 
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/image.hpp"
+#include "sensor_msgs/msg/camera_info.hpp"
 #include "std_msgs/msg/string.hpp"
 #include "vision_msgs/msg/detection2_d_array.hpp"
 
@@ -16,7 +20,6 @@
 #include "logging.h"
 
 
-
 // ? Loaded ONCE in create() from the parameter server (defaults from
 // ? PerceptionParams). Override at startup with
 // ? `ros2 param set /perception image_topic <topic>` BEFORE the node spins.
@@ -26,6 +29,18 @@ struct PerceptionParams {
     // ? second camera, or SITL - the topic name is deployment-specific, which
     // ? is exactly why it is a parameter and not a constant.
     std::string imageTopic = "/camera/camera/color/image_raw";
+
+    // ? Camera intrinsics. realsense2_camera publishes these alongside the
+    // ? image; they are what turns a pixel offset into a bearing.
+    // ! The Python prototype used `focal_length = width * 0.8`, which is a
+    // ! guess. A wrong focal length is a wrong distance on EVERY detection, so
+    // ! the calibrated value from CameraInfo is used instead. See [#38].
+    std::string cameraInfoTopic = "/camera/camera/color/camera_info";
+
+    // ? Assumed real-world heights, used by the pinhole distance estimate.
+    // ? These are the two numbers the whole distance estimate rests on.
+    float averageHumanHeight = 1.70f;                                                   // metres
+    float averageHeadHeight  = 0.23f;                                                   // metres
 };
 
 
@@ -36,7 +51,8 @@ private:
         rclcpp::Node::SharedPtr node;
 
         // Subscriptions
-        rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr imageSubscription;     // Subscription for camera images
+        rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr imageSubscription;           // Subscription for camera images
+        rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr cameraInfoSubscription; // Intrinsics, latched
         
         // Publishers
         // ? CONTRACT: this topic carries PERSON detections only. Navigation takes
@@ -57,11 +73,26 @@ private:
         // Models
         Person         personModel;
         Head           headModel;
-        DepthAnything  depthAnythingModel;
+        DepthAnything  depthAnythingModel;                                          // ? deferred - see [#40]
 
         // Parameters
-        PerceptionParams params;                                                        // ? Loaded once in create(); not retuned at runtime
+        PerceptionParams params;                                                    // ? Loaded once in create(); not retuned at runtime
     } m;
+
+    // * Runtime state
+    // ? Written by onCameraInfo() (subscription thread), read by onFrame()
+    // ? (subscription thread). Both are in the node's default MutuallyExclusive
+    // ? group, so the executor serializes them - no mutex needed.
+    // ! Until the first CameraInfo arrives, `focalLength` is 0 and every
+    // ! distance would be 0. onFrame() refuses to publish until it is set.
+    float focalLength = 0.0f;                                                       // pixels, from CameraInfo.K[0]
+    float principalX = 0.0f;                                                        // pixels, from CameraInfo.K[2]
+    float principalY = 0.0f;                                                        // pixels, from CameraInfo.K[5]
+
+    // ? One-shot guard so the "no intrinsics" warning is logged once, not at
+    // ? camera rate. A silent early return is a debugging trap: the node looks
+    // ? alive but publishes nothing.
+    bool intrinsicsMissingLogged = false;
 
     // * Default ctor
     explicit Perception(M&& m) : m(std::move(m)) {}                                     // No default ctor exposed;  
@@ -69,16 +100,28 @@ private:
 
     // * Callbacks
     void onFrame(const sensor_msgs::msg::Image& msg);                                   // Callback for camera images
+    void onCameraInfo(const sensor_msgs::msg::CameraInfo& msg);                         // Intrinsics
 
     // * Helpers
-    // ? Two stages, deliberately separate:
-    // ?   fuse()             - pure, no ROS types. Bundles every model's output
-    // ?                        for one frame. Testable without a ROS graph.
-    // ?   toDetectionArray() - the ROS boundary. Converts the bundle into the
+    // ? Three stages, deliberately separate:
+    // ?   toFrame()           - ROS -> OpenCV. The only place that knows about
+    // ?                        sensor_msgs.
+    // ?   fuse()              - pure, no ROS types. Person boxes + head boxes +
+    // ?                        pinhole distance -> camera-frame positions.
+    // ?                        Testable without a ROS graph.
+    // ?   toDetectionArray()  - the ROS boundary. Converts the bundle into the
     // ?                        wire format Navigation consumes.
-    [[nodiscard]] Model::FusedDetections fuse(/* const ref something */) const;
-    [[nodiscard]] std::unique_ptr<vision_msgs::msg::Detection2DArray> 
+    [[nodiscard]] cv::Mat toFrame(const sensor_msgs::msg::Image& msg) const;
+    [[nodiscard]] Model::FusedDetections fuse(const cv::Mat& frame);
+    [[nodiscard]] std::unique_ptr<vision_msgs::msg::Detection2DArray>
     toDetectionArray(const Model::FusedDetections& fused) const;
+
+    // * Distance
+    // ? Pinhole geometry: a known real-world height and its pixel height give
+    // ? the distance. This is the ONLY distance source for persons - the depth
+    // ? map is not involved.
+    // ?   distance = (realHeight * focalLength) / pixelHeight
+    [[nodiscard]] float distanceFromPixelHeight(float realHeight, float pixelHeight) const;
     
 public:
     // * Ctors & dtor
@@ -93,6 +136,4 @@ public:
 
     // * Accessors
     [[nodiscard]] inline rclcpp::Node::SharedPtr node() const noexcept { return m.node; }
-    
-    
 };
