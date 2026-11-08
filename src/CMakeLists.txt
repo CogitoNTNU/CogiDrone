@@ -21,6 +21,23 @@ file(GLOB _ros_lib_dirs ${CMAKE_SOURCE_DIR}/vendored/ros2/opt/ros/jazzy/lib)
 #     find_package(px4_msgs REQUIRED)
 # endif()
 
+
+# * Perception dependencies
+# ? TensorRT, CUDA, and OpenCV all ship with JetPack - nothing is vendored.
+# ? `nvinfer` is the inference runtime. `nvonnxparser` is NOT needed: engines
+# ? are built offline with trtexec, not parsed from ONNX at runtime.
+# !
+# ! GUARDED BY `NOT MSVC`. The Windows cross-build exists only to catch compile
+# ! errors, and TensorRT/CUDA/OpenCV are not present there. Consequence, stated
+# ! plainly: the Windows build no longer covers the perception models. The
+# ! Jetson build is the only build that compiles them.
+if(NOT MSVC)
+    find_package(CUDAToolkit REQUIRED)
+    find_library(_nvinfer_lib nvinfer REQUIRED)
+    find_package(OpenCV REQUIRED COMPONENTS core imgproc)
+endif()
+
+
 # * Sources
 add_executable(cogidrone
     # Application
@@ -47,12 +64,28 @@ add_executable(cogidrone
     logging.cpp
 )
 
+# ? The TensorRT-backed sources only exist where TensorRT exists.
+if(NOT MSVC)
+    target_sources(cogidrone PRIVATE
+        perception/models/trt_engine.cpp
+        perception/models/yolo.cpp
+    )
+endif()
+
+
 # * Include
 target_include_directories(cogidrone PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${_ros_include_dirs}
     ${_px4_include_dir}                                                             
 )
+
+if(NOT MSVC)
+    target_include_directories(cogidrone PRIVATE
+        /usr/include/aarch64-linux-gnu                                                  # TensorRT headers
+        ${OpenCV_INCLUDE_DIRS}
+    )
+endif()
 
 
 # * Link
@@ -81,6 +114,14 @@ target_link_libraries(cogidrone PRIVATE
     px4_msgs__rosidl_typesupport_introspection_cpp px4_msgs__rosidl_typesupport_introspection_c
 )
 
+if(NOT MSVC)
+    target_link_libraries(cogidrone PRIVATE
+        ${_nvinfer_lib}
+        CUDA::cudart
+        ${OpenCV_LIBS}
+    )
+endif()
+
 target_link_options(cogidrone PRIVATE
     "-Wl,-rpath-link,${CMAKE_SOURCE_DIR}/vendored/ros2/opt/ros/jazzy/lib"
     "-Wl,-rpath-link,${CMAKE_SOURCE_DIR}/vendored/ros2/usr/lib/aarch64-linux-gnu"
@@ -90,6 +131,8 @@ target_link_options(cogidrone PRIVATE
     # "-Wl,--allow-shlib-undefined"
 )
 
+# TODO: [#33] Remove if ament/colcon is never used. Kept as a fallback for a native
+#     : Jetson build with a sourced ROS environment.
 # if(DEFINED ENV{AMENT_PREFIX_PATH})
 #     ament_target_dependencies(cogidrone px4_msgs)
 # endif()
@@ -102,9 +145,3 @@ if(MSVC)
 else()
     target_compile_options(cogidrone PRIVATE -Wall -Wextra -Wpedantic)
 endif()
-
-# TODO: [#33] Remove if ament/colcon is never used. Kept as a fallback for a native
-#     : Jetson build with a sourced ROS environment.
-# if(DEFINED ENV{AMENT_PREFIX_PATH})
-#     ament_target_dependencies(cogidrone px4_msgs)
-# endif()
