@@ -159,7 +159,7 @@ std::vector<Model::Detection> Yolo::detect(const cv::Mat& frame) {
 
     const std::size_t NUM_ROWS    = SHAPE[1];
     const std::size_t NUM_ANCHORS = SHAPE[2];
-    if (NUM_ROWS < 5) return {};                                                    // ? 4 box + at least 1 class
+    if (NUM_ROWS < 5) return {};                                                        // ? 4 box + at least 1 class
 
     const std::size_t NUM_CLASSES = NUM_ROWS - 4;
 

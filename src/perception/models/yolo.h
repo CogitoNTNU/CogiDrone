@@ -27,13 +27,13 @@
 // ! swap its index arithmetic.
 class Yolo {
 private:
-    struct M {                                                                      // Assembly struct
+    struct M {                                                                          // Assembly struct
         TrtEngine engine;
         int inputWidth = 640;
         int inputHeight = 640;
         float confidenceThreshold = 0.25f;
         float iouThreshold = 0.45f;
-        std::span<const std::string_view> classNames;                               // ? must outlive the model
+        std::span<const std::string_view> classNames;                                   // ? must outlive the model
     } m;
 
     explicit Yolo(M&& m) : m(std::move(m)) {}
@@ -54,9 +54,9 @@ public:
 
     ~Yolo() = default;
 
-    Yolo(Yolo&&) noexcept = default;                                                // movable - engine transfers
+    Yolo(Yolo&&) noexcept = default;                                                    // movable - engine transfers
     Yolo& operator=(Yolo&&) noexcept = default;
-    Yolo(const Yolo&) = delete;                                                     // non-copyable (one engine)
+    Yolo(const Yolo&) = delete;                                                         // non-copyable (one engine)
     Yolo& operator=(const Yolo&) = delete;
 
     // * Inference
