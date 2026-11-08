@@ -1,3 +1,6 @@
+> [!CAUTION]
+> **THIS NOTE IS OUTDATED!**
+
 ### Perception 
 - IMU: acceleration + rotation
 - Cameras: visual information
