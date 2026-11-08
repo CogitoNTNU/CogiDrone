@@ -1,25 +1,40 @@
 #include "perception/models/person.h"
 
 
+namespace {
+// ? Must match the training data.yaml order EXACTLY. A reordered table does not
+// ? fail - it silently relabels every detection.
+constexpr std::array<std::string_view, 6> SR_CLASS_NAMES = {
+    "running",
+    "walking",
+    "laying_down",
+    "human_not_defined",
+    "seated",
+    "stands",
+};
+} // namespace
+
 
 std::expected<Person, Person::InitError> Person::create() {
-    // ! Fallible work FIRST: load engine, build context
+    // ! Fallible work FIRST: load the TensorRT plan
+    auto yolo = Yolo::create(
+        "models/best.engine",                                                           // TODO: [#35] path from a parameter
+        640,
+        640,
+        0.20f,                                                                          // ? CONF_THRESHOLD from depth_final.py
+        0.45f,
+        classNames()
+    );
 
-    // TODO: [#19] Load the engine and weights, then fail if either is unavailable:
-    //     : if (!engine_ok) return std::unexpected(InitError::ModelLoadFailed);
+    if (!yolo) return std::unexpected(InitError::ModelLoadFailed);
 
-    return Person(M{ 
-        /* 
-        engine, 
-        weights 
-        */ 
-    });
+    return Person(M{ .yolo = std::move(*yolo) });
 }
 
-// ??:
-// // Person::~Person() = default;                                                                // members clean up (engine handle)
+std::vector<Model::Detection> Person::detect(const cv::Mat& frame) {
+    return m.yolo.detect(frame);
+}
 
-// std::vector<Person::Detection> Person::detect(const Frame& frame) {
-//     // preprocess -> infer -> decode
-//     return {};
-// }
+std::span<const std::string_view> Person::classNames() noexcept {
+    return SR_CLASS_NAMES;
+}
