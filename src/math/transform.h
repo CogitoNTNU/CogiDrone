@@ -32,8 +32,8 @@ namespace cogidrone {
 // ? `translation` is the child's origin expressed in the parent frame.
 // ? `Transform{}` is the identity: Quat defaults to (1,0,0,0), Vec3 to zero.
 struct Transform {
-    Quat rotation;                                                                  // child -> parent
-    Vec3 translation;                                                               // child origin, in parent frame
+    Quat rotation;                                                                      // child -> parent
+    Vec3 translation;                                                                   // child origin, in parent frame
 };
 
 
@@ -79,8 +79,8 @@ struct Transform {
 // ?   world = dronePosition + R_bodyToWorld * R_cameraToBody * cameraPoint
 [[nodiscard]] inline constexpr Vec3 cameraToWorld(
     const Vec3& cameraPoint,
-    const Quat& bodyToWorld,                                                        // vehicle_attitude.q
-    const Vec3& bodyPositionWorld                                                   // VehicleLocalPosition x, y, z
+    const Quat& bodyToWorld,                                                            // vehicle_attitude.q
+    const Vec3& bodyPositionWorld                                                       // VehicleLocalPosition x, y, z
 ) noexcept {
     return bodyPositionWorld + rotate(bodyToWorld, cameraToBody(cameraPoint));
 }
