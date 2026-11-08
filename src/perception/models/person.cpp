@@ -33,6 +33,7 @@ std::expected<Person, Person::InitError> Person::create() {
     return Person(M{ .yolo = std::move(*yolo) });
 }
 
+// ! DOUBLE CHECK: optimize?
 std::vector<Model::Detection> Person::detect(const cv::Mat& frame) {
     return m.yolo.detect(frame);
 }
