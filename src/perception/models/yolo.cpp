@@ -6,6 +6,8 @@
 #include <opencv2/imgproc.hpp>
 
 
+// TODO: [#42] Address magic numbers/strings
+
 // * Letterbox
 namespace {
 // ? YOLO was trained on square, letterboxed inputs: the frame is scaled to fit

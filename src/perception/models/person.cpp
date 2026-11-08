@@ -1,7 +1,7 @@
 #include "perception/models/person.h"
 
 
-// TODO: Organize magic numbers and strings
+// TODO: [#42] Address magic numbers/strings
 
 namespace {
 // ? Must match the training data.yaml order EXACTLY. A reordered table does not

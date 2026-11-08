@@ -1,7 +1,7 @@
 #include "perception/models/head.h"
 
 
-// TODO: Organize magic numbers and strings
+// TODO: [#42] Address magic numbers/strings
 
 namespace {
 // ? The head model is single-class. The name is unused for logic but keeps the

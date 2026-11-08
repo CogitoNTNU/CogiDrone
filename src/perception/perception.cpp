@@ -1,31 +1,32 @@
 #include "perception.h"
 
 #include <string_view>
+#include <algorithm>
 
- 
+#include <opencv2/imgproc.hpp>
+
+
 Perception::~Perception() = default;
 
 std::expected<std::unique_ptr<Perception>, cogidrone::Error> Perception::create() {
     using namespace std::literals::string_view_literals;                                // ? for "sv" suffix
     
     // * Failable work: Model loads
-    // Person model
     auto personModel = Model::load<Person>("Person model load failed!"sv);
     if (!personModel) return std::unexpected(std::move(personModel.error()));
     cogidrone::log(LOGGING_LEVEL::INFO, "Person model loaded successfully");
 
-    // Head model
     auto headModel = Model::load<Head>("Head model load failed!"sv);
     if (!headModel) return std::unexpected(std::move(headModel.error()));
     cogidrone::log(LOGGING_LEVEL::INFO, "Head model loaded successfully");
 
-    // DepthAnything model
+    // ? DepthAnything is deferred - see [#40]. It is not used for person
+    // ? distance, so the follow mission does not need it.
     auto depthAnythingModel = Model::load<DepthAnything>("DepthAnything model load failed!"sv);
     if (!depthAnythingModel) return std::unexpected(std::move(depthAnythingModel.error()));
     cogidrone::log(LOGGING_LEVEL::INFO, "DepthAnything model loaded successfully");
 
     // * ROS2
-    // Node
     auto node = std::make_shared<rclcpp::Node>(
         "perception",
         rclcpp::NodeOptions().use_intra_process_comms(true)
@@ -35,7 +36,10 @@ std::expected<std::unique_ptr<Perception>, cogidrone::Error> Perception::create(
 
     // * Parameters (non-failable: defaults live in PerceptionParams)
     PerceptionParams params;
-    params.imageTopic = node->declare_parameter("image_topic", params.imageTopic);
+    params.imageTopic         = node->declare_parameter("image_topic", params.imageTopic);
+    params.cameraInfoTopic    = node->declare_parameter("camera_info_topic", params.cameraInfoTopic);
+    params.averageHumanHeight = node->declare_parameter("average_human_height", params.averageHumanHeight);
+    params.averageHeadHeight  = node->declare_parameter("average_head_height", params.averageHeadHeight);
 
     cogidrone::log(LOGGING_LEVEL::INFO, "Perception parameters initialized successfully");
 
@@ -45,13 +49,14 @@ std::expected<std::unique_ptr<Perception>, cogidrone::Error> Perception::create(
     // ! the lambda capture of the subscription callback. This is because the subscription callback needs to capture the 
     // ! perception object in order to invoke it's member methods without copying. Therefore, since i have to use a two-
     // ! step construction process anyway, it is better to initialize the object here and call a `wire()` method to connect 
-    // ! the subscribers and publishers, rather than relying on the caller to do it (the Drone) manually.
+    // ! the subscribers and publishers, rather than relying on the caller (the Drone) to do it manually.
     // * Partial assembly
     auto p = std::unique_ptr<Perception>(
         new Perception(M{                                                               // ? Transfer ownership into unique_ptr as ctor is private
             // ROS2
             .node = std::move(node),
             .imageSubscription = nullptr,                                               // ? will be wired later
+            .cameraInfoSubscription = nullptr,                                          // ? will be wired later
             .targetPublisher = nullptr,                                                 // ? will be wired later
             // Models
             .personModel = std::move(*personModel),
@@ -63,11 +68,9 @@ std::expected<std::unique_ptr<Perception>, cogidrone::Error> Perception::create(
     );
     cogidrone::log(LOGGING_LEVEL::INFO, "Perception object partially constructed");
 
-    // Wire the node
     p->wire();                                      
     cogidrone::log(LOGGING_LEVEL::INFO, "Perception object wired successfully");
 
-    // * Return the fully constructed Perception object
     return p;
 }
 
@@ -80,29 +83,55 @@ void Perception::wire() noexcept {
         }                                                                               // ! would therefore cause a dangling pointer as the `this` adress would be 
     );                                                                                  // ! invalid. Fix: make perception non-movable and owned via a unique_ptr
 
-    // TODO: [#22] Decide the wire format - see the note on `M::targetPublisher`.
+    // ? Intrinsics are latched: they are published once and never change for a
+    // ? fixed camera configuration. `transient_local` means a late-joining
+    // ? Perception still receives the last one.
+    m.cameraInfoSubscription = m.node->create_subscription<sensor_msgs::msg::CameraInfo>(
+        m.params.cameraInfoTopic,
+        rclcpp::QoS(1).transient_local(),
+        [this](const sensor_msgs::msg::CameraInfo& msg) {
+            this->onCameraInfo(msg);
+        }
+    );
+
     m.targetPublisher = m.node->create_publisher<vision_msgs::msg::Detection2DArray>(
         "/perception/detections",
         rclcpp::QoS(10)
     );
 }
 
-// * Callbacks
-void Perception::onFrame(const sensor_msgs::msg::Image& msg) {
-    // TODO: [#20] Implement a toFrame() conversion from sensor_msgs::Image to each
-    //     : model's expected input (resize, normalise, layout).
-    const auto PEOPLE    = m.personModel.detect(/* toFrame */(msg));
-    const auto HEADS     = m.headModel.detect(/* toFrame */(msg));
-    const auto DISTANCES = m.depthAnythingModel.distance(/* toFrame */(msg));
 
-    // TODO: [#21] These fused detections are NOT meant to be published yet.
-    //     : FusedDetections should bundle every model's output for each frame
-    //     : (all people, all heads, and the depth heatmap). We then have to
-    //     : calculate the 3D position of each detected person and head using
-    //     : the depth heatmap, AND THEN publish the final fused detections.
-    //     : IMPORTANT: PERCEPTION SHOULD PUBLISH AN EMPTY DETECTION IF NO
-    //     : PEOPLE ARE DETECTED.
-    const auto FUSED = fuse(/* PEOPLE, HEADS, DISTANCES */);
+// * Callbacks
+void Perception::onCameraInfo(const sensor_msgs::msg::CameraInfo& msg) {
+    // TODO: [#42] Address magic numbers/strings
+    // ? K is row-major 3x3: [fx 0 cx; 0 fy cy; 0 0 1].
+    // ? fx and fy are equal for a square-pixel sensor, but read both and use
+    // ? fx for horizontal and fy for vertical if they ever diverge.
+    focalLength = static_cast<float>(msg.k[0]);
+    principalX  = static_cast<float>(msg.k[2]);
+    principalY  = static_cast<float>(msg.k[5]);
+
+    cogidrone::log(LOGGING_LEVEL::INFO, "Camera intrinsics received");
+}
+
+void Perception::onFrame(const sensor_msgs::msg::Image& msg) {
+    // ! No intrinsics yet: every distance would be 0, and Navigation would
+    // ! follow a person who is always at the camera. Refuse to publish.
+    // ! This is NOT a crash - the watchdog in Navigation will see silence and
+    // ! hold position, which is the correct behaviour.
+    if (focalLength <= 0.0f) {
+        if (!intrinsicsMissingLogged) {
+            intrinsicsMissingLogged = true;
+            cogidrone::log(LOGGING_LEVEL::WARNING,
+                "No camera intrinsics yet - not publishing detections");
+        }
+        return;
+    }
+
+    const cv::Mat FRAME = toFrame(msg);
+    if (FRAME.empty()) return;
+
+    const Model::FusedDetections FUSED = fuse(FRAME);
 
     // ! Publish UNCONDITIONALLY. An empty array is the "no person in this frame"
     // ! signal Navigation's Policy A depends on, AND the heartbeat that keeps
@@ -111,24 +140,153 @@ void Perception::onFrame(const sensor_msgs::msg::Image& msg) {
     m.targetPublisher->publish(toDetectionArray(FUSED));
 }
 
+
 // * Helpers
-[[nodiscard]] Model::FusedDetections Perception::fuse(/* const ref something */) const {
-    // TODO: [#21] Real fusion once the models return detections instead of `bool`.
-    return Model::FusedDetections{};
+cv::Mat Perception::toFrame(const sensor_msgs::msg::Image& msg) const {
+    // ? sensor_msgs::Image is a raw byte buffer with a stride. OpenCV needs a
+    // ? Mat that wraps it without copying, then a clone because the message is
+    // ? released when the callback returns.
+    // ! `step` is NOT always width * channels - the publisher may pad rows.
+    // ! Using width * channels directly produces a sheared image.
+    const bool IS_RGB = (msg.encoding == "rgb8");
+    const bool IS_BGR = (msg.encoding == "bgr8");
+
+    if (!IS_RGB && !IS_BGR) {
+        cogidrone::log(LOGGING_LEVEL::WARNING, "Unsupported image encoding");
+        return {};
+    }
+
+    cv::Mat wrapped(
+        static_cast<int>(msg.height),
+        static_cast<int>(msg.width),
+        CV_8UC3,
+        const_cast<uint8_t*>(msg.data.data()),                                      // ? OpenCV's API predates const-correctness
+        static_cast<std::size_t>(msg.step)
+    );
+
+    cv::Mat frame = wrapped.clone();
+
+    // ? The models were trained on BGR (OpenCV default). realsense2_camera
+    // ? publishes rgb8 by default, so convert.
+    if (IS_RGB) {
+        cv::cvtColor(frame, frame, cv::COLOR_RGB2BGR);
+    }
+
+    return frame;
 }
 
-[[nodiscard]] std::unique_ptr<vision_msgs::msg::Detection2DArray>
-Perception::toDetectionArray(const Model::FusedDetections& fused) const {
-    auto out = std::make_unique<vision_msgs::msg::Detection2DArray>();                  // ? unique_ptr publish: zero-copy intra-process
+Model::FusedDetections Perception::fuse(const cv::Mat& frame) {
+    Model::FusedDetections fused;
 
-    // TODO: [#21] For each fused person, append a Detection2D with:
-    //     :   results[0].hypothesis.class_id = "person"
-    //     :   results[0].hypothesis.score    = confidence
-    //     :   results[0].pose.pose.position  = camera-frame XYZ (needs depth + intrinsics)
-    //     :   bbox                           = pixel box
-    // ?
-    // ? Until then this returns an empty array, which is the correct
-    // ? "no person detected" message - not a placeholder.
-    (void)fused;
+    // * 1. Persons on the full frame
+    const std::vector<Model::Detection> PERSONS = m.personModel.detect(frame);
+
+    for (const Model::Detection& person : PERSONS) {
+        // * 2. Head on the person crop
+        // ? Clamp the crop to the frame: a box can extend past the edge when a
+        // ? person is partially out of view.
+        const int X1 = std::max(0, static_cast<int>(person.bbox[0]));
+        const int Y1 = std::max(0, static_cast<int>(person.bbox[1]));
+        const int X2 = std::min(frame.cols, static_cast<int>(person.bbox[2]));
+        const int Y2 = std::min(frame.rows, static_cast<int>(person.bbox[3]));
+
+        if (X2 <= X1 || Y2 <= Y1) continue;                                         // ? Degenerate box
+
+        const cv::Mat CROP = frame(cv::Rect(X1, Y1, X2 - X1, Y2 - Y1));
+        const std::vector<Model::Detection> HEADS = m.headModel.detect(CROP);
+
+        // * 3. Distance: head preferred, body fallback
+        // ? This is the whole reason the head model exists. A head is ~23 cm
+        // ? wide, so its pixel height gives a much better distance than the
+        // ? body's, which assumes a 1.70 m person regardless of who they are.
+        // ? See prøblems.txt: body is "whack" at range, head is good to ~15 m.
+        float distance = 0.0f;
+
+        if (!HEADS.empty()) {
+            // ? Highest-confidence head, matching the Python prototype.
+            const auto BEST_HEAD = std::max_element(
+                HEADS.begin(), HEADS.end(),
+                [](const Model::Detection& a, const Model::Detection& b) {
+                    return a.confidence < b.confidence;
+                }
+            );
+
+            const float HEAD_PIXEL_HEIGHT = BEST_HEAD->bbox[3] - BEST_HEAD->bbox[1];
+            distance = distanceFromPixelHeight(m.params.averageHeadHeight, HEAD_PIXEL_HEIGHT);
+        }
+
+        if (distance <= 0.0f) {
+            const float BODY_PIXEL_HEIGHT = person.bbox[3] - person.bbox[1];
+            distance = distanceFromPixelHeight(m.params.averageHumanHeight, BODY_PIXEL_HEIGHT);
+        }
+
+        if (distance <= 0.0f) continue;                                             // ? No usable height
+
+        // * 4. Camera-frame position
+        // ? The box centre's pixel offset from the principal point, scaled by
+        // ? distance / focalLength, gives the lateral offset in metres. This is
+        // ? `offset_in_meters()` from depth_head.py.
+        const float CENTER_X = (person.bbox[0] + person.bbox[2]) / 2.0f;
+        const float CENTER_Y = (person.bbox[1] + person.bbox[3]) / 2.0f;
+
+        Model::Detection fusedPerson = person;
+        fusedPerson.positionCamera = cogidrone::Vec3{
+            (CENTER_X - principalX) * distance / focalLength,                       // x: right
+            (CENTER_Y - principalY) * distance / focalLength,                       // y: down
+            distance                                                                // z: forward
+        };
+
+        fused.persons.push_back(fusedPerson);
+    }
+
+    return fused;
+}
+
+std::unique_ptr<vision_msgs::msg::Detection2DArray>
+Perception::toDetectionArray(const Model::FusedDetections& fused) const {
+    auto out = std::make_unique<vision_msgs::msg::Detection2DArray>();              // ? unique_ptr publish: zero-copy intra-process
+
+    for (const Model::Detection& person : fused.persons) {
+        vision_msgs::msg::Detection2D detection;
+
+        // ? bbox is centre + size, not corners.
+        detection.bbox.center.position.x = (person.bbox[0] + person.bbox[2]) / 2.0;
+        detection.bbox.center.position.y = (person.bbox[1] + person.bbox[3]) / 2.0;
+        detection.bbox.size_x = person.bbox[2] - person.bbox[0];
+        detection.bbox.size_y = person.bbox[3] - person.bbox[1];
+
+        vision_msgs::msg::ObjectHypothesisWithPose hypothesis;
+        hypothesis.hypothesis.class_id = "person";                                  // ? CONTRACT: always "person"
+        hypothesis.hypothesis.score = person.confidence;
+
+        // ? Camera-frame position. Navigation converts to world NED via
+        // ? cogidrone::cameraToWorld() - see math/transform.h and [#32].
+        hypothesis.pose.pose.position.x = person.positionCamera.x;
+        hypothesis.pose.pose.position.y = person.positionCamera.y;
+        hypothesis.pose.pose.position.z = person.positionCamera.z;
+
+        detection.results.push_back(hypothesis);
+
+        // ? The pose class travels in `id`, not `class_id`, so Navigation can
+        // ? use it later without breaking the "person only" contract.
+        const auto CLASS_NAMES = Person::classNames();
+        if (person.classId >= 0 && static_cast<std::size_t>(person.classId) < CLASS_NAMES.size()) {
+            detection.id = std::string(CLASS_NAMES[static_cast<std::size_t>(person.classId)]);
+        }
+
+        out->detections.push_back(std::move(detection));
+    }
+
     return out;
+}
+
+
+// * Distance
+float Perception::distanceFromPixelHeight(float realHeight, float pixelHeight) const {
+    // ? Pinhole: an object of known real height h at distance d projects to
+    // ? h * f / d pixels. Inverting gives d = h * f / pixelHeight.
+    // ! A zero or negative pixel height means the box is degenerate - return 0
+    // ! so the caller falls through to the other estimate.
+    if (pixelHeight <= 0.0f) return 0.0f;
+    return (realHeight * focalLength) / pixelHeight;
 }

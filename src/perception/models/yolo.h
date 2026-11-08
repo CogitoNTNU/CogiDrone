@@ -13,6 +13,8 @@
 #include "perception/models/trt_engine.h"
 
 
+// TODO: [#42] Address magic numbers/strings
+
 // * YOLO
 // ? Shared inference for the two YOLO models (person + head). Both are
 // ? ultralytics exports with the same output layout, so the letterbox, decode,

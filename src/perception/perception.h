@@ -20,6 +20,7 @@
 #include "logging.h"
 
 
+
 // ? Loaded ONCE in create() from the parameter server (defaults from
 // ? PerceptionParams). Override at startup with
 // ? `ros2 param set /perception image_topic <topic>` BEFORE the node spins.
