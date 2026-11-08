@@ -103,6 +103,7 @@ public:
     TrtEngine& operator=(const TrtEngine&) = delete;
 
     // * Inference
+    // ! DOUBLE CHECK:
     // TODO: Reduce copy overhead by passing a preallocated output vector to fill, or a pointer to the output buffer.
     // ? Copies `input` to the device, runs the engine, copies the output back.
     // ? Returns the output as a flat float vector; the caller reshapes using
