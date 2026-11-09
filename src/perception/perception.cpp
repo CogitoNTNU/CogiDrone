@@ -254,7 +254,6 @@ void Perception::fuse(const cv::Mat& frame, std::vector<Model::Detection>& out) 
 std::unique_ptr<vision_msgs::msg::Detection2DArray>
 Perception::toDetectionArray(const std::vector<Model::Detection>& fused) const {
     // TODO: [#42] Address magic numbers/strings
-    // TODO: [#43] Use `emplace_back()` instead of `push_back()` to avoid a copy.
     auto out = std::make_unique<vision_msgs::msg::Detection2DArray>();              // ? unique_ptr publish: zero-copy intra-process
 
     // ? One allocation for the message itself is unavoidable: `publish()` takes
@@ -263,7 +262,16 @@ Perception::toDetectionArray(const std::vector<Model::Detection>& fused) const {
     out->detections.reserve(fused.size());
 
     for (const Model::Detection& person : fused) {
-        vision_msgs::msg::Detection2D detection;
+        // ? `emplace_back()` default-constructs IN PLACE and returns a reference
+        // ? (C++17). Filling through that reference avoids the move that
+        // ? `push_back(std::move(local))` would perform - and a ROS message
+        // ? move is not free: `PoseWithCovariance` holds a `std::array<double, 36>`
+        // ? which arrays cannot move, only copy.
+        // ?
+        // ! The reference is valid only until the NEXT `emplace_back()` on the
+        // ! same vector. Every field below is written before the loop advances,
+        // ! so it is never used after a potential reallocation.
+        auto& detection = out->detections.emplace_back();
 
         // ? bbox is centre + size, not corners.
         detection.bbox.center.position.x = (person.bbox[0] + person.bbox[2]) / 2.0;
@@ -271,10 +279,10 @@ Perception::toDetectionArray(const std::vector<Model::Detection>& fused) const {
         detection.bbox.size_x = person.bbox[2] - person.bbox[0];
         detection.bbox.size_y = person.bbox[3] - person.bbox[1];
 
-        // TODO: [#43] Use `emplace_back()` instead of `push_back()` to avoid 
-        //     : temporary construction of the hypothesis object. This is a copy, 
-        //     : and we can avoid it by constructing the object in place.
-        vision_msgs::msg::ObjectHypothesisWithPose hypothesis;
+        // ? Same reasoning: construct the hypothesis in place, fill through the
+        // ? reference. `detection.results` has exactly one element, so this
+        // ? never reallocates and the reference stays valid.
+        auto& hypothesis = detection.results.emplace_back();
         hypothesis.hypothesis.class_id = "person";                                  // ? CONTRACT: always "person"
         hypothesis.hypothesis.score = person.confidence;
 
@@ -284,16 +292,12 @@ Perception::toDetectionArray(const std::vector<Model::Detection>& fused) const {
         hypothesis.pose.pose.position.y = person.positionCamera.y;
         hypothesis.pose.pose.position.z = person.positionCamera.z;
 
-        detection.results.push_back(std::move(hypothesis));
-
         // ? The pose class travels in `id`, not `class_id`, so Navigation can
         // ? use it later without breaking the "person only" contract.
         const auto CLASS_NAMES = Person::classNames();
         if (person.classId >= 0 && static_cast<std::size_t>(person.classId) < CLASS_NAMES.size()) {
             detection.id = std::string(CLASS_NAMES[static_cast<std::size_t>(person.classId)]);
         }
-
-        out->detections.push_back(std::move(detection));
     }
 
     return out;
