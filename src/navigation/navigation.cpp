@@ -317,7 +317,7 @@ ControlState Navigation::deriveControlState() const noexcept {
     //     :     if (state == MissionState::LANDING) return ControlState::NAVIGATION_HAS_CONTROL;
     //     : between the `armed` and `offboardActive` checks. The mission state is
     //     : a third input, and it is load-bearing.
-    if (!armed)         return ControlState::WAITING_FOR_ARM;
+    if (!armed)          return ControlState::WAITING_FOR_ARM;
     if (!offboardActive) return ControlState::PILOT_HAS_CONTROL;
     return ControlState::NAVIGATION_HAS_CONTROL;
 }
