@@ -45,11 +45,13 @@ public:
     Head& operator=(const Head&) = delete;
 
     // * Inference
-    // TODO: [#41] Reduce copy overhead by passing a preallocated
-    //     : output vector to fill, or a pointer to the output buffer.
     // ? `personCrop` is the person's bounding box, already cropped from the
     // ? frame. `out` receives head boxes in the CROP's pixel coordinates - the
     // ? caller must add the crop origin to map them back to the frame. `out` is
     // ? cleared first, so the caller can reuse one vector across frames.
-    void detect(const cv::Mat& personCrop, std::vector<Model::Detection>& out);
+    // ? Inline: this is a pure forwarder. Keeping it in the header lets the
+    // ? compiler inline it into Perception::fuse() without LTO.
+    inline void detect(const cv::Mat& personCrop, std::vector<Model::Detection>& out) {
+        m.yolo.detect(personCrop, out);
+    }
 };

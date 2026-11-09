@@ -178,8 +178,6 @@ cv::Mat Perception::toFrame(const sensor_msgs::msg::Image& msg) const {
 }
 
 void Perception::fuse(const cv::Mat& frame, std::vector<Model::Detection>& out) {
-    // TODO: [#41] Reduce function call overhead by passing a preallocated  
-    //     : output vector to fill, or a pointer to the output buffer. 
     // TODO: [#42] Address magic numbers/strings
     // TODO: [#43] Use `emplace_back()` instead of `push_back()` to avoid a copy.
     out.clear();

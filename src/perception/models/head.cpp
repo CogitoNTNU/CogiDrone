@@ -25,9 +25,3 @@ std::expected<Head, Head::InitError> Head::create() {
 
     return Head(M{ .yolo = std::move(*yolo) });
 }
-
-// TODO: [#41] Reduce copy overhead by passing a preallocated
-//     : output vector to fill, or a pointer to the output buffer.
-void Head::detect(const cv::Mat& personCrop, std::vector<Model::Detection>& out) {
-    m.yolo.detect(personCrop, out);
-}

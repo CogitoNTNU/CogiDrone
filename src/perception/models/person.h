@@ -46,13 +46,15 @@ public:
     Person& operator=(const Person&) = delete;
 
     // * Inference
-    // TODO: [#41] Reduce copy overhead by passing a preallocated
-    //     : output vector to fill, or a pointer to the output buffer.
     // ? `out` receives boxes in the ORIGINAL frame's pixel coordinates. It is
     // ? cleared first, so the caller can reuse one vector across frames.
     // ? `positionCamera` is NOT filled here - distance needs the head pass,
     // ? which is Perception's job (see fuse()).
-    void detect(const cv::Mat& frame, std::vector<Model::Detection>& out);
+    // ? Inline: this is a pure forwarder. Keeping it in the header lets the
+    // ? compiler inline it into Perception::fuse() without LTO.
+    inline void detect(const cv::Mat& frame, std::vector<Model::Detection>& out) {
+        m.yolo.detect(frame, out);
+    }
 
     // * Class table
     [[nodiscard]] static std::span<const std::string_view> classNames() noexcept;

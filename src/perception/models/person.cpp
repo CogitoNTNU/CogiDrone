@@ -33,12 +33,6 @@ std::expected<Person, Person::InitError> Person::create() {
     return Person(M{ .yolo = std::move(*yolo) });
 }
 
-// TODO: [#41] Reduce copy overhead by passing a preallocated
-//     : output vector to fill, or a pointer to the output buffer.
-void Person::detect(const cv::Mat& frame, std::vector<Model::Detection>& out) {
-    m.yolo.detect(frame, out);
-}
-
 std::span<const std::string_view> Person::classNames() noexcept {
     return SR_CLASS_NAMES;
 }
