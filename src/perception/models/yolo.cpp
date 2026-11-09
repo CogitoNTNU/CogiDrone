@@ -204,6 +204,9 @@ void Yolo::detect(const cv::Mat& frame, std::vector<Model::Detection>& out) {
         const float X2 = (CX + W / 2.0f - LETTERBOXED.padX) / LETTERBOXED.scale;
         const float Y2 = (CY + H / 2.0f - LETTERBOXED.padY) / LETTERBOXED.scale;
 
+        // TODO: [#43] Use `emplace_back()` instead of `push_back()` to avoid 
+        //     : temporary construction of the hypothesis object. This is a copy, 
+        //     : and we can avoid it by constructing the object in place.
         Model::Detection detection;
         detection.bbox = {
             std::clamp(X1, 0.0f, static_cast<float>(frame.cols)),
