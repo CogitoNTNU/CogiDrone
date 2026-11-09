@@ -204,20 +204,21 @@ void Yolo::detect(const cv::Mat& frame, std::vector<Model::Detection>& out) {
         const float X2 = (CX + W / 2.0f - LETTERBOXED.padX) / LETTERBOXED.scale;
         const float Y2 = (CY + H / 2.0f - LETTERBOXED.padY) / LETTERBOXED.scale;
 
-        // TODO: [#43] Use `emplace_back()` instead of `push_back()` to avoid 
-        //     : temporary construction of the hypothesis object. This is a copy, 
-        //     : and we can avoid it by constructing the object in place.
-        Model::Detection detection;
-        detection.bbox = {
-            std::clamp(X1, 0.0f, static_cast<float>(frame.cols)),
-            std::clamp(Y1, 0.0f, static_cast<float>(frame.rows)),
-            std::clamp(X2, 0.0f, static_cast<float>(frame.cols)),
-            std::clamp(Y2, 0.0f, static_cast<float>(frame.rows))
-        };
-        detection.confidence = bestScore;
-        detection.classId = bestClass;
-
-        m.candidates.push_back(std::move(detection));
+        // ? `emplace_back` with positional arguments, not a designated initializer:
+        // ? this constructs the Detection in place, avoiding a 36-byte copy per
+        // ? candidate. The `/* .field = */` comments carry the names that designated
+        // ? initializers would have enforced - if `Detection`'s field order ever
+        // ? changes, these comments must change with it.
+        m.candidates.emplace_back(
+            /* .bbox = */       std::array<float, 4>{
+                                    std::clamp(X1, 0.0f, static_cast<float>(frame.cols)),
+                                    std::clamp(Y1, 0.0f, static_cast<float>(frame.rows)),
+                                    std::clamp(X2, 0.0f, static_cast<float>(frame.cols)),
+                                    std::clamp(Y2, 0.0f, static_cast<float>(frame.rows))
+                                },
+            /* .confidence = */ bestScore,
+            /* .classId = */    bestClass
+        );
     }
 
     // * 4. Suppress
