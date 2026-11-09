@@ -113,9 +113,9 @@ private:
     // ?   toDetectionArray()  - the ROS boundary. Converts the bundle into the
     // ?                        wire format Navigation consumes.
     [[nodiscard]] cv::Mat toFrame(const sensor_msgs::msg::Image& msg) const;
-    [[nodiscard]] Model::FusedDetections fuse(const cv::Mat& frame);
+    [[nodiscard]] std::vector<Model::Detection> fuse(const cv::Mat& frame);
     [[nodiscard]] std::unique_ptr<vision_msgs::msg::Detection2DArray>
-    toDetectionArray(const Model::FusedDetections& fused) const;
+    toDetectionArray(const std::vector<Model::Detection>& fused) const;
 
     // * Distance
     // ? Pinhole geometry: a known real-world height and its pixel height give

@@ -131,7 +131,7 @@ void Perception::onFrame(const sensor_msgs::msg::Image& msg) {
     const cv::Mat FRAME = toFrame(msg);
     if (FRAME.empty()) return;
 
-    const Model::FusedDetections FUSED = fuse(FRAME);
+    const std::vector<Model::Detection> FUSED = fuse(FRAME);
 
     // ! Publish UNCONDITIONALLY. An empty array is the "no person in this frame"
     // ! signal Navigation's Policy A depends on, AND the heartbeat that keeps
@@ -175,12 +175,12 @@ cv::Mat Perception::toFrame(const sensor_msgs::msg::Image& msg) const {
     return frame;
 }
 
-Model::FusedDetections Perception::fuse(const cv::Mat& frame) {
+std::vector<Model::Detection> Perception::fuse(const cv::Mat& frame) {
     // TODO: [#41] Reduce function call overhead by passing a preallocated  
     //     : output vector to fill, or a pointer to the output buffer. 
     // TODO: [#42] Address magic numbers/strings
     // TODO: [#43] Use `emplace_back()` instead of `push_back()` to avoid a copy.
-    Model::FusedDetections fused;
+    std::vector<Model::Detection> fused;
 
     // * 1. Persons on the full frame
     const std::vector<Model::Detection> PERSONS = m.personModel.detect(frame);
@@ -250,7 +250,7 @@ Model::FusedDetections Perception::fuse(const cv::Mat& frame) {
 }
 
 std::unique_ptr<vision_msgs::msg::Detection2DArray>
-Perception::toDetectionArray(const Model::FusedDetections& fused) const {
+Perception::toDetectionArray(const std::vector<Model::Detection>& fused) const {
     // TODO: [#42] Address magic numbers/strings
     // TODO: [#43] Use `emplace_back()` instead of `push_back()` to avoid a copy.
     auto out = std::make_unique<vision_msgs::msg::Detection2DArray>();              // ? unique_ptr publish: zero-copy intra-process

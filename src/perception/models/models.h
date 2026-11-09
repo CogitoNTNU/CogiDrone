@@ -1,9 +1,8 @@
 #pragma once
 
-#include <expected>
-#include <string_view>
 #include <source_location>
-#include <vector>
+#include <string_view>
+#include <expected>
 #include <array>
 
 #include "logging.h"
@@ -29,10 +28,12 @@ struct Detection {
 // ? Everything the models produce for ONE frame.
 // ? Persons only: DepthAnything's output is not part of person fusion - it is
 // ? relative depth for non-person objects, which belongs to Representation.
-// ! DOUBLE CHECK: We might just typedef this to `std::vector<Detection>` if we don't need a struct for now.
-struct FusedDetections {
-    std::vector<Detection> persons;
-};
+// ! YAGNI argument for not implementing this now: when [#40] actually lands,
+// ! we will know what the second member is. Adding the struct then is a 
+// ! five-minute refactor with real information. Adding it now is a guess.
+// struct FusedDetections {
+//     std::vector<Detection> persons;
+// };
 
 
 // * Functions
