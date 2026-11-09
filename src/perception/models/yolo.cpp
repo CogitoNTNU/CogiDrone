@@ -71,32 +71,71 @@ struct Letterbox {
 
 // ? `detections` is sorted in place and left intact so the caller keeps its
 // ? capacity. `out` receives the survivors and is cleared first.
+// ? `suppressed` is caller-owned scratch - see the note on
+// ? `Yolo::M::suppressedScratch`.
+// ?
+// ? `detections` is a `std::span`, not a `std::vector&`: this function only
+// ? sorts and indexes it, never resizes it. The span states that contract in
+// ? the signature, and `size()` becomes a register value instead of a
+// ? `(finish - start) / sizeof(Detection)` computation the compiler must prove
+// ? is loop-invariant.
+// ! `suppressed` stays a `std::vector&` because it is `assign`ed - the function
+// ! owns its sizing. A span would push that precondition onto the caller with
+// ! no diagnostic if it were wrong.
 void nonMaxSuppression(
-    std::vector<Model::Detection>& detections,
+    std::span<Model::Detection> detections,
     float iouThreshold,
-    std::vector<Model::Detection>& out
+    std::vector<Model::Detection>& out,
+    std::vector<std::uint8_t>& suppressed
 ) {
     out.clear();
 
-    // TODO: Use std::ranges since C++23 is available
+    // ? `std::ranges::sort` is deliberately NOT used: it forwards to the same
+    // ? introsort as `std::sort`, so the codegen is identical. A projection
+    // ? would also be free - `&Model::Detection::confidence` is a compile-time
+    // ? constant offset. There is no performance argument either way, and the
+    // ? iterator pair is already in hand.
     std::sort(detections.begin(), detections.end(),
         [](const Model::Detection& a, const Model::Detection& b) {
             return a.confidence > b.confidence;
         });
 
-    std::vector<bool> suppressed(detections.size(), false);
+    // ? `assign`, not `resize`: it reuses the existing capacity, so after the
+    // ? first frame this never allocates.
+    suppressed.assign(detections.size(), 0u);
 
-    for (std::size_t i = 0; i < detections.size(); ++i) {
+    // ? `out` can never exceed `detections.size()`: every element is either
+    // ? suppressed or kept. Reserving the upper bound means one allocation
+    // ? instead of log2(n).
+    out.reserve(detections.size());
+
+    for (std::size_t i = 0z; i < detections.size(); ++i) {
         if (suppressed[i]) continue;
-        out.push_back(std::move(detections[i]));
 
-        for (std::size_t j = i + 1; j < detections.size(); ++j) {
+        // ! Suppress BEFORE moving. The inner loop reads `detections[i]`, and
+        // ! after `std::move(detections[i])` its value is unspecified. It
+        // ! happens to survive today because `Detection` is trivially copyable,
+        // ! but that is a property of the type, not of this loop. Add a
+        // ! `std::string` member and the IoU comparison silently reads an
+        // ! empty string.
+        for (std::size_t j = i + 1z; j < detections.size(); ++j) {
             if (suppressed[j])                                      continue;
             if (detections[j].classId != detections[i].classId)     continue;
             if (iou(detections[i].bbox, detections[j].bbox) > iouThreshold) {
-                suppressed[j] = true;
+                suppressed[j] = 1u;
             }
         }
+
+        // ? `std::move`, not a copy: `detections` is a view over the caller's
+        // ? scratch vector, and this element is never read again.
+        // ? For `Detection` (36 bytes, trivially copyable) the move is a
+        // ? 36-byte memcpy - identical to the copy. It is written as a move so
+        // ? the intent is explicit, and so the code stays correct if
+        // ? `Detection` ever gains a member whose move is cheaper than its copy.
+        // ? Default construction with emplace_back reference is not applicable
+        // ? here because we don't temporarily construct anything we move into
+        // ? `out` - the move is directly from the caller's scratch vector.
+        out.push_back(std::move(detections[i]));
     }
 }
 } // namespace
@@ -222,5 +261,5 @@ void Yolo::detect(const cv::Mat& frame, std::vector<Model::Detection>& out) {
     }
 
     // * 4. Suppress
-    nonMaxSuppression(m.candidates, m.iouThreshold, out);
+    nonMaxSuppression(m.candidates, m.iouThreshold, out, m.suppressedScratch);
 }

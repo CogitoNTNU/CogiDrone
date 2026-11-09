@@ -1,9 +1,10 @@
 #pragma once
 
+#include <string_view>
+#include <cstdint>
 #include <expected>
 #include <memory>
 #include <string>
-#include <string_view>
 #include <vector>
 #include <span>
 
@@ -47,6 +48,14 @@ private:
         // ? `clear()` keeps the capacity, so after the first few frames this
         // ? never reallocates.
         std::vector<Model::Detection> candidates;
+
+        // NMS scratch
+        // ? `std::vector<bool>` allocates on construction, and NMS runs 4x per
+        // ? frame (1 person pass + 3 head passes). Reusing the buffer removes
+        // ? that allocation. `std::uint8_t`, not `bool`: the bool
+        // ? specialization packs bits, so every access is a shift-and-mask.
+        // ? See [#41].
+        std::vector<std::uint8_t> suppressedScratch;
     } m;
 
     explicit Yolo(M&& m) : m(std::move(m)) {}

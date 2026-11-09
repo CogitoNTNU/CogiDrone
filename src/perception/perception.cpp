@@ -261,7 +261,7 @@ void Perception::fuse(const cv::Mat& frame, std::vector<Model::Detection>& out) 
 }
 
 std::unique_ptr<vision_msgs::msg::Detection2DArray>
-Perception::toDetectionArray(const std::vector<Model::Detection>& fused) const {
+Perception::toDetectionArray(std::span<const Model::Detection> fused) const {
     // TODO: [#42] Address magic numbers/strings
     auto out = std::make_unique<vision_msgs::msg::Detection2DArray>();              // ? unique_ptr publish: zero-copy intra-process
 

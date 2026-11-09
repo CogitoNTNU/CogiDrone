@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <span>
 
 #include <opencv2/core.hpp>
 
@@ -127,10 +128,15 @@ private:
     // ?
     // ! `fuse()` writes into `out` and clears it first. It does NOT return a
     // ! vector - that would allocate per frame. See [#41].
+    // ?
+    // ? `toDetectionArray()` takes a `std::span`, not a `const std::vector&`:
+    // ? it only reads and iterates, never resizes. The span states that
+    // ? contract, and makes the function callable with a `std::array` or a raw
+    // ? buffer in a test.
     [[nodiscard]] cv::Mat toFrame(const sensor_msgs::msg::Image& msg) const;
     void fuse(const cv::Mat& frame, std::vector<Model::Detection>& out);
     [[nodiscard]] std::unique_ptr<vision_msgs::msg::Detection2DArray>
-    toDetectionArray(const std::vector<Model::Detection>& fused) const;
+    toDetectionArray(std::span<const Model::Detection> fused) const;
 
     // * Distance
     // ? Pinhole geometry: a known real-world height and its pixel height give
