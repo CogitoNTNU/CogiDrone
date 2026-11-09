@@ -655,48 +655,6 @@ void Navigation::followBehavior() {
 }
 
 
-
-// * Navigation math
-//// Vec3 Navigation::followTarget() const {
-////     // * Direction of motion - fall back to the current drone-to-person line if the person is stationary
-////     Vec3 personDirection = m.personWorldVelocity.normalized();
-////     if (m.personWorldVelocity.norm() < 0.1f) {
-////         personDirection = (m.drone.position - m.personWorldPosition).normalized();
-////     }
-//// 
-////     // * A point behind the person at the follow distance, at the target height
-////     Vec3 target = m.personWorldPosition - personDirection * m.params.targetFollowDistance;
-////     target.z = m.params.targetHeight;
-////     return target;
-//// }
-//// 
-//// Vec3 Navigation::velocityTowards(const Vec3& target) const {
-////     // * P-controller
-////     Vec3 velocity = (target - m.drone.position) * m.params.positionPGain;
-//// 
-////     // * Clamp to max follow speed
-////     const float speed = velocity.norm();
-////     if (speed > m.params.maxFollowSpeed) {
-////         velocity = velocity * (m.params.maxFollowSpeed / speed);
-////     }
-////     return velocity;
-//// }
-//// 
-//// float Navigation::desiredYawTowards(const Vec3& target) const {
-////     const Vec3 toTarget = target - m.drone.position;
-////     return std::atan2(toTarget.y, toTarget.x);
-//// }
-//// 
-//// Vec3 Navigation::cameraToWorld(const Vec3& camera) const {
-////     // TODO: [#32] Apply the static camera mount extrinsic (camera -> body) once the rig is fixed;
-////     //     : for now the camera is assumed coincident with the body frame
-////     const Vec3 body = camera;
-//// 
-////     // * Body -> world: rotate by the drone orientation, then translate by the drone position
-////     return m.drone.position + rotate(m.drone.orientation, body);
-//// }
-
-
 // * Publishing
 void Navigation::publishSetpoint(const cogidrone::Vec3& positionNed, float yaw) {
     auto sp = std::make_unique<px4_msgs::msg::TrajectorySetpoint>();                    // ? unique_ptr publish: zero-copy intra-process
