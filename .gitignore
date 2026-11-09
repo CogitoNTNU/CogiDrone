@@ -276,6 +276,7 @@ toolchain.windows.config
 # 3rd party libraries
 # third-party/
 !vendored/**
+vendored/ros2/debs/
 
 # ROS 2 / simulation
 ros2_ws/install/
