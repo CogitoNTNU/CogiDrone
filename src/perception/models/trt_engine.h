@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <span>
 #include <cstddef>
 
 #include <NvInfer.h>
@@ -12,7 +13,8 @@
 
 // * TensorRT engine
 // ? Owns one serialized TensorRT plan and everything needed to run it:
-// ? runtime, engine, execution context, device buffers, CUDA stream.
+// ? runtime, engine, execution context, device buffers, CUDA stream, and the
+// ? host staging buffers.
 // ?
 // ! THE ENGINE IS BUILT ON THE JETSON, NOT SHIPPED
 // ? A .engine file is a serialized plan for ONE GPU architecture and ONE
@@ -32,6 +34,11 @@
 // ? This targets TensorRT 10 (JetPack 6+). TRT 8 uses enqueueV2 with a bindings
 // ? array instead of enqueueV3 with named tensor addresses, and getBindingDimensions
 // ? instead of getTensorShape. The difference is isolated in infer() and create().
+// ?
+// ! ZERO ALLOCATION PER INFERENCE
+// ? The host input and output buffers are allocated ONCE in wire() and reused
+// ? for the engine's whole life. `infer()` returns a view into the output
+// ? buffer, not a new vector. See [#41].
 class TrtEngine {
 public:
     enum class InitError {
@@ -73,6 +80,13 @@ private:
         std::unique_ptr<void, CudaDeleter> deviceInput;
         std::unique_ptr<void, CudaDeleter> deviceOutput;
 
+        // Host staging buffers
+        // ? Allocated ONCE in wire(), sized from the engine's tensor shapes.
+        // ? `infer()` reads hostInput and writes hostOutput, so neither is
+        // ? allocated per call. This is the whole point of [#41].
+        std::vector<float> hostInput;
+        std::vector<float> hostOutput;
+
         // Shapes
         std::string inputName;
         std::string outputName;
@@ -103,18 +117,26 @@ public:
     TrtEngine& operator=(const TrtEngine&) = delete;
 
     // * Inference
-    // ! DOUBLE CHECK:
     // TODO: [#41] Reduce copy overhead by passing a preallocated
     //     : output vector to fill, or a pointer to the output buffer.
-    // ? Copies `input` to the device, runs the engine, copies the output back.
-    // ? Returns the output as a flat float vector; the caller reshapes using
-    // ? outputShape().
+    // ? Two-step, so the caller writes the input tensor directly into the
+    // ? staging buffer with no intermediate copy:
+    // ?
+    // ?     std::span<float> input = engine.inputBuffer();
+    // ?     // ... fill input with exactly inputElementCount() floats ...
+    // ?     std::span<const float> output = engine.infer();
+    // ?
+    // ! `inputBuffer()` returns a view into a member. It is valid until the
+    // ! next call to inputBuffer() or infer(). Do not store it.
+    // ! `infer()` returns a view into a member. It is valid until the next
+    // ! call to infer(). Consume it before then.
     // ! Synchronous: it blocks on the stream. That is deliberate - Perception
     // ! runs on the executor thread and the next frame cannot be processed
     // ! until this one is done anyway.
     // ! NOT const: it writes the device buffers and rebinds the context's tensor
     // ! addresses. Marking it const would be a lie.
-    [[nodiscard]] std::vector<float> infer(const std::vector<float>& input);
+    [[nodiscard]] std::span<float> inputBuffer() noexcept;
+    [[nodiscard]] std::span<const float> infer();
 
     // * Accessors
     [[nodiscard]] inline const std::vector<std::size_t>& outputShape() const noexcept { return m.outputShape; }
