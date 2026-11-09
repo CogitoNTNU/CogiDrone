@@ -351,14 +351,6 @@ private:
     void followBehavior();
     // TODO: [#27] Obstacle avoidance - blocked on Representation producing an obstacle map
     
-
-    // * Navigation math
-    // TODO: [#33] Dead prototypes - restore or delete. `cameraToWorld` is tracked by [#32].
-    // // [[nodiscard]] Vec3 followTarget() const;                                            // Target position behind the person
-    // // [[nodiscard]] Vec3 velocityTowards(const Vec3& target) const;                       // P-controller velocity command
-    // // [[nodiscard]] float desiredYawTowards(const Vec3& target) const;                    // Yaw to face the target
-    // // [[nodiscard]] Vec3 cameraToWorld(const Vec3& camera) const;                         // Camera frame -> world frame
-
     // * Publishing
     void publishSetpoint(const cogidrone::Vec3& positionNed, float yaw);                // The ONLY path to the flight controller
     void publishFlightCommand(cogidrone::FlightCommand command);
