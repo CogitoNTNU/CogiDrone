@@ -48,11 +48,14 @@ struct Letterbox {
 
 
 // * NMS
-// ! DOUBLE CHECK: Might be able to use constexpr here
 // ? Standard greedy IoU suppression, per class. Two people standing next to
 // ? each other must not suppress one another, hence per-class rather than
 // ? global.
-[[nodiscard]] float iou(const std::array<float, 4>& a, const std::array<float, 4>& b) {
+// ? 
+// ? `constexpr`: std::max/std::min are constexpr since C++14, and this is pure
+// ? arithmetic. Marking it constexpr costs nothing and lets a unit test assert
+// ? a known overlap with static_assert.
+[[nodiscard]] constexpr float iou(const std::array<float, 4>& a, const std::array<float, 4>& b) {
     const float IX1 = std::max(a[0], b[0]);
     const float IY1 = std::max(a[1], b[1]);
     const float IX2 = std::min(a[2], b[2]);
