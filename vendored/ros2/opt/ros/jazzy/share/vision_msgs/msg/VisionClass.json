@@ -1,0 +1,36 @@
+{
+  "type_description_msg": {
+    "type_description": {
+      "type_name": "vision_msgs/msg/VisionClass",
+      "fields": [
+        {
+          "name": "class_id",
+          "type": {
+            "type_id": 5,
+            "capacity": 0,
+            "string_capacity": 0,
+            "nested_type_name": ""
+          },
+          "default_value": ""
+        },
+        {
+          "name": "class_name",
+          "type": {
+            "type_id": 17,
+            "capacity": 0,
+            "string_capacity": 0,
+            "nested_type_name": ""
+          },
+          "default_value": ""
+        }
+      ]
+    },
+    "referenced_type_descriptions": []
+  },
+  "type_hashes": [
+    {
+      "type_name": "vision_msgs/msg/VisionClass",
+      "hash_string": "RIHS01_1e4a11f0fed50b5623cb8ff26ca0e37952a48a9c074d16f804b44e9164c2037a"
+    }
+  ]
+}
