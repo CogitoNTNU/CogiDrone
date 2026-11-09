@@ -70,6 +70,7 @@ struct Letterbox {
     std::vector<Model::Detection> detections,
     float iouThreshold
 ) {
+    // TODO: Use std::ranges since C++23 is available
     std::sort(detections.begin(), detections.end(),
         [](const Model::Detection& a, const Model::Detection& b) {
             return a.confidence > b.confidence;
@@ -80,7 +81,7 @@ struct Letterbox {
 
     for (std::size_t i = 0; i < detections.size(); ++i) {
         if (suppressed[i]) continue;
-        kept.push_back(detections[i]);
+        kept.push_back(std::move(detections[i]));
 
         for (std::size_t j = i + 1; j < detections.size(); ++j) {
             if (suppressed[j]) continue;

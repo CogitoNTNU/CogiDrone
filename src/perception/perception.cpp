@@ -233,6 +233,7 @@ Model::FusedDetections Perception::fuse(const cv::Mat& frame) {
         const float CENTER_X = (person.bbox[0] + person.bbox[2]) / 2.0f;
         const float CENTER_Y = (person.bbox[1] + person.bbox[3]) / 2.0f;
 
+        // ? Is this a copy? Yes, but the copy is deliberate: we want to keep the original person
         Model::Detection fusedPerson = person;
         fusedPerson.positionCamera = cogidrone::Vec3{
             (CENTER_X - principalX) * distance / focalLength,                       // x: right
@@ -240,7 +241,7 @@ Model::FusedDetections Perception::fuse(const cv::Mat& frame) {
             distance                                                                // z: forward
         };
 
-        fused.persons.push_back(fusedPerson);
+        fused.persons.push_back(std::move(fusedPerson));
     }
 
     return fused;
@@ -261,6 +262,9 @@ Perception::toDetectionArray(const Model::FusedDetections& fused) const {
         detection.bbox.size_x = person.bbox[2] - person.bbox[0];
         detection.bbox.size_y = person.bbox[3] - person.bbox[1];
 
+        // TODO: [#43] Use `emplace_back()` instead of `push_back()` to avoid 
+        //     : temporary construction of the hypothesis object. This is a copy, 
+        //     : and we can avoid it by constructing the object in place.
         vision_msgs::msg::ObjectHypothesisWithPose hypothesis;
         hypothesis.hypothesis.class_id = "person";                                  // ? CONTRACT: always "person"
         hypothesis.hypothesis.score = person.confidence;
@@ -271,7 +275,7 @@ Perception::toDetectionArray(const Model::FusedDetections& fused) const {
         hypothesis.pose.pose.position.y = person.positionCamera.y;
         hypothesis.pose.pose.position.z = person.positionCamera.z;
 
-        detection.results.push_back(hypothesis);
+        detection.results.push_back(std::move(hypothesis));
 
         // ? The pose class travels in `id`, not `class_id`, so Navigation can
         // ? use it later without breaking the "person only" contract.
