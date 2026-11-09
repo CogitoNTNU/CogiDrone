@@ -274,7 +274,13 @@ Thumbs.db
 toolchain.windows.config
 
 # 3rd party libraries
-# third-party/
+# ? vendored/ is committed on purpose - it is the IntelliSense and cross-link source.
+# ! The negation below is LOAD-BEARING. The generic rules above (*.so, lib/, lib64/,
+# ! __pycache__/, *.py[cod]) match files INSIDE vendored/. Without !vendored/**,
+# ! a fresh clone gets headers but no .so files, and the link fails with
+# ! "cannot find -lpx4_msgs__rosidl_typesupport_cpp".
+# ! Order matters: this must come after the generic rules, and the debs rule
+# ! must come after this one.
 !vendored/**
 vendored/ros2/debs/
 
