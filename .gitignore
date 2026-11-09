@@ -264,3 +264,6 @@ toolchain.windows.config
 # 3rd party libraries
 # third-party/
 !third-party
+
+# Vendored download cache - regenerate with vendored/ros2/get.sh
+vendored/ros2/debs/
