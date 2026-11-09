@@ -275,7 +275,6 @@ toolchain.windows.config
 
 # 3rd party libraries
 # third-party/
-!third-party
 !vendored/**
 
 # ROS 2 / simulation
