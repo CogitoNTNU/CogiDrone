@@ -47,6 +47,7 @@ std::expected<std::unique_ptr<Navigation>, cogidrone::Error> Navigation::create(
             .detectionSubscription = nullptr,                                           // ? will be wired later
             .offboardActiveSubscription = nullptr,                                      // ? will be wired later
             .armedSubscription = nullptr,                                               // ? will be wired later
+            .localPositionSubscription = nullptr,                                       // ? will be wired later  
             .setpointPublisher = nullptr,                                               // ? will be wired later
             .flightCommandPublisher = nullptr,                                          // ? will be wired later
             .missionStatusPublisher = nullptr,                                          // ? will be wired later

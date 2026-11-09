@@ -113,6 +113,8 @@ std::expected<TrtEngine, TrtEngine::InitError> TrtEngine::create(
         .stream = nullptr,                                                              // ? will be wired in wire()
         .deviceInput = nullptr,                                                         // ? will be wired in wire()
         .deviceOutput = nullptr,                                                        // ? will be wired in wire()
+        .hostInput = {},                                                                // ? sized in wire(), not here
+        .hostOutput = {},                                                               // ? sized in wire(), not here                
         .inputName = inputName,
         .outputName = outputName,
         .inputBytes = inputElements * sizeof(float),

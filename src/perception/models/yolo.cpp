@@ -162,7 +162,9 @@ std::expected<Yolo, Yolo::InitError> Yolo::create(
         .inputHeight = inputHeight,
         .confidenceThreshold = confidenceThreshold,
         .iouThreshold = iouThreshold,
-        .classNames = classNames
+        .classNames = classNames,
+        .candidates = {},                                                               // ? decode scratch, grows to capacity on first frame
+        .suppressedScratch = {}                                                         // ? NMS scratch, reused across all 4 passes
     });
 }
 
