@@ -45,11 +45,11 @@ public:
     Head& operator=(const Head&) = delete;
 
     // * Inference
-    // ! DOUBLE CHECK: return type
     // TODO: [#41] Reduce copy overhead by passing a preallocated
     //     : output vector to fill, or a pointer to the output buffer.
     // ? `personCrop` is the person's bounding box, already cropped from the
-    // ? frame. Returns head boxes in the CROP's pixel coordinates - the caller
-    // ? must add the crop origin to map them back to the frame.
-    [[nodiscard]] std::vector<Model::Detection> detect(const cv::Mat& personCrop);
+    // ? frame. `out` receives head boxes in the CROP's pixel coordinates - the
+    // ? caller must add the crop origin to map them back to the frame. `out` is
+    // ? cleared first, so the caller can reuse one vector across frames.
+    void detect(const cv::Mat& personCrop, std::vector<Model::Detection>& out);
 };

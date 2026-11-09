@@ -3,6 +3,7 @@
 #include <expected>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include <opencv2/core.hpp>
 
@@ -20,7 +21,6 @@
 #include "logging.h"
 
 
-
 // ? Loaded ONCE in create() from the parameter server (defaults from
 // ? PerceptionParams). Override at startup with
 // ? `ros2 param set /perception image_topic <topic>` BEFORE the node spins.
@@ -35,7 +35,7 @@ struct PerceptionParams {
     // ? image; they are what turns a pixel offset into a bearing.
     // ! The Python prototype used `focal_length = width * 0.8`, which is a
     // ! guess. A wrong focal length is a wrong distance on EVERY detection, so
-    // ! the calibrated value from CameraInfo is used instead. See [#38].
+    // ? the calibrated value from CameraInfo is used instead. See [#38].
     std::string cameraInfoTopic = "/camera/camera/color/camera_info";
 
     // ? Assumed real-world heights, used by the pinhole distance estimate.
@@ -95,6 +95,18 @@ private:
     // ? alive but publishes nothing.
     bool intrinsicsMissingLogged = false;
 
+    // * Frame scratch
+    // ? Reused across frames. `clear()` keeps the capacity, so after the first
+    // ? few frames none of these allocate. They are members rather than locals
+    // ? because a local would be destroyed and reallocated every frame - which
+    // ? is exactly the cost [#41] removes.
+    // ?
+    // ! `personsScratch` and `headsScratch` are separate on purpose: fuse()
+    // ! iterates persons while writing heads, so they must not alias.
+    std::vector<Model::Detection> personsScratch;
+    std::vector<Model::Detection> headsScratch;
+    std::vector<Model::Detection> fusedScratch;
+
     // * Default ctor
     explicit Perception(M&& m) : m(std::move(m)) {}                                     // No default ctor exposed;  
     void wire() noexcept;                                                               // Wire the node's subscriptions and publishers to the member methods
@@ -112,8 +124,11 @@ private:
     // ?                        Testable without a ROS graph.
     // ?   toDetectionArray()  - the ROS boundary. Converts the bundle into the
     // ?                        wire format Navigation consumes.
+    // ?
+    // ! `fuse()` writes into `out` and clears it first. It does NOT return a
+    // ! vector - that would allocate per frame. See [#41].
     [[nodiscard]] cv::Mat toFrame(const sensor_msgs::msg::Image& msg) const;
-    [[nodiscard]] std::vector<Model::Detection> fuse(const cv::Mat& frame);
+    void fuse(const cv::Mat& frame, std::vector<Model::Detection>& out);
     [[nodiscard]] std::unique_ptr<vision_msgs::msg::Detection2DArray>
     toDetectionArray(const std::vector<Model::Detection>& fused) const;
 

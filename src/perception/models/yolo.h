@@ -27,6 +27,10 @@
 // ! VERIFY THIS AT EXPORT TIME - a different ultralytics version may transpose
 // ! to [1, numAnchors, 4 + numClasses]. If it does, the decode loop below must
 // ! swap its index arithmetic.
+// ?
+// ! ZERO ALLOCATION PER FRAME
+// ? The input tensor lives in TrtEngine's staging buffer, and the decode
+// ? scratch lives in `m.candidates`. `detect()` allocates nothing. See [#41].
 class Yolo {
 private:
     struct M {                                                                          // Assembly struct
@@ -36,6 +40,13 @@ private:
         float confidenceThreshold = 0.25f;
         float iouThreshold = 0.45f;
         std::span<const std::string_view> classNames;                                   // ? must outlive the model
+
+        // Decode scratch
+        // ? Every anchor above the confidence threshold lands here, then NMS
+        // ? sorts it in place and writes the survivors to the caller's vector.
+        // ? `clear()` keeps the capacity, so after the first few frames this
+        // ? never reallocates.
+        std::vector<Model::Detection> candidates;
     } m;
 
     explicit Yolo(M&& m) : m(std::move(m)) {}
@@ -62,8 +73,10 @@ public:
     Yolo& operator=(const Yolo&) = delete;
 
     // * Inference
-    // ? `frame` is BGR, as it arrives from the camera. Returns boxes in the
-    // ? ORIGINAL frame's pixel coordinates - the letterbox is undone internally.
+    // ? `frame` is BGR, as it arrives from the camera. `out` receives boxes in
+    // ? the ORIGINAL frame's pixel coordinates - the letterbox is undone
+    // ? internally. `out` is cleared first, so the caller can reuse one vector
+    // ? across frames.
     // ! NOT const: TrtEngine::infer() writes the device buffers.
-    [[nodiscard]] std::vector<Model::Detection> detect(const cv::Mat& frame);
+    void detect(const cv::Mat& frame, std::vector<Model::Detection>& out);
 };

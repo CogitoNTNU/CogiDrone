@@ -51,7 +51,7 @@ struct Letterbox {
 // ? Standard greedy IoU suppression, per class. Two people standing next to
 // ? each other must not suppress one another, hence per-class rather than
 // ? global.
-// ? 
+// ?
 // ? `constexpr`: std::max/std::min are constexpr since C++14, and this is pure
 // ? arithmetic. Marking it constexpr costs nothing and lets a unit test assert
 // ? a known overlap with static_assert.
@@ -69,33 +69,35 @@ struct Letterbox {
     return UNION > 0.0f ? INTER / UNION : 0.0f;
 }
 
-[[nodiscard]] std::vector<Model::Detection> nonMaxSuppression(
-    std::vector<Model::Detection> detections,
-    float iouThreshold
+// ? `detections` is sorted in place and left intact so the caller keeps its
+// ? capacity. `out` receives the survivors and is cleared first.
+void nonMaxSuppression(
+    std::vector<Model::Detection>& detections,
+    float iouThreshold,
+    std::vector<Model::Detection>& out
 ) {
+    out.clear();
+
     // TODO: Use std::ranges since C++23 is available
     std::sort(detections.begin(), detections.end(),
         [](const Model::Detection& a, const Model::Detection& b) {
             return a.confidence > b.confidence;
         });
 
-    std::vector<Model::Detection> kept;
     std::vector<bool> suppressed(detections.size(), false);
 
     for (std::size_t i = 0; i < detections.size(); ++i) {
         if (suppressed[i]) continue;
-        kept.push_back(std::move(detections[i]));
+        out.push_back(std::move(detections[i]));
 
         for (std::size_t j = i + 1; j < detections.size(); ++j) {
-            if (suppressed[j]) continue;
-            if (detections[j].classId != detections[i].classId) continue;
+            if (suppressed[j])                                      continue;
+            if (detections[j].classId != detections[i].classId)     continue;
             if (iou(detections[i].bbox, detections[j].bbox) > iouThreshold) {
                 suppressed[j] = true;
             }
         }
     }
-
-    return kept;
 }
 } // namespace
 
@@ -127,7 +129,9 @@ std::expected<Yolo, Yolo::InitError> Yolo::create(
 
 
 // * Inference
-std::vector<Model::Detection> Yolo::detect(const cv::Mat& frame) {
+void Yolo::detect(const cv::Mat& frame, std::vector<Model::Detection>& out) {
+    out.clear();
+
     // * 1. Preprocess
     const Letterbox LETTERBOXED = letterbox(frame, m.inputWidth, m.inputHeight);
 
@@ -138,38 +142,40 @@ std::vector<Model::Detection> Yolo::detect(const cv::Mat& frame) {
     cv::cvtColor(LETTERBOXED.image, rgb, cv::COLOR_BGR2RGB);
     rgb.convertTo(rgb, CV_32FC3, 1.0 / 255.0);
 
-    std::vector<float> inputTensorValues(
-        static_cast<std::size_t>(3 * m.inputWidth * m.inputHeight)
-    );
+    // ? Write straight into the engine's staging buffer. No intermediate
+    // ? vector, no copy into the engine. This is the 4.9 MB allocation that
+    // ? [#41] removes.
+    std::span<float> inputTensor = m.engine.inputBuffer();
+
     // ? HWC -> CHW: channel plane c holds every pixel's channel c.
     for (int y = 0; y < m.inputHeight; ++y) {
         for (int x = 0; x < m.inputWidth; ++x) {
             const cv::Vec3f& PIXEL = rgb.at<cv::Vec3f>(y, x);
             for (int c = 0; c < 3; ++c) {
-                inputTensorValues[static_cast<std::size_t>(c) * m.inputWidth * m.inputHeight
-                                  + static_cast<std::size_t>(y) * m.inputWidth
-                                  + static_cast<std::size_t>(x)] = PIXEL[c];
+                inputTensor[static_cast<std::size_t>(c) * m.inputWidth * m.inputHeight
+                          + static_cast<std::size_t>(y) * m.inputWidth
+                          + static_cast<std::size_t>(x)] = PIXEL[c];
             }
         }
     }
 
     // * 2. Run
-    const std::vector<float> OUTPUT = m.engine.infer(inputTensorValues);
-    if (OUTPUT.empty()) return {};
+    const std::span<const float> OUTPUT = m.engine.infer();
+    if (OUTPUT.empty()) return;
 
     // * 3. Decode
     // ? Output is [1, 4 + numClasses, numAnchors], row-major. Element
     // ? (row, anchor) is at row * numAnchors + anchor.
     const std::vector<std::size_t>& SHAPE = m.engine.outputShape();
-    if (SHAPE.size() != 3) return {};
+    if (SHAPE.size() != 3) return;
 
     const std::size_t NUM_ROWS    = SHAPE[1];
     const std::size_t NUM_ANCHORS = SHAPE[2];
-    if (NUM_ROWS < 5) return {};                                                        // ? 4 box + at least 1 class
+    if (NUM_ROWS < 5) return;                                                           // ? 4 box + at least 1 class
 
     const std::size_t NUM_CLASSES = NUM_ROWS - 4;
 
-    std::vector<Model::Detection> candidates;
+    m.candidates.clear();
 
     for (std::size_t anchor = 0; anchor < NUM_ANCHORS; ++anchor) {
         // ? Best class for this anchor.
@@ -208,9 +214,9 @@ std::vector<Model::Detection> Yolo::detect(const cv::Mat& frame) {
         detection.confidence = bestScore;
         detection.classId = bestClass;
 
-        candidates.push_back(detection);
+        m.candidates.push_back(std::move(detection));
     }
 
     // * 4. Suppress
-    return nonMaxSuppression(std::move(candidates), m.iouThreshold);
+    nonMaxSuppression(m.candidates, m.iouThreshold, out);
 }

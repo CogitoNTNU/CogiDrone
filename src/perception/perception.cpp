@@ -131,13 +131,15 @@ void Perception::onFrame(const sensor_msgs::msg::Image& msg) {
     const cv::Mat FRAME = toFrame(msg);
     if (FRAME.empty()) return;
 
-    const std::vector<Model::Detection> FUSED = fuse(FRAME);
+    // ? Write into the member scratch, not a local. A local would be destroyed
+    // ? and reallocated every frame. See [#41].
+    fuse(FRAME, fusedScratch);
 
     // ! Publish UNCONDITIONALLY. An empty array is the "no person in this frame"
     // ! signal Navigation's Policy A depends on, AND the heartbeat that keeps
     // ! Navigation's watchdog from declaring Perception dead. Skipping the
     // ! publish when nothing was found is indistinguishable from a crash.
-    m.targetPublisher->publish(toDetectionArray(FUSED));
+    m.targetPublisher->publish(toDetectionArray(fusedScratch));
 }
 
 
@@ -175,17 +177,17 @@ cv::Mat Perception::toFrame(const sensor_msgs::msg::Image& msg) const {
     return frame;
 }
 
-std::vector<Model::Detection> Perception::fuse(const cv::Mat& frame) {
+void Perception::fuse(const cv::Mat& frame, std::vector<Model::Detection>& out) {
     // TODO: [#41] Reduce function call overhead by passing a preallocated  
     //     : output vector to fill, or a pointer to the output buffer. 
     // TODO: [#42] Address magic numbers/strings
     // TODO: [#43] Use `emplace_back()` instead of `push_back()` to avoid a copy.
-    std::vector<Model::Detection> fused;
+    out.clear();
 
     // * 1. Persons on the full frame
-    const std::vector<Model::Detection> PERSONS = m.personModel.detect(frame);
+    m.personModel.detect(frame, personsScratch);
 
-    for (const Model::Detection& person : PERSONS) {
+    for (const Model::Detection& person : personsScratch) {
         // * 2. Head on the person crop
         // ? Clamp the crop to the frame: a box can extend past the edge when a
         // ? person is partially out of view.
@@ -197,7 +199,7 @@ std::vector<Model::Detection> Perception::fuse(const cv::Mat& frame) {
         if (X2 <= X1 || Y2 <= Y1) continue;                                         // ? Degenerate box
 
         const cv::Mat CROP = frame(cv::Rect(X1, Y1, X2 - X1, Y2 - Y1));
-        const std::vector<Model::Detection> HEADS = m.headModel.detect(CROP);
+        m.headModel.detect(CROP, headsScratch);
 
         // * 3. Distance: head preferred, body fallback
         // ? This is the whole reason the head model exists. A head is ~23 cm
@@ -206,10 +208,10 @@ std::vector<Model::Detection> Perception::fuse(const cv::Mat& frame) {
         // ? See prøblems.txt: body is "whack" at range, head is good to ~15 m.
         float distance = 0.0f;
 
-        if (!HEADS.empty()) {
+        if (!headsScratch.empty()) {
             // ? Highest-confidence head, matching the Python prototype.
             const auto BEST_HEAD = std::max_element(
-                HEADS.begin(), HEADS.end(),
+                headsScratch.begin(), headsScratch.end(),
                 [](const Model::Detection& a, const Model::Detection& b) {
                     return a.confidence < b.confidence;
                 }
@@ -233,9 +235,13 @@ std::vector<Model::Detection> Perception::fuse(const cv::Mat& frame) {
         const float CENTER_X = (person.bbox[0] + person.bbox[2]) / 2.0f;
         const float CENTER_Y = (person.bbox[1] + person.bbox[3]) / 2.0f;
 
-        // ? Copy, not move: `person` is a const& into PERSONS, so it cannot be
-        // ? mutated and must not be. The copy is the mutable working value that
-        // ? gets `positionCamera` filled in before being moved into the result.
+        // TODO: [#43] Use `emplace_back()` instead of `push_back()` to avoid 
+        //     : temporary construction of the hypothesis object. This is a copy, 
+        //     : and we can avoid it by constructing the object in place.
+        // ? Copy, not move: `person` is a const& into personsScratch, so it
+        // ? cannot be mutated and must not be. The copy is the mutable working
+        // ? value that gets `positionCamera` filled in before being moved into
+        // ? the result.
         Model::Detection fusedPerson = person;
         fusedPerson.positionCamera = cogidrone::Vec3{
             (CENTER_X - principalX) * distance / focalLength,                       // x: right
@@ -243,10 +249,8 @@ std::vector<Model::Detection> Perception::fuse(const cv::Mat& frame) {
             distance                                                                // z: forward
         };
 
-        fused.persons.push_back(std::move(fusedPerson));
+        out.push_back(std::move(fusedPerson));
     }
-
-    return fused;
 }
 
 std::unique_ptr<vision_msgs::msg::Detection2DArray>
@@ -255,7 +259,12 @@ Perception::toDetectionArray(const std::vector<Model::Detection>& fused) const {
     // TODO: [#43] Use `emplace_back()` instead of `push_back()` to avoid a copy.
     auto out = std::make_unique<vision_msgs::msg::Detection2DArray>();              // ? unique_ptr publish: zero-copy intra-process
 
-    for (const Model::Detection& person : fused.persons) {
+    // ? One allocation for the message itself is unavoidable: `publish()` takes
+    // ? ownership of the unique_ptr. But the inner vector can be sized once
+    // ? instead of growing.
+    out->detections.reserve(fused.size());
+
+    for (const Model::Detection& person : fused) {
         vision_msgs::msg::Detection2D detection;
 
         // ? bbox is centre + size, not corners.

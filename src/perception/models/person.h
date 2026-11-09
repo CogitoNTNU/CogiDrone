@@ -46,13 +46,13 @@ public:
     Person& operator=(const Person&) = delete;
 
     // * Inference
-    // ! DOUBLE CHECK: return type
     // TODO: [#41] Reduce copy overhead by passing a preallocated
     //     : output vector to fill, or a pointer to the output buffer.
-    // ? Returns person boxes in the ORIGINAL frame's pixel coordinates.
+    // ? `out` receives boxes in the ORIGINAL frame's pixel coordinates. It is
+    // ? cleared first, so the caller can reuse one vector across frames.
     // ? `positionCamera` is NOT filled here - distance needs the head pass,
     // ? which is Perception's job (see fuse()).
-    [[nodiscard]] std::vector<Model::Detection> detect(const cv::Mat& frame);
+    void detect(const cv::Mat& frame, std::vector<Model::Detection>& out);
 
     // * Class table
     [[nodiscard]] static std::span<const std::string_view> classNames() noexcept;
