@@ -22,16 +22,24 @@ file(GLOB _ros_lib_dirs ${CMAKE_SOURCE_DIR}/vendored/ros2/opt/ros/jazzy/lib)
 # endif()
 
 
+
 # * Perception dependencies
-# ? TensorRT, CUDA, and OpenCV all ship with JetPack - nothing is vendored.
-# ? `nvinfer` is the inference runtime. `nvonnxparser` is NOT needed: engines
-# ? are built offline with trtexec, not parsed from ONNX at runtime.
+# ? TensorRT, CUDA, and OpenCV are only present on the Jetson itself.
+# ? Three builds exist, and only one has them:
+# ?   Jetson native (aarch64 Linux, no toolchain file)     -> HAS them
+# ?   Windows cross-compile (aarch64-linux-gnu toolchain)  -> does NOT
+# ?   Native MSVC (Windows x64)                            -> does NOT
 # !
-# ! GUARDED BY `NOT MSVC`. The Windows cross-build exists only to catch compile
-# ! errors, and TensorRT/CUDA/OpenCV are not present there. Consequence, stated
-# ! plainly: the Windows build no longer covers the perception models. The
-# ! Jetson build is the only build that compiles them.
-if(NOT MSVC)
+# ! `if(NOT MSVC)` was WRONG. The cross-compile uses aarch64-linux-gnu-g++,
+# ! so MSVC is false and the find_package() calls ran against a host with no
+# ! aarch64 CUDA. The configure then failed with "Could not find nvcc".
+# ! The correct predicate is "native Linux", not "not MSVC".
+set(_has_perception_models FALSE)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT CMAKE_CROSSCOMPILING)
+    set(_has_perception_models TRUE)
+endif()
+
+if(_has_perception_models)
     find_package(CUDAToolkit REQUIRED)
     find_library(_nvinfer_lib nvinfer REQUIRED)
     find_package(OpenCV REQUIRED COMPONENTS core imgproc)
@@ -68,7 +76,7 @@ add_executable(cogidrone
 )
 
 # ? The TensorRT-backed sources only exist where TensorRT exists.
-if(NOT MSVC)
+if(_has_perception_models)
     target_sources(cogidrone PRIVATE
         perception/models/trt_engine.cpp
         perception/models/yolo.cpp
@@ -83,7 +91,7 @@ target_include_directories(cogidrone PRIVATE
     ${_px4_include_dir}                                                             
 )
 
-if(NOT MSVC)
+if(_has_perception_models)
     target_include_directories(cogidrone PRIVATE
         /usr/include/aarch64-linux-gnu                                                  # TensorRT headers
         ${OpenCV_INCLUDE_DIRS}
@@ -117,7 +125,7 @@ target_link_libraries(cogidrone PRIVATE
     px4_msgs__rosidl_typesupport_introspection_cpp px4_msgs__rosidl_typesupport_introspection_c
 )
 
-if(NOT MSVC)
+if(_has_perception_models)
     target_link_libraries(cogidrone PRIVATE
         ${_nvinfer_lib}
         CUDA::cudart
