@@ -12,11 +12,13 @@
 #include "std_msgs/msg/u_int8.hpp"
 #include "px4_msgs/msg/trajectory_setpoint.hpp"
 #include "px4_msgs/msg/vehicle_local_position.hpp"
+// #include "px4_msgs/msg/vehicle_attitude.hpp"
 #include "vision_msgs/msg/detection2_d_array.hpp"
 
 #include "logging.h"
 #include "controller/flight_commands.h"
 #include "math/vec3.h"
+#include "math/transform.h"
 #include "enum_names.h"
 
 
@@ -35,6 +37,77 @@
 // ? running the state machine twice per frame (once from the timer, once from 
 // ? the callback) for no benefit.
 
+// * Frame chain - why Navigation converts, and why yaw-only
+// ? Three frames are in play. Mixing them up is the easiest way to fly the
+// ? drone into something:
+// ?
+// ?   CAMERA   x right, y DOWN,  z forward     OpenCV convention
+// ?   BODY     x forward, y right, z down      PX4 FRD
+// ?   WORLD    x north, y east,  z down        PX4 NED
+// ?
+// ? Perception reports in CAMERA frame on purpose. A sensor node should not
+// ? need the vehicle's orientation, and keeping the conversion here means the
+// ? Perception pipeline stays testable without a flight controller.
+// ?
+// ?   CAMERA -> BODY   fixed. The camera is bolted to the airframe, so this is
+// ?                    a pure axis permutation: body = {cam.z, cam.x, cam.y}.
+// ?                    See cogidrone::cameraToBody() in math/transform.h.
+// ?   BODY   -> WORLD  NOT fixed. This is the vehicle's attitude, which changes
+// ?                    every control cycle.
+// ?
+// ? THE APPROXIMATION
+// ? We build the body->world rotation from YAW ALONE, using
+// ? `VehicleLocalPosition.heading` - a field we already subscribe to. Roll and
+// ? pitch are treated as zero.
+// ?
+// ? Why that is sufficient TODAY:
+// ?   - Every consumer of `person.position` reads only .x and .y.
+// ?     followBehavior() and detectionIsValid() never touch .z.
+// ?   - The horizontal projection of a camera-frame point depends on yaw alone.
+// ?     Roll and pitch only leak into the horizontal plane through the VERTICAL
+// ?     component of the detection.
+// ?
+// ? The error is bounded and small:
+// ?
+// ?     horizontal_error  ~=  |camera.y| * sqrt(pitch^2 + roll^2)
+// ?
+// ?   |camera.y| is the person's offset below the camera axis. For a drone at
+// ?   2.5 m looking at a 1.7 m person, that is ~0.8 m. Against a 4 m standoff:
+// ?
+// ?     tilt  5 deg  ->  0.07 m  (1.7%)
+// ?     tilt 10 deg  ->  0.14 m  (3.5%)
+// ?     tilt 20 deg  ->  0.28 m  (7.0%)
+// ?     tilt 30 deg  ->  0.42 m  (10.5%)
+// ?
+// ? A position-hold drone sits under ~10 deg in calm air. Even a 30 deg transit
+// ? leaves the standoff within half a metre.
+// ?
+// ? WHY NOT SUBSCRIBE TO vehicle_attitude
+// ? It publishes at ~250 Hz (EKF2 rate) versus the camera's 30 Hz, and it would
+// ? join the same MutuallyExclusive callback group - so it would serialize
+// ? against onDetections(), which runs the full YOLO pipeline for 20-30 ms.
+// ? The CPU cost is negligible (~0.025%), but the conceptual cost is not: a
+// ? second high-rate topic, a second callback, a second state member, and a
+// ? second entry in the thread-safety invariant below. All to compute a .z that
+// ? nothing reads.
+// ?
+// ! WHAT THIS COSTS
+// ! `person.position.z` is a camera-frame value rotated by yaw only. It is NOT
+// ! a trustworthy world altitude. Nothing reads it today. If something starts
+// ! to, that is the trigger to upgrade.
+// !
+// ! UPGRADE TRIGGERS - switch to the full quaternion when ANY of these is true:
+// !   1. A gimbal or a non-forward camera mount lands. Then camera->body is no
+// !      longer a fixed permutation, which is exactly [#32].
+// !   2. `person.position.z` is needed for anything (terrain-relative altitude,
+// !      a 3D follow point, a drop-release height).
+// !   3. Flight testing shows the tilt error matters against the standoff.
+// !
+// ! The upgrade is mechanical: subscribe to /fmu/out/vehicle_attitude
+// ! (best_effort, same as local position), store the quaternion, and pass it to
+// ! cogidrone::cameraToWorld() instead of the yaw-only Quat built in
+// ! onDetections(). cameraToWorld() already takes a full Quat - no signature
+// ! change is needed.
 
 // * Control state
 // ? The relationship between Navigation and PX4, derived from the two booleans
@@ -150,8 +223,12 @@ enum class MissionState {
 
 // * Data types
 struct PersonDetection {
-    cogidrone::Vec3 position;                                                           // TODO: [#21] world-frame position (NED) - requires fused detections (depth + intrinsics) from Perception
+    // ! `.z` is NOT a trustworthy world altitude.
+    // ? See the "Frame chain" block above for the yaw-only approximation this uses. 
+    cogidrone::Vec3 position;                                                           // World-frame NED, converted from Perception's camera-frame XYZ in onDetections(). 
+    
     float confidence = 0.0f;                                                            // Detection confidence [0-1]
+    
     // ! The clock type is load-bearing. `rclcpp::Time{}` defaults to
     // ! RCL_SYSTEM_TIME, but `node->now()` returns RCL_ROS_TIME, and
     // ! `rclcpp::Time::operator-` THROWS std::runtime_error when the two
@@ -162,6 +239,7 @@ struct PersonDetection {
     // ! because an unscoped enum converts to uint32_t. The 3-arg form is
     // ! unambiguous by arity.
     rclcpp::Time timestamp{0, 0, RCL_ROS_TIME};
+    
     bool valid = false;
 };
 

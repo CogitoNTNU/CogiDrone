@@ -205,7 +205,41 @@ void Navigation::onDetections(const vision_msgs::msg::Detection2DArray& msg) {
         person.timestamp = m.node->now();
         person.valid = true;
 
-        // TODO: [#21] person.position = ... (world-frame, from fused detections)
+        // * Camera frame -> world NED
+        // ? Perception publishes camera-frame XYZ in results[0].pose.pose.position
+        // ? (OpenCV: x right, y down, z forward). Converting needs the vehicle's
+        // ? orientation, which is why this lives here and not in Perception.
+        // ?
+        // ! YAW-ONLY APPROXIMATION - see the "Frame chain" block in navigation.h
+        // ! for the full reasoning and the error table. In short: every consumer
+        // ! of `person.position` reads only .x and .y, and the horizontal
+        // ! projection depends on yaw alone. Roll and pitch leak in only through
+        // ! the vertical component, contributing |camera.y| * tilt - about 0.14 m
+        // ! at 10 degrees against a 4 m standoff.
+        // !
+        // ! `heading` is NAN when the EKF has no yaw estimate. Falling back to 0
+        // ! is deliberate: a NAN would propagate into the setpoint and PX4 would
+        // ! reject it, which is a worse failure than a wrong-but-finite heading.
+        // ! The drone is not flying autonomously without a position fix anyway -
+        // ! dronePositionValid() gates every behavior.
+        const float HEADING = std::isfinite(dronePosition.heading) ? dronePosition.heading : 0.0f;
+
+        // ? Quaternion for a rotation of HEADING about the world z (down) axis.
+        // ? Half-angle form: q = {cos(a/2), 0, 0, sin(a/2)}.
+        const cogidrone::Quat YAW_ONLY{
+            std::cos(HEADING * 0.5f), 0.0f, 0.0f, std::sin(HEADING * 0.5f)
+        };
+
+        const auto& CAMERA_POSITION = best->results.front().pose.pose.position;
+        person.position = cogidrone::cameraToWorld(
+            cogidrone::Vec3{
+                static_cast<float>(CAMERA_POSITION.x),
+                static_cast<float>(CAMERA_POSITION.y),
+                static_cast<float>(CAMERA_POSITION.z)
+            },
+            YAW_ONLY,
+            cogidrone::Vec3{dronePosition.x, dronePosition.y, dronePosition.z}
+        );
     }
     
     // ? Only run the mission when we are the pilot. In every other control
@@ -620,6 +654,18 @@ void Navigation::followBehavior() {
     // ? No valid detection: hold. evaluateTransitions() moves us to PERSON_LOST
     // ? once the hysteresis window expires; until then, holding is correct.
     if (!detectionIsValid() || !dronePositionValid()) {
+        hoverBehavior();
+        return;
+    }
+
+    // ? `person.position` is only written when a detection carries a pose.
+    // ? A zero vector means "no world position yet" - holding is the only safe
+    // ? action. Without this, the drone flies to a 4 m ring around the EKF origin.
+    // ?
+    // ! GUARD: This is not defensive padding. It is the difference between a 
+    // ! bug and a flyaway, and it stays correct even after the full-attitude 
+    // ! upgrade: a detection with no pose still yields a zero vector.
+    if (person.position.norm() < 1e-3f) {
         hoverBehavior();
         return;
     }
