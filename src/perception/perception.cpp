@@ -233,7 +233,9 @@ Model::FusedDetections Perception::fuse(const cv::Mat& frame) {
         const float CENTER_X = (person.bbox[0] + person.bbox[2]) / 2.0f;
         const float CENTER_Y = (person.bbox[1] + person.bbox[3]) / 2.0f;
 
-        // ? Is this a copy? Yes, but the copy is deliberate: we want to keep the original person
+        // ? Copy, not move: `person` is a const& into PERSONS, so it cannot be
+        // ? mutated and must not be. The copy is the mutable working value that
+        // ? gets `positionCamera` filled in before being moved into the result.
         Model::Detection fusedPerson = person;
         fusedPerson.positionCamera = cogidrone::Vec3{
             (CENTER_X - principalX) * distance / focalLength,                       // x: right
