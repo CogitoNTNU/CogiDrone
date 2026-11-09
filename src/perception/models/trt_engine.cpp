@@ -149,18 +149,29 @@ std::expected<void, TrtEngine::InitError> TrtEngine::wire() {
     }
     m.deviceOutput.reset(output);
 
+    // * Host staging buffers
+    // ? Sized from the engine's tensor shapes, allocated once. `assign` rather
+    // ? than `resize` so the memory is zero-initialised - a partially-filled
+    // ? input buffer then produces zeros, not garbage.
+    m.hostInput.assign(m.inputBytes / sizeof(float), 0.0f);
+    m.hostOutput.assign(m.outputBytes / sizeof(float), 0.0f);
+
     return {};
 }
 
 
 // * Inference
-std::vector<float> TrtEngine::infer(const std::vector<float>& input) {
+std::span<float> TrtEngine::inputBuffer() noexcept {
+    return m.hostInput;
+}
+
+std::span<const float> TrtEngine::infer() {
     // * 1. Host -> device
     // ! On the same stream as the enqueue below, so the ordering is guaranteed
     // ! without an explicit synchronize between them.
     cudaMemcpyAsync(
         m.deviceInput.get(),
-        input.data(),
+        m.hostInput.data(),
         m.inputBytes,
         cudaMemcpyHostToDevice,
         m.stream
@@ -180,9 +191,8 @@ std::vector<float> TrtEngine::infer(const std::vector<float>& input) {
     }
 
     // * 3. Device -> host
-    std::vector<float> output(m.outputBytes / sizeof(float));
     cudaMemcpyAsync(
-        output.data(),
+        m.hostOutput.data(),
         m.deviceOutput.get(),
         m.outputBytes,
         cudaMemcpyDeviceToHost,
@@ -192,5 +202,5 @@ std::vector<float> TrtEngine::infer(const std::vector<float>& input) {
     // ? The only synchronization point. Everything above is queued.
     cudaStreamSynchronize(m.stream);
 
-    return output;
+    return m.hostOutput;
 }
