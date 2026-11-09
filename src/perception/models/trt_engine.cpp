@@ -161,9 +161,7 @@ std::expected<void, TrtEngine::InitError> TrtEngine::wire() {
 
 
 // * Inference
-std::span<float> TrtEngine::inputBuffer() noexcept {
-    return m.hostInput;
-}
+// ? inputBuffer() is defined inline in the header - it is a member access.
 
 std::span<const float> TrtEngine::infer() {
     // * 1. Host -> device

@@ -117,8 +117,6 @@ public:
     TrtEngine& operator=(const TrtEngine&) = delete;
 
     // * Inference
-    // TODO: [#41] Reduce copy overhead by passing a preallocated
-    //     : output vector to fill, or a pointer to the output buffer.
     // ? Two-step, so the caller writes the input tensor directly into the
     // ? staging buffer with no intermediate copy:
     // ?
@@ -135,7 +133,12 @@ public:
     // ! until this one is done anyway.
     // ! NOT const: it writes the device buffers and rebinds the context's tensor
     // ! addresses. Marking it const would be a lie.
-    [[nodiscard]] std::span<float> inputBuffer() noexcept;
+    // !
+    // ! `inputBuffer()` is NOT const either, and that is not an oversight: a
+    // ! const member function sees `m.hostInput` as `const std::vector<float>`,
+    // ! from which only `std::span<const float>` can be formed. The caller must
+    // ! be able to WRITE into this buffer, so the function cannot be const.
+    [[nodiscard]] inline std::span<float> inputBuffer() noexcept { return m.hostInput; }
     [[nodiscard]] std::span<const float> infer();
 
     // * Accessors
