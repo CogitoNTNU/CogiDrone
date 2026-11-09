@@ -179,11 +179,15 @@ cv::Mat Perception::toFrame(const sensor_msgs::msg::Image& msg) const {
 
 void Perception::fuse(const cv::Mat& frame, std::vector<Model::Detection>& out) {
     // TODO: [#42] Address magic numbers/strings
-    // TODO: [#43] Use `emplace_back()` instead of `push_back()` to avoid a copy.
     out.clear();
 
     // * 1. Persons on the full frame
     m.personModel.detect(frame, personsScratch);
+
+    // ? `personsScratch.size()` is an upper bound on `out.size()`: some persons
+    // ? are skipped below (degenerate box, no usable height). Reserving the
+    // ? upper bound means `out` never reallocates mid-loop.
+    out.reserve(personsScratch.size());
 
     for (const Model::Detection& person : personsScratch) {
         // * 2. Head on the person crop
@@ -233,21 +237,26 @@ void Perception::fuse(const cv::Mat& frame, std::vector<Model::Detection>& out) 
         const float CENTER_X = (person.bbox[0] + person.bbox[2]) / 2.0f;
         const float CENTER_Y = (person.bbox[1] + person.bbox[3]) / 2.0f;
 
-        // TODO: [#43] Use `emplace_back()` instead of `push_back()` to avoid 
-        //     : temporary construction of the hypothesis object. This is a copy, 
-        //     : and we can avoid it by constructing the object in place.
-        // ? Copy, not move: `person` is a const& into personsScratch, so it
-        // ? cannot be mutated and must not be. The copy is the mutable working
-        // ? value that gets `positionCamera` filled in before being moved into
-        // ? the result.
-        Model::Detection fusedPerson = person;
-        fusedPerson.positionCamera = cogidrone::Vec3{
-            (CENTER_X - principalX) * distance / focalLength,                       // x: right
-            (CENTER_Y - principalY) * distance / focalLength,                       // y: down
-            distance                                                                // z: forward
-        };
-
-        out.push_back(std::move(fusedPerson));
+        // ? `emplace_back` with positional arguments, not a designated
+        // ? initializer: this constructs the Detection in place, avoiding both
+        // ? the copy out of `person` and the move into `out`. The
+        // ? `/* .field = */` comments carry the names that designated
+        // ? initializers would have enforced - if `Detection`'s field order ever
+        // ? changes, these comments must change with it.
+        // ?
+        // ! `person` is a const& into personsScratch, so its fields are copied
+        // ! by value here. That is unavoidable: `positionCamera` is computed
+        // ! from the intrinsics, which `Yolo` does not know about.
+        out.emplace_back(
+            /* .bbox = */           person.bbox,
+            /* .confidence = */     person.confidence,
+            /* .classId = */        person.classId,
+            /* .positionCamera = */ cogidrone::Vec3{
+                                        (CENTER_X - principalX) * distance / focalLength,       // x: right
+                                        (CENTER_Y - principalY) * distance / focalLength,       // y: down
+                                        distance                                                // z: forward
+                                    }
+        );
     }
 }
 
