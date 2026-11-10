@@ -167,8 +167,8 @@ target_link_libraries(cogidrone PRIVATE
 # ? paths makes the binary self-contained: no LD_LIBRARY_PATH, works from
 # ? systemd, launch files, and SSH non-interactive shells.
 set_target_properties(cogidrone PROPERTIES
-    BUILD_RPATH "${_px4_lib_dir};${_ros_lib_dirs}"
-    INSTALL_RPATH "${_px4_lib_dir};${_ros_lib_dirs}"
+    BUILD_RPATH "$ORIGIN/../../vendored/px4_msgs/lib;$ORIGIN/../../vendored/ros2/opt/ros/jazzy/lib"
+    INSTALL_RPATH "$ORIGIN/../../vendored/px4_msgs/lib;$ORIGIN/../../vendored/ros2/opt/ros/jazzy/lib"
 )
 
 
