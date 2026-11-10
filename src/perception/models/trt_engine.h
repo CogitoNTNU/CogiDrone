@@ -111,8 +111,9 @@ public:
 
     ~TrtEngine();
 
-    TrtEngine(TrtEngine&&) noexcept = default;                                          // movable - handles transfer
-    TrtEngine& operator=(TrtEngine&&) noexcept = default;
+    TrtEngine(TrtEngine&& other) noexcept;                                              // movable - handles transfer
+    TrtEngine& operator=(TrtEngine&& other) noexcept;    
+
     TrtEngine(const TrtEngine&) = delete;                                               // non-copyable (one context)
     TrtEngine& operator=(const TrtEngine&) = delete;
 
