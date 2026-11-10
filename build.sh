@@ -100,7 +100,7 @@ fi
 
 # ? nvinfer is the inference runtime. Its absence means the CMake configure
 # ? will fail, so catch it here with a readable message.
-if ldconfig -p | grep -q libnvinfer.so; then
+if ldconfig -p | grep libnvinfer.so >/dev/null; then
     ok "TensorRT runtime present"
 else
     fail "libnvinfer.so not found. Is JetPack installed correctly?"
