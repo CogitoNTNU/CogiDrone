@@ -144,13 +144,15 @@ build_engine() {
     info "Building $name.engine (FP16)..."
     # ? --memPoolSize replaces the deprecated --workspace in TensorRT 10+.
     # ? 2 GiB is generous for a 640x640 YOLO; the actual peak is far lower.
-    "$TRTEXEC" \
-        --onnx="$onnx" \
-        --saveEngine="$engine" \
+    local LOG="/tmp/trtexec-$name.log"
+    if ! "$TRTEXEC" \
+        --onnx="$onnx" \ 
+        --saveEngine="$engine" \ 
         --fp16 \
-        --memPoolSize=workspace:2048MiB \
-        >/dev/null 2>&1 \
-        || fail "trtexec failed for $name. Check the ONNX export layout."
+        --memPoolSize=workspace:2048MiB \ 
+        >"$LOG" 2>&1; then
+        fail "trtexec failed for $name. Log: $LOG (tail: $(tail -n 3 "$LOG" | tr '\n' ' '))"
+    fi
 
     ok "$name.engine built"
 }
