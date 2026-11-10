@@ -61,7 +61,7 @@ for arg in "$@"; do
             printf "${BOLD}CogiDrone - Jetson native build${RESET}\n\n"
             printf "  ${CYAN}--engines${RESET}  Rebuild the TensorRT .engine plans from .onnx\n"
             printf "  ${CYAN}--clean${RESET}    Delete $BUILD_DIR before configuring\n"
-            printf "  ${CYAN}-jN${RESET}       Build with N jobs (default: nproc)\n"
+            printf "  ${CYAN}-jN${RESET}        Build with N jobs (default: nproc)\n"
             exit 0
             ;;
         *) fail "Unknown argument: $arg" ;;
