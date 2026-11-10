@@ -65,7 +65,7 @@ file(GLOB _ros_lib_dirs ${CMAKE_SOURCE_DIR}/vendored/ros2/opt/ros/jazzy/lib)
 # ? root is .../include/px4_msgs (same <pkg>/<pkg>/ nesting as Jazzy packages)
 set(_px4_include_dir ${CMAKE_SOURCE_DIR}/vendored/px4_msgs/include/px4_msgs)
 set(_px4_lib_dir     ${CMAKE_SOURCE_DIR}/vendored/px4_msgs/lib)
-
+set(_ros_sys_lib_dir ${CMAKE_SOURCE_DIR}/vendored/ros2/usr/lib/aarch64-linux-gnu)
 
 # * Sources
 # ! HEADERS ARE LISTED ON PURPOSE.
@@ -160,6 +160,20 @@ target_link_libraries(cogidrone PRIVATE
     opencv_core opencv_imgproc
 )
 
+# * Runtime library resolution
+# ? The binary links against vendored px4_msgs + ROS 2 libs unconditionally
+# ? (see the link block above). Without an rpath the dynamic linker cannot
+# ? find them at runtime. Embedding the paths makes the binary self-contained:
+# ? no LD_LIBRARY_PATH, works from systemd, launch files, and SSH.
+set_target_properties(cogidrone PROPERTIES
+    BUILD_RPATH   "${_px4_lib_dir};${_ros_lib_dirs};${_ros_sys_lib_dir}"
+    INSTALL_RPATH "${_px4_lib_dir};${_ros_lib_dirs};${_ros_sys_lib_dir}"
+)
+
+# ? --disable-new-dtags emits DT_RPATH instead of DT_RUNPATH. DT_RUNPATH is
+# ? NOT inherited by transitive dependencies, so libs needed only by librcl.so
+# ? (rcl_yaml_param_parser, ...) would not be found. DT_RPATH is inherited.
+target_link_options(cogidrone PRIVATE "-Wl,--disable-new-dtags")
 
 # * Cross-link resolution
 # ? `-rpath-link` resolves the DT_NEEDED entries of the libraries above. `-L`

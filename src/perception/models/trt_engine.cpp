@@ -53,6 +53,26 @@ TrtEngine::~TrtEngine() {
     if (m.stream) cudaStreamDestroy(m.stream);
 }
 
+
+TrtEngine::TrtEngine(TrtEngine&& other) noexcept : m(std::move(other.m)) {
+    other.m.stream = nullptr;
+}
+
+TrtEngine& TrtEngine::operator=(TrtEngine&& other) noexcept {
+    if (this == &other) {
+        return *this;
+    }
+
+    if (m.stream) {
+        cudaStreamDestroy(m.stream);
+    }
+
+    m = std::move(other.m);
+    other.m.stream = nullptr;
+
+    return *this;
+}
+
 std::expected<TrtEngine, TrtEngine::InitError> TrtEngine::create(
     const std::string& enginePath,
     const std::string& inputName,

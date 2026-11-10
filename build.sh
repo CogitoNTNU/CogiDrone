@@ -61,13 +61,20 @@ for arg in "$@"; do
             printf "${BOLD}CogiDrone - Jetson native build${RESET}\n\n"
             printf "  ${CYAN}--engines${RESET}  Rebuild the TensorRT .engine plans from .onnx\n"
             printf "  ${CYAN}--clean${RESET}    Delete $BUILD_DIR before configuring\n"
-            printf "  ${CYAN}-jN${RESET}       Build with N jobs (default: nproc)\n"
+            printf "  ${CYAN}-jN${RESET}        Build with N jobs (default: nproc)\n"
             exit 0
             ;;
         *) fail "Unknown argument: $arg" ;;
     esac
 done
 
+
+# * Build log
+# ? Everything the script prints also lands in logs/build.log. ANSI colours
+# ? are stripped for the file so it stays readable in editors/diffs.
+LOG_DIR="$SCRIPT_DIR/logs"
+mkdir -p "$LOG_DIR"
+exec > >(tee >(sed -u 's/\x1B\[[0-9;]*[A-Za-z]//g' > "$LOG_DIR/build.log")) 2>&1
 
 # * 1. Preflight
 step "Preflight"
@@ -100,7 +107,7 @@ fi
 
 # ? nvinfer is the inference runtime. Its absence means the CMake configure
 # ? will fail, so catch it here with a readable message.
-if ldconfig -p | grep -q libnvinfer.so; then
+if ldconfig -p | grep libnvinfer.so >/dev/null; then
     ok "TensorRT runtime present"
 else
     fail "libnvinfer.so not found. Is JetPack installed correctly?"
@@ -141,16 +148,26 @@ build_engine() {
         return
     fi
 
-    info "Building $name.engine (FP16)..."
+    local LOG="$LOG_DIR/trtexec-$name.log"
+    info "Building $name.engine (FP16)... log: $LOG"
+
+    # ? Follow the log in a new terminal window, if one can be opened.
+    # ? Fails silently under SSH/headless - the log file is still there.
+    if command -v gnome-terminal >/dev/null && [ -n "${DISPLAY:-}" ]; then
+        gnome-terminal -- bash -c "touch '$LOG'; tail -n 40 -f '$LOG'; exec bash" \
+            || true
+    fi
+
     # ? --memPoolSize replaces the deprecated --workspace in TensorRT 10+.
     # ? 2 GiB is generous for a 640x640 YOLO; the actual peak is far lower.
-    "$TRTEXEC" \
+    if ! "$TRTEXEC" \
         --onnx="$onnx" \
         --saveEngine="$engine" \
         --fp16 \
-        --memPoolSize=workspace:2048MiB \
-        >/dev/null 2>&1 \
-        || fail "trtexec failed for $name. Check the ONNX export layout."
+        --memPoolSize=workspace:4096 \
+        >"$LOG" 2>&1; then
+        fail "trtexec failed for $name. Log: $LOG (tail: $(tail -n 3 "$LOG" | tr '\n' ' '))"
+    fi
 
     ok "$name.engine built"
 }
