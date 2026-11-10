@@ -149,7 +149,7 @@ build_engine() {
         --onnx="$onnx" \
         --saveEngine="$engine" \
         --fp16 \
-        --memPoolSize=workspace:2048MiB \
+        --memPoolSize=workspace:4096
         >"$LOG" 2>&1; then
         fail "trtexec failed for $name. Log: $LOG (tail: $(tail -n 3 "$LOG" | tr '\n' ' '))"
     fi
