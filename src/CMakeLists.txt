@@ -161,14 +161,12 @@ target_link_libraries(cogidrone PRIVATE
 )
 
 # * Runtime library resolution
-# ? The binary links against vendored px4_msgs + ROS 2 libs unconditionally
-# ? (see the link block above). Without an rpath the dynamic linker cannot
-# ? find them at runtime - it has no idea where they came from. Embedding the
-# ? paths makes the binary self-contained: no LD_LIBRARY_PATH, works from
-# ? systemd, launch files, and SSH non-interactive shells.
+# ? CMAKE_BUILD_RPATH_USE_ORIGIN makes CMake emit $ORIGIN-relative rpaths for
+# ? build-tree targets automatically - no manual escaping needed.
+set(CMAKE_BUILD_RPATH_USE_ORIGIN TRUE)
 set_target_properties(cogidrone PROPERTIES
-    BUILD_RPATH "$ORIGIN/../../vendored/px4_msgs/lib;$ORIGIN/../../vendored/ros2/opt/ros/jazzy/lib"
-    INSTALL_RPATH "$ORIGIN/../../vendored/px4_msgs/lib;$ORIGIN/../../vendored/ros2/opt/ros/jazzy/lib"
+    BUILD_RPATH "${_px4_lib_dir};${_ros_lib_dirs}"
+    INSTALL_RPATH "${_px4_lib_dir};${_ros_lib_dirs}"
 )
 
 
