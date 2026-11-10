@@ -1,0 +1,57 @@
+_wandb:
+    value:
+        cli_version: 0.30.0
+        e:
+            h995iv4f3l4oxaub8l4fhfuud816mo6u:
+                apple:
+                    ecpuCores: 6
+                    gpuCores: 10
+                    macModel: Mac17,4
+                    memoryGb: 32
+                    name: Apple M5
+                    pcpuCores: 4
+                    ramTotalBytes: "34359738368"
+                codePath: python/cv_training/training.py
+                codePathLocal: python/cv_training/training.py
+                cpu_count: 10
+                cpu_count_logical: 10
+                disk:
+                    /:
+                        total: "994610155520"
+                        used: "219522510848"
+                email: elias.nummerto@gmail.com
+                executable: /Users/evaloy/Documents/NTNU/Cogito/CogiDrone/CogiDroneGit/.venv/bin/python
+                git:
+                    commit: 47c78ccfbf545fc86b48250e3e0cb2d65736af30
+                    remote: https://github.com/CogitoNTNU/CogiDrone.git
+                host: dhcp-10-22-67-53.wlan.ntnu.no
+                memory:
+                    total: "34359738368"
+                os: macOS-26.6.2-arm64-arm-64bit-Mach-O
+                program: /Users/evaloy/Documents/NTNU/Cogito/CogiDrone/CogiDroneGit/python/cv_training/training.py
+                python: CPython 3.14.7
+                root: /Users/evaloy/Documents/NTNU/Cogito/CogiDrone/CogiDroneGit
+                startedAt: "2026-09-29T18:02:21.171221Z"
+                writerId: h995iv4f3l4oxaub8l4fhfuud816mo6u
+        m: []
+        python_version: 3.14.7
+        t:
+            "1":
+                - 1
+            "2":
+                - 1
+                - 41
+            "3":
+                - 16
+            "4": 3.14.7
+            "5": 0.30.0
+            "12": 0.30.0
+            "13": darwin-arm64
+architecture:
+    value: CNN
+dataset:
+    value: CIFAR-100
+epochs:
+    value: 10
+learning_rate:
+    value: 0.02

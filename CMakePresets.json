@@ -3,10 +3,19 @@
   "configurePresets": [
     {
       "name": "linux-arm64",
-      "displayName": "Linux ARM64",
+      "displayName": "Linux ARM64 (cross-compile)",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/linux-arm64",
       "toolchainFile": "${sourceDir}/cmake/aarch64-linux-gnu.cmake"
+    },
+    {
+      "name": "jetson-native",
+      "displayName": "Jetson (native, TensorRT)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/jetson",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
     }
   ]
 }
