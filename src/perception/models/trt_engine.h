@@ -111,9 +111,15 @@ public:
 
     ~TrtEngine();
 
+    // ? TrtEngine is movable because it has no address-sensitive state:
+    // ? callbacks never capture its `this` pointer, and all resources needed
+    // ? for inference are owned by `m`. Factory functions return complete
+    // ? TrtEngine values through std::expected and move-construct them into
+    // ? their final Yolo/model owners. This is ownership transfer during
+    // ? construction, not exposure of a partially initialized object.
     TrtEngine(TrtEngine&& other) noexcept;                                              // movable - handles transfer
-    TrtEngine& operator=(TrtEngine&& other) noexcept;    
-
+    
+    TrtEngine& operator=(TrtEngine&&) noexcept = delete;                                // move assignment deleted because engines are initialized into their final owners
     TrtEngine(const TrtEngine&) = delete;                                               // non-copyable (one context)
     TrtEngine& operator=(const TrtEngine&) = delete;
 

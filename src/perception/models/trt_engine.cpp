@@ -47,31 +47,26 @@ void logTensorNames(const nvinfer1::ICudaEngine& engine) {
 
 
 // * Ctors & dtor
+// Dtor
 TrtEngine::~TrtEngine() {
     // ? Destroy the stream before the buffers it was used with. The unique_ptr
     // ? members are destroyed after this body runs, so the order is correct.
     if (m.stream) cudaStreamDestroy(m.stream);
 }
 
-
+// ! TensorRT objects, CUDA buffers, and containers have RAII move semantics,
+// ! but cudaStream_t is only an opaque handle. Default moving would copy the
+// ! stream, causing both objects to destroy the same CUDA resource. The move
+// ! constructor therefore transfers the complete, already-wired state and
+// ! nulls the source stream. The source remains valid for destruction, while
+// ! exactly one TrtEngine owns the stream. Move assignment is deliberately
+// ! deleted because engines are created once and initialized into their final
+// ! owners; this class never replaces an existing engine.
+// Move ctor
 TrtEngine::TrtEngine(TrtEngine&& other) noexcept : m(std::move(other.m)) {
     other.m.stream = nullptr;
 }
 
-TrtEngine& TrtEngine::operator=(TrtEngine&& other) noexcept {
-    if (this == &other) {
-        return *this;
-    }
-
-    if (m.stream) {
-        cudaStreamDestroy(m.stream);
-    }
-
-    m = std::move(other.m);
-    other.m.stream = nullptr;
-
-    return *this;
-}
 
 std::expected<TrtEngine, TrtEngine::InitError> TrtEngine::create(
     const std::string& enginePath,
