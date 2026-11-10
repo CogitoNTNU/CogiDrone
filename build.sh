@@ -69,6 +69,13 @@ for arg in "$@"; do
 done
 
 
+# * Build log
+# ? Everything the script prints also lands in logs/build.log. ANSI colours
+# ? are stripped for the file so it stays readable in editors/diffs.
+LOG_DIR="$SCRIPT_DIR/logs"
+mkdir -p "$LOG_DIR"
+exec > >(tee >(sed -u 's/\x1B\[[0-9;]*[A-Za-z]//g' > "$LOG_DIR/build.log")) 2>&1
+
 # * 1. Preflight
 step "Preflight"
 
@@ -141,19 +148,18 @@ build_engine() {
         return
     fi
 
-        local LOG="/tmp/trtexec-$name.log"
+    local LOG="$LOG_DIR/trtexec-$name.log"
     info "Building $name.engine (FP16)... log: $LOG"
 
     # ? Follow the log in a new terminal window, if one can be opened.
     # ? Fails silently under SSH/headless - the log file is still there.
     if command -v gnome-terminal >/dev/null && [ -n "${DISPLAY:-}" ]; then
-        gnome-terminal -- bash -c "tail -n 40 -f '$LOG'; exec bash" \
+        gnome-terminal -- bash -c "touch '$LOG'; tail -n 40 -f '$LOG'; exec bash" \
             || true
     fi
 
     # ? --memPoolSize replaces the deprecated --workspace in TensorRT 10+.
     # ? 2 GiB is generous for a 640x640 YOLO; the actual peak is far lower.
-    local LOG="/tmp/trtexec-$name.log"
     if ! "$TRTEXEC" \
         --onnx="$onnx" \
         --saveEngine="$engine" \
