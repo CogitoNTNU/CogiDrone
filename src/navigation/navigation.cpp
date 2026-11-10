@@ -210,12 +210,12 @@ void Navigation::onDetections(const vision_msgs::msg::Detection2DArray& msg) {
         // ? (OpenCV: x right, y down, z forward). Converting needs the vehicle's
         // ? orientation, which is why this lives here and not in Perception.
         // ?
-        // ! YAW-ONLY APPROXIMATION - see the "Frame chain" block in navigation.h
-        // ! for the full reasoning and the error table. In short: every consumer
-        // ! of `person.position` reads only .x and .y, and the horizontal
-        // ! projection depends on yaw alone. Roll and pitch leak in only through
-        // ! the vertical component, contributing |camera.y| * tilt - about 0.14 m
-        // ! at 10 degrees against a 4 m standoff.
+        // ! YAW-ONLY APPROXIMATION - tracked as [#45]. See the "Frame chain"
+        // ! block in navigation.h for the full reasoning and the error table.
+        // ! In short: every consumer of `person.position` reads only .x and .y,
+        // ! and the horizontal projection depends on yaw alone. Roll and pitch
+        // ! leak in only through the vertical component, contributing
+        // ! |camera.y| * tilt - about 0.14 m at 10 degrees against a 4 m standoff.
         // !
         // ! `heading` is NAN when the EKF has no yaw estimate. Falling back to 0
         // ! is deliberate: a NAN would propagate into the setpoint and PX4 would

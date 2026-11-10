@@ -37,6 +37,7 @@
 // ? running the state machine twice per frame (once from the timer, once from 
 // ? the callback) for no benefit.
 
+// TODO: [45] Upgrade to full quaternion for camera->world conversion
 // * Frame chain - why Navigation converts, and why yaw-only
 // ? Three frames are in play. Mixing them up is the easiest way to fly the
 // ? drone into something:
@@ -55,7 +56,7 @@
 // ?   BODY   -> WORLD  NOT fixed. This is the vehicle's attitude, which changes
 // ?                    every control cycle.
 // ?
-// ? THE APPROXIMATION
+// ? THE APPROXIMATION - tracked as [#45]
 // ? We build the body->world rotation from YAW ALONE, using
 // ? `VehicleLocalPosition.heading` - a field we already subscribe to. Roll and
 // ? pitch are treated as zero.
@@ -102,6 +103,8 @@
 // !   2. `person.position.z` is needed for anything (terrain-relative altitude,
 // !      a 3D follow point, a drop-release height).
 // !   3. Flight testing shows the tilt error matters against the standoff.
+// !
+// ! See [#45] for the tracking issue.
 // !
 // ! The upgrade is mechanical: subscribe to /fmu/out/vehicle_attitude
 // ! (best_effort, same as local position), store the quaternion, and pass it to
