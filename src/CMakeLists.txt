@@ -160,6 +160,17 @@ target_link_libraries(cogidrone PRIVATE
     opencv_core opencv_imgproc
 )
 
+# * Runtime library resolution
+# ? The binary links against vendored px4_msgs + ROS 2 libs unconditionally
+# ? (see the link block above). Without an rpath the dynamic linker cannot
+# ? find them at runtime - it has no idea where they came from. Embedding the
+# ? paths makes the binary self-contained: no LD_LIBRARY_PATH, works from
+# ? systemd, launch files, and SSH non-interactive shells.
+set_target_properties(cogidrone PROPERTIES
+    BUILD_RPATH "${_px4_lib_dir};${_ros_lib_dirs}"
+    INSTALL_RPATH "${_px4_lib_dir};${_ros_lib_dirs}"
+)
+
 
 # * Cross-link resolution
 # ? `-rpath-link` resolves the DT_NEEDED entries of the libraries above. `-L`
