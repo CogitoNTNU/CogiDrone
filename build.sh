@@ -141,7 +141,16 @@ build_engine() {
         return
     fi
 
-    info "Building $name.engine (FP16)..."
+        local LOG="/tmp/trtexec-$name.log"
+    info "Building $name.engine (FP16)... log: $LOG"
+
+    # ? Follow the log in a new terminal window, if one can be opened.
+    # ? Fails silently under SSH/headless - the log file is still there.
+    if command -v gnome-terminal >/dev/null && [ -n "${DISPLAY:-}" ]; then
+        gnome-terminal -- bash -c "tail -n 40 -f '$LOG'; exec bash" \
+            || true
+    fi
+
     # ? --memPoolSize replaces the deprecated --workspace in TensorRT 10+.
     # ? 2 GiB is generous for a 640x640 YOLO; the actual peak is far lower.
     local LOG="/tmp/trtexec-$name.log"
@@ -149,7 +158,7 @@ build_engine() {
         --onnx="$onnx" \
         --saveEngine="$engine" \
         --fp16 \
-        --memPoolSize=workspace:4096
+        --memPoolSize=workspace:4096 \
         >"$LOG" 2>&1; then
         fail "trtexec failed for $name. Log: $LOG (tail: $(tail -n 3 "$LOG" | tr '\n' ' '))"
     fi
