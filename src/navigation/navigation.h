@@ -269,7 +269,7 @@ struct NavigationParams {
 
     // Detection
     float detectionTimeout          = 2.0f;                                             // seconds
-    float minDetectionConfidence    = 0.7f;
+    float minDetectionConfidence    = 0.4f;                                             // ? MIN_CONFIDENCE in target_closest.py
     float trackConfirmTime          = 1.0f;                                             // seconds of stable track before committing to FOLLOWING
 };
 
@@ -382,6 +382,10 @@ private:
     // ? Heading the search sweep started from. Captured on entry to SEARCHING so
     // ? the sweep never snaps the drone round to a fixed heading.
     float searchStartYaw = 0.0f;
+
+    // ? Last frame's target box, for ClosestTargeter-style target persistence
+    // ? in onDetections() (same person = box IoU >= 0.3).
+    vision_msgs::msg::BoundingBox2D lastTargetBox;
 
     // ? The two raw inputs from FlightController. Written by onArmed() /
     // ? onOffboardActive(), read by deriveControlState().

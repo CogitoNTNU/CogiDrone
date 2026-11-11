@@ -83,12 +83,14 @@ void Perception::wire() noexcept {
         }                                                                               // ! would therefore cause a dangling pointer as the `this` adress would be 
     );                                                                                  // ! invalid. Fix: make perception non-movable and owned via a unique_ptr
 
-    // ? Intrinsics are latched: they are published once and never change for a
-    // ? fixed camera configuration. `transient_local` means a late-joining
-    // ? Perception still receives the last one.
+    // ? realsense2_camera and ros_gz_bridge publish CameraInfo with every frame
+    // ? as VOLATILE. A TRANSIENT_LOCAL subscription never matches a VOLATILE
+    // ? publisher (requested <= offered), so it would receive nothing.
+    // ? SENSOR_DATA (best_effort + volatile) matches reliable and best_effort
+    // ? publishers alike.
     m.cameraInfoSubscription = m.node->create_subscription<sensor_msgs::msg::CameraInfo>(
         m.params.cameraInfoTopic,
-        rclcpp::QoS(1).transient_local(),
+        rclcpp::SensorDataQoS(),
         [this](const sensor_msgs::msg::CameraInfo& msg) {
             this->onCameraInfo(msg);
         }
@@ -111,7 +113,11 @@ void Perception::onCameraInfo(const sensor_msgs::msg::CameraInfo& msg) {
     principalX  = static_cast<float>(msg.k[2]);
     principalY  = static_cast<float>(msg.k[5]);
 
-    cogidrone::log(LOGGING_LEVEL::INFO, "Camera intrinsics received");
+    // ? CameraInfo arrives with every frame - log only the first one.
+    if (!intrinsicsReceivedLogged) {
+        intrinsicsReceivedLogged = true;
+        cogidrone::log(LOGGING_LEVEL::INFO, "Camera intrinsics received");
+    }
 }
 
 void Perception::onFrame(const sensor_msgs::msg::Image& msg) {

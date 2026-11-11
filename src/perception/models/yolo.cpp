@@ -210,13 +210,43 @@ void Yolo::detect(const cv::Mat& frame, std::vector<Model::Detection>& out) {
     const std::vector<std::size_t>& SHAPE = m.engine.outputShape();
     if (SHAPE.size() != 3) return;
 
+    m.candidates.clear();
+
+    // ! END-TO-END LAYOUT (YOLO26 and other NMS-free ultralytics exports):
+    // !   [1, maxDetections, 6]   e.g. [1, 300, 6] for models/best.engine
+    // !   each row = x1, y1, x2, y2, score, classId   (corners, LETTERBOXED space)
+    // ? The model already did the one-to-one matching, so there is no NMS
+    // ? step. Reading this as [1, 4 + numClasses, numAnchors] treats box
+    // ? corners as class scores - confidences of 500+ and boxes in the wrong place.
+    if (SHAPE[2] == 6 && SHAPE[1] > SHAPE[2]) {
+        for (std::size_t row = 0; row < SHAPE[1]; ++row) {
+            const float* DET = OUTPUT.data() + row * 6;
+            if (DET[4] < m.confidenceThreshold) continue;
+
+            const float X1 = (DET[0] - LETTERBOXED.padX) / LETTERBOXED.scale;
+            const float Y1 = (DET[1] - LETTERBOXED.padY) / LETTERBOXED.scale;
+            const float X2 = (DET[2] - LETTERBOXED.padX) / LETTERBOXED.scale;
+            const float Y2 = (DET[3] - LETTERBOXED.padY) / LETTERBOXED.scale;
+
+            out.emplace_back(
+                /* .bbox = */       std::array<float, 4>{
+                                        std::clamp(X1, 0.0f, static_cast<float>(frame.cols)),
+                                        std::clamp(Y1, 0.0f, static_cast<float>(frame.rows)),
+                                        std::clamp(X2, 0.0f, static_cast<float>(frame.cols)),
+                                        std::clamp(Y2, 0.0f, static_cast<float>(frame.rows))
+                                    },
+                /* .confidence = */ DET[4],
+                /* .classId = */    static_cast<int>(DET[5])
+            );
+        }
+        return;
+    }
+
     const std::size_t NUM_ROWS    = SHAPE[1];
     const std::size_t NUM_ANCHORS = SHAPE[2];
     if (NUM_ROWS < 5) return;                                                           // ? 4 box + at least 1 class
 
     const std::size_t NUM_CLASSES = NUM_ROWS - 4;
-
-    m.candidates.clear();
 
     for (std::size_t anchor = 0; anchor < NUM_ANCHORS; ++anchor) {
         // ? Best class for this anchor.

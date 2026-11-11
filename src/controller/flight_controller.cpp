@@ -67,14 +67,14 @@ void FlightController::wire() noexcept {
     // * Subscriptions
     // PX4 namespace: the bridge exposes uORB topics under /fmu/out/
     m.localPositionSubscription = m.node->create_subscription<px4_msgs::msg::VehicleLocalPosition>(
-        "/fmu/out/vehicle_local_position", 
+        "/fmu/out/vehicle_local_position_v1", 
         rclcpp::QoS(10).best_effort(),
         [this](const px4_msgs::msg::VehicleLocalPosition& msg) { 
             this->onLocalPosition(msg); 
         }
     );
     m.statusSubscription = m.node->create_subscription<px4_msgs::msg::VehicleStatus>(
-        "/fmu/out/vehicle_status", 
+        "/fmu/out/vehicle_status_v1", 
         rclcpp::QoS(10).best_effort(),
         [this](const px4_msgs::msg::VehicleStatus& msg) { 
             this->onStatus(msg); 

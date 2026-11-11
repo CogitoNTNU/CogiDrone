@@ -1,5 +1,6 @@
 #include "navigation.h"
 
+#include <algorithm>
 #include <chrono>
 #include <string>
 #include <cmath>
@@ -124,7 +125,7 @@ void Navigation::wire() noexcept {
     // ? topic as best_effort, and a reliable subscriber would never match.
     // ! No explicit callback group - same invariant as the other callbacks.
     m.localPositionSubscription = m.node->create_subscription<px4_msgs::msg::VehicleLocalPosition>(
-        "/fmu/out/vehicle_local_position",
+        "/fmu/out/vehicle_local_position_v1",
         rclcpp::QoS(10).best_effort(),
         [this](const px4_msgs::msg::VehicleLocalPosition& msg) {
             this->onLocalPosition(msg);
@@ -188,13 +189,45 @@ void Navigation::onDetections(const vision_msgs::msg::Detection2DArray& msg) {
     // ? `/perception/heads`), not a second branch here.
     // ! If Perception ever publishes mixed classes on this topic, this loop will
     // ! follow a head. Change the topic, not this loop.
-    const vision_msgs::msg::Detection2D* best = nullptr;
+    // ? Selection follows the Python prototype's ClosestTargeter
+    // ? (targeter/target_closest.py): among detections at or above
+    // ? minDetectionConfidence, keep the CURRENT target (box IoU >= 0.3 with
+    // ? last frame's box) unless another person is clearly closer (< 80 % of
+    // ? its distance); otherwise take the closest. Distance is camera-frame z.
+    constexpr double MIN_IOU_SAME_TARGET = 0.3;
+    constexpr double SWITCH_MARGIN = 0.8;
+    const auto IOU = [](const vision_msgs::msg::BoundingBox2D& a, const vision_msgs::msg::BoundingBox2D& b) {
+        const double IX = std::max(0.0, std::min(a.center.position.x + a.size_x / 2, b.center.position.x + b.size_x / 2)
+                                      - std::max(a.center.position.x - a.size_x / 2, b.center.position.x - b.size_x / 2));
+        const double IY = std::max(0.0, std::min(a.center.position.y + a.size_y / 2, b.center.position.y + b.size_y / 2)
+                                      - std::max(a.center.position.y - a.size_y / 2, b.center.position.y - b.size_y / 2));
+        const double UNION = a.size_x * a.size_y + b.size_x * b.size_y - IX * IY;
+        return UNION > 0.0 ? IX * IY / UNION : 0.0;
+    };
+    const auto DISTANCE = [](const vision_msgs::msg::Detection2D& d) {
+        return d.results.front().pose.pose.position.z;
+    };
+
+    const vision_msgs::msg::Detection2D* closest = nullptr;
+    const vision_msgs::msg::Detection2D* current = nullptr;
     for (const auto& detection : msg.detections) {
         if (detection.results.empty()) continue;                                        // ? Malformed entry
-        if (!best || detection.results.front().hypothesis.score
-                   > best->results.front().hypothesis.score) {
-            best = &detection;
+        if (detection.results.front().hypothesis.score < m.params.minDetectionConfidence) continue;
+        if (!closest || DISTANCE(detection) < DISTANCE(*closest)) {
+            closest = &detection;
         }
+        if (person.valid && IOU(detection.bbox, lastTargetBox) >= MIN_IOU_SAME_TARGET
+            && (!current || IOU(detection.bbox, lastTargetBox) > IOU(current->bbox, lastTargetBox))) {
+            current = &detection;
+        }
+    }
+
+    const vision_msgs::msg::Detection2D* best = closest;
+    if (current && !(DISTANCE(*closest) < DISTANCE(*current) * SWITCH_MARGIN)) {
+        best = current;
+    }
+    if (best) {
+        lastTargetBox = best->bbox;
     }
 
     // * Policy A: an empty array means "no person in this frame"
@@ -480,6 +513,7 @@ void Navigation::onEnter(MissionState entered) {
     // ? Edge-triggered outputs: exactly once per transition, never per tick.
     switch (entered) {
         case MissionState::SEARCHING:
+        case MissionState::PERSON_LOST:                                                 // ? PERSON_LOST sweeps too - see executeBehavior()
             // TODO: [#23] Rework searchBehavior() to use Representation's map of the environment.
             //     : The current searchBehavior is a simple rotate-in-place. This is a design
             //     : choice, we could also have a mix of: orbit, lawn-mower, and hold+rotate.
@@ -577,13 +611,12 @@ void Navigation::executeBehavior() {
             break;
 
         case MissionState::PERSON_LOST:
-            // ? Hold: do NOT publish a new setpoint. FlightController re-streams
-            // ? the last one, so PX4 actively holds the last COMMANDED position.
-            // ? Deliberate over hoverBehavior(), which would hold the CURRENT
-            // ? position: if the person vanished mid-transit, the last commanded
-            // ? point is where the drone was already heading, and completing
-            // ? that transit is a gentler correction than stopping short of it.
-            // ? Both are safe; this one is smoother.
+            // ? Sweep in place to re-acquire. Holding the last commanded point
+            // ? (the old behaviour) left the camera staring at wherever the
+            // ? person USED to be, so a person who walked out of frame was never
+            // ? seen again. The lost -> detected transition then picks them up.
+            // TODO: [#26] timeout -> RETURNING - blocked on the home-reference decision
+            searchBehavior();
             break;
 
         case MissionState::FOLLOWING:

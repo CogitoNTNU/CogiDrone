@@ -1,0 +1,171 @@
+{
+ "reference_height_m": 1.0,
+ "species": {
+  "spruce": [
+   {
+    "crown_base": 0.2,
+    "crown_radius": 0.18,
+    "crown_center": 0.6,
+    "trunk_r": 0.0105,
+    "hw": 0.17706907981322312,
+    "zmax": 1.020075,
+    "tris_near": 1130,
+    "tris_far": 8,
+    "bark_tris": 112,
+    "leaf_tris": 1018
+   },
+   {
+    "crown_base": 0.36,
+    "crown_radius": 0.16,
+    "crown_center": 0.6799999999999999,
+    "trunk_r": 0.0105,
+    "hw": 0.16349211014786347,
+    "zmax": 1.020075,
+    "tris_near": 1148,
+    "tris_far": 8,
+    "bark_tris": 112,
+    "leaf_tris": 1036
+   },
+   {
+    "crown_base": 0.5,
+    "crown_radius": 0.14,
+    "crown_center": 0.75,
+    "trunk_r": 0.0105,
+    "hw": 0.1514849616924133,
+    "zmax": 1.020075,
+    "tris_near": 1158,
+    "tris_far": 8,
+    "bark_tris": 112,
+    "leaf_tris": 1046
+   }
+  ],
+  "pine": [
+   {
+    "crown_base": 0.42,
+    "crown_radius": 0.17,
+    "crown_center": 0.76,
+    "trunk_r": 0.0115,
+    "hw": 0.2634715833826015,
+    "zmax": 1.0562825397011786,
+    "tris_near": 2156,
+    "tris_far": 8,
+    "bark_tris": 684,
+    "leaf_tris": 1472
+   },
+   {
+    "crown_base": 0.55,
+    "crown_radius": 0.22,
+    "crown_center": 0.8250000000000001,
+    "trunk_r": 0.0115,
+    "hw": 0.3448573340852964,
+    "zmax": 1.0475953278859738,
+    "tris_near": 1852,
+    "tris_far": 8,
+    "bark_tris": 594,
+    "leaf_tris": 1258
+   },
+   {
+    "crown_base": 0.5,
+    "crown_radius": 0.2,
+    "crown_center": 0.8,
+    "trunk_r": 0.0115,
+    "hw": 0.34017288041068555,
+    "zmax": 1.0168333052405785,
+    "tris_near": 2056,
+    "tris_far": 8,
+    "bark_tris": 654,
+    "leaf_tris": 1402
+   }
+  ],
+  "birch": [
+   {
+    "crown_base": 0.3,
+    "crown_radius": 0.16,
+    "crown_center": 0.65,
+    "trunk_r": 0.0085,
+    "hw": 0.2099773666818765,
+    "zmax": 1.004798973721194,
+    "tris_near": 624,
+    "tris_far": 8,
+    "bark_tris": 276,
+    "leaf_tris": 348
+   },
+   {
+    "crown_base": 0.42,
+    "crown_radius": 0.14,
+    "crown_center": 0.71,
+    "trunk_r": 0.0085,
+    "hw": 0.2040594097315146,
+    "zmax": 1.006735054605978,
+    "tris_near": 560,
+    "tris_far": 8,
+    "bark_tris": 252,
+    "leaf_tris": 308
+   },
+   {
+    "crown_base": 0.34,
+    "crown_radius": 0.19,
+    "crown_center": 0.67,
+    "trunk_r": 0.0085,
+    "hw": 0.24035969745168206,
+    "zmax": 1.008102561473535,
+    "tris_near": 688,
+    "tris_far": 8,
+    "bark_tris": 300,
+    "leaf_tris": 388
+   }
+  ],
+  "alder": [
+   {
+    "crown_base": 0.28,
+    "crown_radius": 0.22,
+    "crown_center": 0.64,
+    "trunk_r": 0.0065,
+    "hw": 0.2903282900470893,
+    "zmax": 0.9753037968019772,
+    "tris_near": 852,
+    "tris_far": 8,
+    "bark_tris": 432,
+    "leaf_tris": 420
+   },
+   {
+    "crown_base": 0.35,
+    "crown_radius": 0.19,
+    "crown_center": 0.675,
+    "trunk_r": 0.0065,
+    "hw": 0.24246475618371685,
+    "zmax": 0.9433266626496413,
+    "tris_near": 624,
+    "tris_far": 8,
+    "bark_tris": 312,
+    "leaf_tris": 312
+   }
+  ],
+  "juniper": [
+   {
+    "crown_base": 0.05,
+    "crown_radius": 0.085,
+    "crown_center": 0.5,
+    "trunk_r": 0.012,
+    "hw": 0.16706510270885136,
+    "zmax": 1.005,
+    "tris_near": 78,
+    "tris_far": 8,
+    "bark_tris": 20,
+    "leaf_tris": 58
+   },
+   {
+    "crown_base": 0.05,
+    "crown_radius": 0.15,
+    "crown_center": 0.5,
+    "trunk_r": 0.012,
+    "hw": 0.2053116067189746,
+    "zmax": 1.005,
+    "tris_near": 94,
+    "tris_far": 8,
+    "bark_tris": 20,
+    "leaf_tris": 74
+   }
+  ]
+ }
+}

@@ -54,7 +54,7 @@ private:
 
         // Subscriptions
         rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr imageSubscription;           // Subscription for camera images
-        rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr cameraInfoSubscription; // Intrinsics, latched
+        rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr cameraInfoSubscription; // Intrinsics, sent with every frame
         
         // Publishers
         // ? CONTRACT: this topic carries PERSON detections only. Navigation takes
@@ -95,6 +95,7 @@ private:
     // ? camera rate. A silent early return is a debugging trap: the node looks
     // ? alive but publishes nothing.
     bool intrinsicsMissingLogged = false;
+    bool intrinsicsReceivedLogged = false;
 
     // * Frame scratch
     // ? Reused across frames. `clear()` keeps the capacity, so after the first
