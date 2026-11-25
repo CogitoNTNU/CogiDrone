@@ -110,6 +110,7 @@ add_executable(cogidrone
     controller/flight_controller.cpp
     controller/flight_controller.h
     controller/flight_commands.h
+    controller/px4_topics.h
 
     # Math
     math/vec3.h
