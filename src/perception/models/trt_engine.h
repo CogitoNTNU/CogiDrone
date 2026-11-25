@@ -76,7 +76,7 @@ private:
         std::unique_ptr<nvinfer1::IExecutionContext, TrtDeleter> context;
 
         // CUDA
-        cudaStream_t stream = nullptr;
+        cudaStream_t stream;
         std::unique_ptr<void, CudaDeleter> deviceInput;
         std::unique_ptr<void, CudaDeleter> deviceOutput;
 
@@ -90,8 +90,8 @@ private:
         // Shapes
         std::string inputName;
         std::string outputName;
-        std::size_t inputBytes = 0;
-        std::size_t outputBytes = 0;
+        std::size_t inputBytes;
+        std::size_t outputBytes;
         std::vector<std::size_t> outputShape;                                           // e.g. {1, 10, 8400}
     } m;
 
