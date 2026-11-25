@@ -26,12 +26,17 @@ namespace cogidrone::px4 {
 // ! ONE allocation per call. Call this ONCE in wire(), never per message.
 // ! The returned string is copied by create_subscription, so the temporary
 // ! is safe to pass directly.
-template <typename Msg>
+// ?
+// ! NOT ALL PX4 MESSAGES ARE VERSIONED.
+// ! `OffboardControlMode` has no MESSAGE_VERSION member, so it cannot use this
+// ! template - its topic name is a plain literal. Check the message header
+// ! before assuming a topic needs a suffix.
+template <typename MessageType> requires requires { MessageType::MESSAGE_VERSION; }
 [[nodiscard]] std::string versionedTopic(std::string_view base) {
-    if constexpr (Msg::MESSAGE_VERSION == 0) {
+    if constexpr (MessageType::MESSAGE_VERSION == 0) {
         return std::string(base);                                                       // ? version 0 messages carry no suffix
     } else {
-        return std::string(base) + "_v" + std::to_string(Msg::MESSAGE_VERSION);
+        return std::string(base) + "_v" + std::to_string(MessageType::MESSAGE_VERSION);
     }
 }
 
