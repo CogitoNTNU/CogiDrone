@@ -95,7 +95,6 @@ private:
     // ? camera rate. A silent early return is a debugging trap: the node looks
     // ? alive but publishes nothing.
     bool intrinsicsMissingLogged = false;
-    bool intrinsicsReceivedLogged = false;
 
     // * Frame scratch
     // ? Reused across frames. `clear()` keeps the capacity, so after the first

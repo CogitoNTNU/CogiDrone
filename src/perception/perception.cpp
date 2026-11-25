@@ -109,13 +109,16 @@ void Perception::onCameraInfo(const sensor_msgs::msg::CameraInfo& msg) {
     // ? K is row-major 3x3: [fx 0 cx; 0 fy cy; 0 0 1].
     // ? fx and fy are equal for a square-pixel sensor, but read both and use
     // ? fx for horizontal and fy for vertical if they ever diverge.
+    // ?
+    // ! CameraInfo arrives with EVERY frame, so this callback runs at camera
+    // ! rate. Log only the 0 -> usable transition, not per message.
+    const bool INTRINSICS_MISSING_BEFORE_ASSIGNMENT = (focalLength <= 0.0f);
+
     focalLength = static_cast<float>(msg.k[0]);
     principalX  = static_cast<float>(msg.k[2]);
     principalY  = static_cast<float>(msg.k[5]);
 
-    // ? CameraInfo arrives with every frame - log only the first one.
-    if (!intrinsicsReceivedLogged) {
-        intrinsicsReceivedLogged = true;
+    if (INTRINSICS_MISSING_BEFORE_ASSIGNMENT && focalLength > 0.0f) {
         cogidrone::log(LOGGING_LEVEL::INFO, "Camera intrinsics received");
     }
 }
