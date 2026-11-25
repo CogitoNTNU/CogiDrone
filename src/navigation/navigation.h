@@ -466,7 +466,7 @@ private:
     // this monstrocity below :) (Good fucking luck figuring out how the 
     // `cogidrone::NamedEnum` concept + X-macro method works!)     
     // 
-    // Thanks for coming to my TED talk
+    // Thanks for reading!
     //   - Elias Alexander Wiklund Ottersbo
     template <cogidrone::NamedEnum E>
     [[nodiscard]] static constexpr std::string_view toString(E state) noexcept {
