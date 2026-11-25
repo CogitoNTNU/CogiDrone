@@ -19,14 +19,11 @@ constexpr std::array<std::string_view, 6> SR_CLASS_NAMES = {
 
 std::expected<Person, Person::InitError> Person::create() {
     // ! Fallible work FIRST: load the TensorRT plan
-    auto yolo = Yolo::create(
-        "models/best.engine",                                                           // TODO: [#35] path from a parameter
-        640,
-        640,
-        0.20f,                                                                          // ? CONF_THRESHOLD from depth_final.py
-        0.45f,
-        classNames()
-    );
+    auto yolo = Yolo<OutputLayout::END_TO_END>::create({
+        .enginePath = "models/best.engine",                                         // TODO: [#35] path from a parameter
+        .confidenceThreshold = 0.20f,                                               // ? CONF_THRESHOLD from depth_final.py
+        .classNames = classNames()
+    });
 
     if (!yolo) return std::unexpected(InitError::ModelLoadFailed);
 

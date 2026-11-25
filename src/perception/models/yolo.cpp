@@ -241,30 +241,36 @@ void decode(
 
 // * Ctors & dtor
 template <OutputLayout Layout>
-std::expected<Yolo<Layout>, typename Yolo<Layout>::InitError> Yolo<Layout>::create(
-    const std::string& enginePath,
-    int inputWidth,
-    int inputHeight,
-    float confidenceThreshold,
-    float iouThreshold,
-    std::span<const std::string_view> classNames
-) {
+std::expected<Yolo<Layout>, typename Yolo<Layout>::InitError>
+Yolo<Layout>::create(YoloParams<Layout> params) {
     // ! Fallible work FIRST: load the TensorRT plan
     // ? "images" and "output0" are the names ultralytics emits. If the export
     // ? used different names, TrtEngine::create() logs the ones it found.
-    auto engine = TrtEngine::create(enginePath, "images", "output0");
+    auto engine = TrtEngine::create(params.enginePath, "images", "output0");
     if (!engine) return std::unexpected(InitError::ModelLoadFailed);
 
-    return Yolo(M{
+    // ? `.iouThreshold` is omitted here: `M`'s default member initializer
+    // ? supplies it. Designated initializers may skip members, they just may
+    // ? not reorder them.
+    M members{
         .engine = std::move(*engine),
-        .inputWidth = inputWidth,
-        .inputHeight = inputHeight,
-        .confidenceThreshold = confidenceThreshold,
-        .iouThreshold = iouThreshold,
-        .classNames = classNames,
+        .inputWidth = params.inputWidth,
+        .inputHeight = params.inputHeight,
+        .confidenceThreshold = params.confidenceThreshold,
+        .classNames = params.classNames,
         .candidates = {},                                                               // ? decode scratch, grows to capacity on first frame
         .suppressedScratch = {}                                                         // ? NMS scratch, reused across all 4 passes
-    });
+    };
+
+    // ? `iouThreshold` exists ONLY on YoloParams<ANCHORS>, so this is the only
+    // ? place it can be read. The discarded branch is not instantiated, so
+    // ? `params.iouThreshold` is never even named for END_TO_END - it is not a
+    // ? dead read, it is a name that does not exist.
+    if constexpr (Layout == OutputLayout::ANCHORS) {
+        members.iouThreshold = params.iouThreshold;
+    }
+
+    return Yolo(std::move(members));
 }
 
 

@@ -40,6 +40,38 @@ enum class OutputLayout {
     ANCHORS,
 };
 
+// * Construction parameters
+// ? Split by layout so a parameter that does not apply CANNOT be passed.
+// ? `iouThreshold` exists only for ANCHORS: an END_TO_END export has already
+// ? done its one-to-one matching, so there is nothing to suppress.
+// ?
+// ? The defaults here mirror `M`'s. A call site therefore states only what
+// ? DIFFERS from the default - which is the information a reader wants.
+// ?
+// ! THESE ARE TWO INDEPENDENT AGGREGATES, NOT A BASE/DERIVED PAIR.
+// ! C++20 forbids initializing an inherited member with a designator, so
+// ! inheritance would break the designated-initializer call style. The shared
+// ! fields are duplicated on purpose. Both structs are adjacent, and a field
+// ! added to one but not the other fails at the call site that sets it.
+template <OutputLayout Layout>
+struct YoloParams {
+    std::string enginePath;
+    int inputWidth = 640;
+    int inputHeight = 640;
+    float confidenceThreshold = 0.25f;
+    std::span<const std::string_view> classNames;                                       // ? must outlive the model
+};
+
+template <>
+struct YoloParams<OutputLayout::ANCHORS> {
+    std::string enginePath;
+    int inputWidth = 640;
+    int inputHeight = 640;
+    float confidenceThreshold = 0.25f;
+    std::span<const std::string_view> classNames;                                       // ? must outlive the model
+    float iouThreshold = 0.45f;                                                         // ? NMS IoU - ANCHORS only
+};
+
 // * YOLO
 // ? Shared inference for the two YOLO models (person + head). Letterbox,
 // ? normalisation, and engine plumbing are identical; only the decode step
@@ -63,10 +95,10 @@ class Yolo {
 private:
     struct M {                                                                          // Assembly struct
         TrtEngine engine;
-        int inputWidth = 640;
-        int inputHeight = 640;
-        float confidenceThreshold = 0.25f;
-        float iouThreshold = 0.45f;
+        int inputWidth;
+        int inputHeight;
+        float confidenceThreshold;
+        float iouThreshold;                                                             // ? ANCHORS only - never read for END_TO_END
         std::span<const std::string_view> classNames;                                   // ? must outlive the model
 
         // Decode scratch
@@ -92,14 +124,7 @@ public:
         ModelLoadFailed,
     };
 
-    [[nodiscard]] static std::expected<Yolo, InitError> create(
-        const std::string& enginePath,
-        int inputWidth,
-        int inputHeight,
-        float confidenceThreshold,
-        float iouThreshold,
-        std::span<const std::string_view> classNames
-    );
+    [[nodiscard]] static std::expected<Yolo, InitError> create(YoloParams<Layout> params);
 
     ~Yolo() = default;
 
