@@ -249,9 +249,15 @@ Yolo<Layout>::create(YoloParams<Layout> params) {
     auto engine = TrtEngine::create(params.enginePath, "images", "output0");
     if (!engine) return std::unexpected(InitError::ModelLoadFailed);
 
-    // ? `.iouThreshold` is omitted here: `M`'s default member initializer
-    // ? supplies it. Designated initializers may skip members, they just may
-    // ? not reorder them.
+    // ? `.iouThreshold` is omitted here and set below, because it exists only
+    // ? on YoloParams<ANCHORS>. `M` has no default member initializer for it,
+    // ? so the omitted field is ZERO-initialized.
+    // ?
+    // ! That zero is deliberate, not an oversight. For END_TO_END the field is
+    // ! never read. For ANCHORS the `if constexpr` below always sets it first.
+    // ! If that branch were ever deleted, ANCHORS would run NMS with a 0.0
+    // ! threshold and suppress nearly every box - a loud failure, which is the
+    // ! behaviour we want from a mistake.
     M members{
         .engine = std::move(*engine),
         .inputWidth = params.inputWidth,
