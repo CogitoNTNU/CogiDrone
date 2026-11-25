@@ -4,6 +4,7 @@ python/dataset/
 
 # Ultralytics ouput
 runs/
+CogiDroneTraining/
 
 # Local scratch
 .backup
