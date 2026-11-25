@@ -126,7 +126,6 @@ void Navigation::wire() noexcept {
     // ? Read straight from PX4. `best_effort` is mandatory: PX4 publishes this
     // ? topic as best_effort, and a reliable subscriber would never match.
     // ! No explicit callback group - same invariant as the other callbacks.
-
     { // Local position subscription
         using MessageType = px4_msgs::msg::VehicleLocalPosition;
         m.localPositionSubscription = m.node->create_subscription<MessageType>(
