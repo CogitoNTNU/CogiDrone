@@ -16,22 +16,49 @@
 
 // TODO: [#42] Address magic numbers/strings
 
-// * YOLO
-// ? Shared inference for the two YOLO models (person + head). Both are
-// ? ultralytics exports with the same output layout, so the letterbox, decode,
-// ? and NMS are shared; only the weights, class table, and thresholds differ.
+
+// * Output layout
+// ? Ultralytics exports two different tensor layouts depending on the model
+// ? architecture. The layout is a property of the MODEL, not of the frame, so
+// ? it is a template parameter: the caller (Person / Head) already knows which
+// ? model it loaded. Stating it here removes the runtime shape-sniffing that
+// ? could silently misread a transposed export.
 // ?
-// ! OUTPUT LAYOUT (ultralytics ONNX export, no objectness, no NMS):
-// !   [1, 4 + numClasses, numAnchors]   e.g. [1, 10, 8400] for 6 classes
-// !   rows 0..3   = cx, cy, w, h   (pixels, in the LETTERBOXED 640x640 space)
-// !   rows 4..    = per-class scores (already sigmoided)
-// ! VERIFY THIS AT EXPORT TIME - a different ultralytics version may transpose
-// ! to [1, numAnchors, 4 + numClasses]. If it does, the decode loop below must
-// ! swap its index arithmetic.
+// ?   END_TO_END   [1, maxDetections, 6]              YOLO26 and other NMS-free
+// ?                each row = x1, y1, x2, y2, score, classId
+// ?                The model did one-to-one matching, so NO NMS runs.
+// ?
+// ?   ANCHORS      [1, 4 + numClasses, numAnchors]    YOLOv8 / YOLO11
+// ?                rows 0..3 = cx, cy, w, h; rows 4.. = per-class scores
+// ?                Many anchors fire per object, so NMS is REQUIRED.
+// ?
+// ! The attribute axis is LAST in one layout and SECOND in the other, so the
+// ! index arithmetic is genuinely different - not merely reordered. That is
+// ! why this is a compile-time branch rather than a runtime one.
+enum class OutputLayout {
+    END_TO_END,
+    ANCHORS,
+};
+
+// * YOLO
+// ? Shared inference for the two YOLO models (person + head). Letterbox,
+// ? normalisation, and engine plumbing are identical; only the decode step
+// ? differs, and it is selected by the `Layout` template parameter.
+// ?
+// ! TEMPLATE, NOT VIRTUAL
+// ? `Layout` is a compile-time constant, so `if constexpr` discards the unused
+// ? decode branch entirely. No vtable, no heap allocation, no runtime branch.
+// ? `Person` and `Head` hold their `Yolo<...>` BY VALUE.
+// ?
+// ! EXPLICIT INSTANTIATION
+// ? The bodies live in yolo.cpp and are instantiated there for the two layouts
+// ? that exist. Including this header does NOT compile the decode loops into
+// ? every translation unit.
 // ?
 // ! ZERO ALLOCATION PER FRAME
 // ? The input tensor lives in TrtEngine's staging buffer, and the decode
 // ? scratch lives in `m.candidates`. `detect()` allocates nothing. See [#41].
+template <OutputLayout Layout>
 class Yolo {
 private:
     struct M {                                                                          // Assembly struct
@@ -83,9 +110,9 @@ public:
 
     // * Inference
     // ? `frame` is BGR, as it arrives from the camera. `out` receives boxes in
-    // ? the ORIGINAL frame's pixel coordinates - the letterbox is undone
-    // ? internally. `out` is cleared first, so the caller can reuse one vector
-    // ? across frames.
+    // ? the ORIGINAL frame's pixel coordinates - the letterbox is undone internally.
+    // ? `out` is cleared first, so the caller can reuse one vector across frames.
+    // ? Does NOT return a vector - that would allocate per frame. See [#41].
     // ! NOT const: TrtEngine::infer() writes the device buffers.
     void detect(const cv::Mat& frame, std::vector<Model::Detection>& out);
 };

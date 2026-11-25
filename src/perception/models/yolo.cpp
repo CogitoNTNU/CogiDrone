@@ -138,11 +138,110 @@ void nonMaxSuppression(
         out.push_back(std::move(detections[i]));
     }
 }
+
+
+// * ANCHORS
+namespace ANCHORS {
+// ? [1, 4 + numClasses, numAnchors], attribute axis SECOND.
+// ? Element (row, anchor) is at row * numAnchors + anchor.
+// ? Many anchors fire per object, so NMS is required.
+void decode(
+    std::span<const float> output,
+    const Letterbox& letterbox,
+    const cv::Mat& frame,
+    float confidenceThreshold,
+    std::size_t numRows,
+    std::size_t numAnchors,
+    std::vector<Model::Detection>& candidates,
+    std::vector<Model::Detection>& out,
+    std::vector<std::uint8_t>& suppressed,
+    float iouThreshold
+) {
+    const std::size_t NUM_CLASSES = numRows - 4;
+
+    for (std::size_t anchor = 0; anchor < numAnchors; ++anchor) {
+        int bestClass = -1;
+        float bestScore = 0.0f;
+        for (std::size_t c = 0; c < NUM_CLASSES; ++c) {
+            const float SCORE = output[(4 + c) * numAnchors + anchor];
+            if (SCORE > bestScore) {
+                bestScore = SCORE;
+                bestClass = static_cast<int>(c);
+            }
+        }
+
+        if (bestScore < confidenceThreshold) continue;
+
+        const float CX = output[0 * numAnchors + anchor];
+        const float CY = output[1 * numAnchors + anchor];
+        const float W  = output[2 * numAnchors + anchor];
+        const float H  = output[3 * numAnchors + anchor];
+
+        const float X1 = (CX - W / 2.0f - letterbox.padX) / letterbox.scale;
+        const float Y1 = (CY - H / 2.0f - letterbox.padY) / letterbox.scale;
+        const float X2 = (CX + W / 2.0f - letterbox.padX) / letterbox.scale;
+        const float Y2 = (CY + H / 2.0f - letterbox.padY) / letterbox.scale;
+
+        candidates.emplace_back(
+            /* .bbox = */       std::array<float, 4>{
+                                    std::clamp(X1, 0.0f, static_cast<float>(frame.cols)),
+                                    std::clamp(Y1, 0.0f, static_cast<float>(frame.rows)),
+                                    std::clamp(X2, 0.0f, static_cast<float>(frame.cols)),
+                                    std::clamp(Y2, 0.0f, static_cast<float>(frame.rows))
+                                },
+            /* .confidence = */ bestScore,
+            /* .classId = */    bestClass
+        );
+    }
+
+    // * 4. Suppress
+    nonMaxSuppression(candidates, iouThreshold, out, suppressed);
+}
+} // namespace ANCHORS
+
+// * END_TO_END
+namespace E2E {
+// ? [1, maxDetections, 6], attribute axis LAST.
+// ? Each row is a complete detection: x1, y1, x2, y2, score, classId.
+// ? The model already did one-to-one matching, so no NMS runs.
+void decode(
+    std::span<const float> output,
+    const Letterbox& letterbox,
+    const cv::Mat& frame,
+    float confidenceThreshold,
+    std::vector<Model::Detection>& out
+) {
+    constexpr std::size_t ATTRIBUTES = 6;
+    const std::size_t ROWS = output.size() / ATTRIBUTES;
+
+    for (std::size_t row = 0; row < ROWS; ++row) {
+        const float* DET = output.data() + row * ATTRIBUTES;
+        if (DET[4] < confidenceThreshold) continue;
+
+        const float X1 = (DET[0] - letterbox.padX) / letterbox.scale;
+        const float Y1 = (DET[1] - letterbox.padY) / letterbox.scale;
+        const float X2 = (DET[2] - letterbox.padX) / letterbox.scale;
+        const float Y2 = (DET[3] - letterbox.padY) / letterbox.scale;
+
+        out.emplace_back(
+            /* .bbox = */       std::array<float, 4>{
+                                    std::clamp(X1, 0.0f, static_cast<float>(frame.cols)),
+                                    std::clamp(Y1, 0.0f, static_cast<float>(frame.rows)),
+                                    std::clamp(X2, 0.0f, static_cast<float>(frame.cols)),
+                                    std::clamp(Y2, 0.0f, static_cast<float>(frame.rows))
+                                },
+            /* .confidence = */ DET[4],
+            /* .classId = */    static_cast<int>(DET[5])
+        );
+    }
+}
+} // namespace E2E
 } // namespace
 
 
 // * Ctors & dtor
-std::expected<Yolo, Yolo::InitError> Yolo::create(
+template <OutputLayout Layout>
+std::expected<Yolo<Layout>, typename Yolo<Layout>::InitError> Yolo<Layout>::create(
     const std::string& enginePath,
     int inputWidth,
     int inputHeight,
@@ -170,7 +269,8 @@ std::expected<Yolo, Yolo::InitError> Yolo::create(
 
 
 // * Inference
-void Yolo::detect(const cv::Mat& frame, std::vector<Model::Detection>& out) {
+template <OutputLayout Layout>
+void Yolo<Layout>::detect(const cv::Mat& frame, std::vector<Model::Detection>& out) {
     out.clear();
 
     // * 1. Preprocess
@@ -204,94 +304,61 @@ void Yolo::detect(const cv::Mat& frame, std::vector<Model::Detection>& out) {
     const std::span<const float> OUTPUT = m.engine.infer();
     if (OUTPUT.empty()) return;
 
-    // * 3. Decode
-    // ? Output is [1, 4 + numClasses, numAnchors], row-major. Element
-    // ? (row, anchor) is at row * numAnchors + anchor.
     const std::vector<std::size_t>& SHAPE = m.engine.outputShape();
     if (SHAPE.size() != 3) return;
 
-    m.candidates.clear();
-
-    // ! END-TO-END LAYOUT (YOLO26 and other NMS-free ultralytics exports):
-    // !   [1, maxDetections, 6]   e.g. [1, 300, 6] for models/best.engine
-    // !   each row = x1, y1, x2, y2, score, classId   (corners, LETTERBOXED space)
-    // ? The model already did the one-to-one matching, so there is no NMS
-    // ? step. Reading this as [1, 4 + numClasses, numAnchors] treats box
-    // ? corners as class scores - confidences of 500+ and boxes in the wrong place.
-    if (SHAPE[2] == 6 && SHAPE[1] > SHAPE[2]) {
-        for (std::size_t row = 0; row < SHAPE[1]; ++row) {
-            const float* DET = OUTPUT.data() + row * 6;
-            if (DET[4] < m.confidenceThreshold) continue;
-
-            const float X1 = (DET[0] - LETTERBOXED.padX) / LETTERBOXED.scale;
-            const float Y1 = (DET[1] - LETTERBOXED.padY) / LETTERBOXED.scale;
-            const float X2 = (DET[2] - LETTERBOXED.padX) / LETTERBOXED.scale;
-            const float Y2 = (DET[3] - LETTERBOXED.padY) / LETTERBOXED.scale;
-
-            out.emplace_back(
-                /* .bbox = */       std::array<float, 4>{
-                                        std::clamp(X1, 0.0f, static_cast<float>(frame.cols)),
-                                        std::clamp(Y1, 0.0f, static_cast<float>(frame.rows)),
-                                        std::clamp(X2, 0.0f, static_cast<float>(frame.cols)),
-                                        std::clamp(Y2, 0.0f, static_cast<float>(frame.rows))
-                                    },
-                /* .confidence = */ DET[4],
-                /* .classId = */    static_cast<int>(DET[5])
+    
+    // * 3. Decode 
+    // (layout-dependent step)
+    // ! The shape is VALIDATED against the declared layout. A mismatch is a
+    // ! build-time mistake (wrong model passed to the wrong wrapper), and it
+    // ! fails loudly here instead of silently producing garbage boxes.
+    // E2E
+    if constexpr (Layout == OutputLayout::END_TO_END) {
+        if (SHAPE[2] != 6) {
+            cogidrone::log(LOGGING_LEVEL::ERROR, 
+                "Engine declared Yolo model output layout as `END_TO_END` but output is not [1, N, 6]"
             );
-        }
-        return;
-    }
-
-    const std::size_t NUM_ROWS    = SHAPE[1];
-    const std::size_t NUM_ANCHORS = SHAPE[2];
-    if (NUM_ROWS < 5) return;                                                           // ? 4 box + at least 1 class
-
-    const std::size_t NUM_CLASSES = NUM_ROWS - 4;
-
-    for (std::size_t anchor = 0; anchor < NUM_ANCHORS; ++anchor) {
-        // ? Best class for this anchor.
-        int bestClass = -1;
-        float bestScore = 0.0f;
-        for (std::size_t c = 0; c < NUM_CLASSES; ++c) {
-            const float SCORE = OUTPUT[(4 + c) * NUM_ANCHORS + anchor];
-            if (SCORE > bestScore) {
-                bestScore = SCORE;
-                bestClass = static_cast<int>(c);
-            }
+            return;
         }
 
-        if (bestScore < m.confidenceThreshold) continue;
+        E2E::decode(
+            OUTPUT, 
+            LETTERBOXED, 
+            frame, 
+            m.confidenceThreshold, 
+            out
+        );
+    } 
+    
+    // Anchors
+    else {
+        if (SHAPE[1] != 4 + m.classNames.size()) {
+            cogidrone::log(LOGGING_LEVEL::ERROR, 
+                "Engine declared Yolo model output layout as `ANCHORS` but row count != 4 + class count"
+            );
+            return;
+        }
 
-        const float CX = OUTPUT[0 * NUM_ANCHORS + anchor];
-        const float CY = OUTPUT[1 * NUM_ANCHORS + anchor];
-        const float W  = OUTPUT[2 * NUM_ANCHORS + anchor];
-        const float H  = OUTPUT[3 * NUM_ANCHORS + anchor];
-
-        // ? Undo the letterbox: subtract the padding, then divide by the scale.
-        // ! Skipping this leaves every box in 640x640 space, which makes every
-        // ! distance wrong by the scale factor.
-        const float X1 = (CX - W / 2.0f - LETTERBOXED.padX) / LETTERBOXED.scale;
-        const float Y1 = (CY - H / 2.0f - LETTERBOXED.padY) / LETTERBOXED.scale;
-        const float X2 = (CX + W / 2.0f - LETTERBOXED.padX) / LETTERBOXED.scale;
-        const float Y2 = (CY + H / 2.0f - LETTERBOXED.padY) / LETTERBOXED.scale;
-
-        // ? `emplace_back` with positional arguments, not a designated initializer:
-        // ? this constructs the Detection in place, avoiding a 36-byte copy per
-        // ? candidate. The `/* .field = */` comments carry the names that designated
-        // ? initializers would have enforced - if `Detection`'s field order ever
-        // ? changes, these comments must change with it.
-        m.candidates.emplace_back(
-            /* .bbox = */       std::array<float, 4>{
-                                    std::clamp(X1, 0.0f, static_cast<float>(frame.cols)),
-                                    std::clamp(Y1, 0.0f, static_cast<float>(frame.rows)),
-                                    std::clamp(X2, 0.0f, static_cast<float>(frame.cols)),
-                                    std::clamp(Y2, 0.0f, static_cast<float>(frame.rows))
-                                },
-            /* .confidence = */ bestScore,
-            /* .classId = */    bestClass
+        m.candidates.clear();
+        ANCHORS::decode(
+            OUTPUT,
+            LETTERBOXED,
+            frame,
+            m.confidenceThreshold,
+            SHAPE[1],
+            SHAPE[2],
+            m.candidates,
+            out,
+            m.suppressedScratch,
+            m.iouThreshold
         );
     }
-
-    // * 4. Suppress
-    nonMaxSuppression(m.candidates, m.iouThreshold, out, m.suppressedScratch);
 }
+
+
+// * Explicit instantiation
+// ? The two layouts that exist. Adding a third means adding a line 
+// ? here and a branch in detect() - nothing else changes.
+template class Yolo<OutputLayout::END_TO_END>;
+template class Yolo<OutputLayout::ANCHORS>;
