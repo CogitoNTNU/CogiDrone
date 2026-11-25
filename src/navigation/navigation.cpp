@@ -5,6 +5,8 @@
 #include <string>
 #include <cmath>
 
+#include "controller/px4_topics.h"
+
 
 // | Logging
 namespace {
@@ -124,13 +126,17 @@ void Navigation::wire() noexcept {
     // ? Read straight from PX4. `best_effort` is mandatory: PX4 publishes this
     // ? topic as best_effort, and a reliable subscriber would never match.
     // ! No explicit callback group - same invariant as the other callbacks.
-    m.localPositionSubscription = m.node->create_subscription<px4_msgs::msg::VehicleLocalPosition>(
-        "/fmu/out/vehicle_local_position_v1",
-        rclcpp::QoS(10).best_effort(),
-        [this](const px4_msgs::msg::VehicleLocalPosition& msg) {
-            this->onLocalPosition(msg);
-        }
-    );
+
+    { // Local position subscription
+        using MessageType = px4_msgs::msg::VehicleLocalPosition;
+        m.localPositionSubscription = m.node->create_subscription<MessageType>(
+            cogidrone::px4::versionedTopic<MessageType>("/fmu/out/vehicle_local_position"),
+            rclcpp::QoS(10).best_effort(),
+            [this](const MessageType& msg) {
+                this->onLocalPosition(msg);
+            }
+        );
+    }
 
     // * Publishers
     m.setpointPublisher = m.node->create_publisher<px4_msgs::msg::TrajectorySetpoint>(
