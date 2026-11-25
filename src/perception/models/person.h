@@ -24,7 +24,7 @@
 class Person {
 private:
     struct M {                                                                          // Assembly struct
-        Yolo yolo;
+        Yolo<OutputLayout::END_TO_END> yolo;
     } m;
 
     explicit Person(M&& m) : m(std::move(m)) {}
