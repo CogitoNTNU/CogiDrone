@@ -201,7 +201,7 @@ void decode(
         const float Y2 = (DET[3] - letterbox.padY) / letterbox.scale;
 
         out.emplace_back(
-            /* .bbox = */       std::array<float, 4>{
+            /* .bbox = */       cogidrone::BoundingBox{
                                     std::clamp(X1, 0.0f, static_cast<float>(frame.cols)),
                                     std::clamp(Y1, 0.0f, static_cast<float>(frame.rows)),
                                     std::clamp(X2, 0.0f, static_cast<float>(frame.cols)),
