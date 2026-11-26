@@ -47,29 +47,6 @@ struct Letterbox {
 }
 
 
-// * NMS
-// ? Standard greedy IoU suppression, per class. Two people standing next to
-// ? each other must not suppress one another, hence per-class rather than
-// ? global.
-// ?
-// ? `constexpr`: std::max/std::min are constexpr since C++14, and this is pure
-// ? arithmetic. Marking it constexpr costs nothing and lets a unit test assert
-// ? a known overlap with static_assert.
-// [[nodiscard]] constexpr float iou(const std::array<float, 4>& a, const std::array<float, 4>& b) {
-//     const float IX1 = std::max(a[0], b[0]);
-//     const float IY1 = std::max(a[1], b[1]);
-//     const float IX2 = std::min(a[2], b[2]);
-//     const float IY2 = std::min(a[3], b[3]);
-
-//     const float INTER = std::max(0.0f, IX2 - IX1) * std::max(0.0f, IY2 - IY1);
-//     const float AREA_A = (a[2] - a[0]) * (a[3] - a[1]);
-//     const float AREA_B = (b[2] - b[0]) * (b[3] - b[1]);
-//     const float UNION = AREA_A + AREA_B - INTER;
-
-//     return UNION > 0.0f ? INTER / UNION : 0.0f;
-// }
-
-
 // * Anchors
 namespace Anchors {
 // ? `detections` is sorted in place and left intact so the caller keeps its
