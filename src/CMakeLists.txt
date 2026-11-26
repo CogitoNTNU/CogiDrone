@@ -115,6 +115,7 @@ add_executable(cogidrone
     # Math
     math/vec3.h
     math/transform.h
+    math/bbox.h
 )
 
 
