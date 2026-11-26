@@ -807,10 +807,10 @@ bool Navigation::detectionIsValid() const {
     // ! arithmetic is not reimplemented here.
     // if (personIsLost()) return false;
 
-    // ? Distance bounds: beyond maxFollowDistance the person is not a follow
-    // ? target, and inside minFollowDistance the standoff point would be behind
-    // ? the drone. Both are "not a valid target", not "lost" - the hysteresis in
-    // ? personIsLost() still governs the state transition.
+    // ? Beyond maxFollowDistance the person is not a follow target. There is no
+    // ? minimum bound: followBehavior()'s standoff geometry already retreats when
+    // ? the drone is too close, because the commanded point is always
+    // ? targetFollowDistance from the person on the DRONE's side.
     if (dronePositionValid()) {
         const float DX = person.position.x - dronePosition.x;
         const float DY = person.position.y - dronePosition.y;
