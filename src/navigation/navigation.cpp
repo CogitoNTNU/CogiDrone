@@ -54,8 +54,6 @@ std::expected<std::unique_ptr<Navigation>, cogidrone::Error> Navigation::create(
     NavigationParams params;
     params.targetFollowDistance   = node->declare_parameter("target_follow_distance", params.targetFollowDistance);
     params.targetHeight           = node->declare_parameter("target_height", params.targetHeight);
-    params.maxFollowSpeed         = node->declare_parameter("max_follow_speed", params.maxFollowSpeed);
-    params.minFollowDistance      = node->declare_parameter("min_follow_distance", params.minFollowDistance);
     params.maxFollowDistance      = node->declare_parameter("max_follow_distance", params.maxFollowDistance);
     params.detectionTimeout       = node->declare_parameter("detection_timeout", params.detectionTimeout);
     params.minDetectionConfidence = node->declare_parameter("min_detection_confidence", params.minDetectionConfidence);

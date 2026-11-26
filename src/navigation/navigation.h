@@ -264,8 +264,6 @@ struct NavigationParams {
     // Following
     float targetFollowDistance      = 4.0f;                                             // meters
     float targetHeight              = 2.5f;                                             // meters above ground
-    float maxFollowSpeed            = 3.0f;                                             // m/s
-    float minFollowDistance         = 2.0f;                                             // safety minimum
     float maxFollowDistance         = 10.0f;                                            // lose tracking beyond this
 
     // Detection
