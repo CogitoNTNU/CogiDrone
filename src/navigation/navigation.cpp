@@ -501,12 +501,15 @@ void Navigation::transitionTo(MissionState next) {
 void Navigation::onEnter(MissionState entered) {
     // ? Edge-triggered outputs: exactly once per transition, never per tick.
     switch (entered) {
+        // ? Both SEARCHING and PERSON_LOST need a fresh sweep origin,
+        // ? otherwise the drone snaps back to a stale heading on entry.
         case MissionState::SEARCHING:
-        case MissionState::PERSON_LOST:                                                 // ? PERSON_LOST sweeps too - see executeBehavior()
             // TODO: [#23] Rework searchBehavior() to use Representation's map of the environment.
             //     : The current searchBehavior is a simple rotate-in-place. This is a design
             //     : choice, we could also have a mix of: orbit, lawn-mower, and hold+rotate.
-            // ? Start the sweep from wherever the drone already points.
+        case MissionState::PERSON_LOST:                                                 // ? PERSON_LOST sweeps too - see executeBehavior()
+            // TODO: [#48] PERSON_LOST will get its own entry action once it has
+            //     : a dedicated behaviour; the sweep origin is a placeholder.
             searchStartYaw = std::isfinite(dronePosition.heading) ? dronePosition.heading : 0.0f;
             break;
 
@@ -547,6 +550,10 @@ void Navigation::onPerceptionCrashed() {
     // ? not exist yet (see the mission-plan comment in navigation.h). Landing on
     // ? a Perception failure would be a mission abort, and aborting is the
     // ? pilot's call, not a timer's.
+    // ? 
+    // ! This is the ONLY place a PERSON_LOST timeout should target RETURNING.
+    // ! The PERSON_LOST case in executeBehavior() is a different situation -
+    // ! Perception is alive there, so its timeout goes to SEARCHING ([#48]).
     // TODO: [#26] timeout -> RETURNING - blocked on the home-reference decision
 }
 
@@ -600,11 +607,28 @@ void Navigation::executeBehavior() {
             break;
 
         case MissionState::PERSON_LOST:
-            // ? Sweep in place to re-acquire. Holding the last commanded point
-            // ? (the old behaviour) left the camera staring at wherever the
-            // ? person USED to be, so a person who walked out of frame was never
-            // ? seen again. The lost -> detected transition then picks them up.
-            // TODO: [#26] timeout -> RETURNING - blocked on the home-reference decision
+            // Basic re-acquisition: sweep in place
+            // ? Holding the last commanded point (the previous behaviour) left
+            // ? the camera staring at wherever the person USED to be, so a
+            // ? person who walked out of frame was never seen again. Rotating
+            // ? sweeps the camera and lets the lost -> detected transition fire.
+            // ?
+            // ! THIS IS A PLACEHOLDER, not the intended behaviour. A real
+            // ! re-acquisition would bias the sweep toward the last known
+            // ! position and cover the drone's blind spots, and would consider
+            // ! repositioning for line of sight around obstacles. That needs
+            // ! Representation ([#18]).
+            // !
+            // ! There is also NO TIMEOUT. If the person is genuinely gone, the
+            // ! mission should fall back to SEARCHING after a dwell period
+            // ! (proposed: 10 s). Deliberately not implemented yet.
+            // !
+            // ! Do NOT confuse this with onPerceptionCrashed(), which also
+            // ! enters PERSON_LOST but does NOT publish a setpoint - a dead
+            // ! Perception cannot see a person, so sweeping is pointless and
+            // ! holding is the honest action. That path's timeout goes to
+            // ! RETURNING ([#26]), not SEARCHING.
+            // TODO: [#48] Dedicated PERSON_LOST re-acquisition behaviour + timeout to SEARCHING
             searchBehavior();
             break;
 
