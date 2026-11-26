@@ -209,8 +209,7 @@ Expect all translation units to compile and the link to fail on `-lnvinfer`, `-l
 On the Jetson, with the XRCE agent running and PX4 connected:
 
 ```bash
-MicroXRCEAgent udp4 -p 8888 &
-./build/jetson/src/cogidrone
+MicroXRCEAgent udp4 -p 8888 & ./build/jetson/src/cogidrone
 ```
 
 The drone will not move until you arm it and switch to offboard mode from your RC transmitter. Until then `ControlState` is `WAITING_FOR_ARM` and Navigation publishes nothing.
