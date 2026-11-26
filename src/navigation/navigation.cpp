@@ -769,8 +769,21 @@ bool Navigation::detectionIsValid() const {
     // ! Caller must hold controlMutex if mutex is reinstated - do NOT lock here!
     // ? No lock: caller (onDetections/onWatchdogTick) is serialized by the executor. 
 
+    // ? STRICT: requires a detection in the MOST RECENT frame.
+    // ! `person.valid` is cleared by an empty frame, so a single dropped
+    // ! detection invalidates the target for ACTION. That is deliberate - the
+    // ! mission must not fly toward something it cannot currently see.
+    // ! The loose variant is HAVE_RECENT_TARGET in selectTarget(), which keeps
+    // ! target IDENTITY across a dropout.
     if (!person.valid) return false;
     if (person.confidence < m.params.minDetectionConfidence) return false;
+
+    // ! Currently unreachable: `person.valid` and `person.timestamp` are
+    // ! assigned together in onDetections(), and this function is only called
+    // ! from that callback. Kept as a guard in case a timer-driven caller is
+    // ! ever added - but routed through the shared predicate so the timeout
+    // ! arithmetic is not reimplemented here.
+    // if (personIsLost()) return false;
 
     // ? Distance bounds: beyond maxFollowDistance the person is not a follow
     // ? target, and inside minFollowDistance the standoff point would be behind
