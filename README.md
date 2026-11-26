@@ -66,7 +66,7 @@ The mission, in order:
   breaks on the mkdocs site, because docs/index.md is a symlink to this file.
 -->
 
-[Person following in the Bymarka world](docs/videos/bymarka_follow_demo_30fps.mp4)
+[Person following in the Bymarka world](https://github.com/CogitoNTNU/CogiDrone/blob/main/docs/videos/bymarka_follow_demo_30fps.mp4)
 
 ## How it works
 
