@@ -77,7 +77,6 @@ second shell run the keyboard controller (`t` take off, `w/a/s/d` move, `r/f` up
 
 ```bash
 ros2 launch cogidrone_bringup sim.launch.py autonomy:=false
-ros2 run cogidrone_control teleop                                   # second shell
 ros2 run rqt_image_view rqt_image_view /camera/camera/color/image_raw   # drone camera
 ```
 
@@ -105,17 +104,20 @@ Mac, put the bag in `rosbags/` and run:
 
 ```bash
 ros2 bag play /workspace/rosbags/flight1 --loop &
-ros2 run cogidrone_perception detector
-ros2 topic echo /cogidrone/detections
+./build/sim/src/cogidrone
 ```
 
 ## How it fits together
 
 ```
 Gazebo (cogidrone_x500 + D435i-like camera)
-   │ camera ──► ros_gz_bridge ──► /camera/camera/color/image_raw ──► detector (YOLO)
-   │                                                                     │ /cogidrone/detections
-PX4 SITL ◄── XRCE-DDS agent (UDP 8888) ◄── /fmu/in/* ◄──────────── offboard (control)
+   │ camera ──► ros_gz_bridge ──► /camera/camera/color/image_raw
+   │                                        │
+   │                                        ▼
+   │                              cogidrone (C++ binary)
+   │                              Perception → Navigation → FlightController
+   │                                        │
+PX4 SITL ◄── XRCE-DDS agent (UDP 8888) ◄── /fmu/in/*
 ```
 
 | Where | What |
@@ -123,8 +125,7 @@ PX4 SITL ◄── XRCE-DDS agent (UDP 8888) ◄── /fmu/in/* ◄────
 | `sim/models/cogidrone_x500/` | Drone: PX4's x500 (our frame) + a camera matching the D435i |
 | `sim/worlds/cogidrone.sdf` | World: NTNU Trondheim coordinates, two people as YOLO targets |
 | `ros2_ws/src/cogidrone_bringup/` | `sim.launch.py` and the Gazebo→ROS bridge config |
-| `ros2_ws/src/cogidrone_perception/` | `detector`: image → YOLO → `vision_msgs/Detection2DArray` |
-| `ros2_ws/src/cogidrone_control/` | `offboard`: arm, take off, yaw toward target (PX4 offboard mode) |
+| `src/` | The C++ autonomy stack (Perception, Navigation, FlightController) |
 
 The camera topics use the same names as `realsense-ros`, so on the real drone you
 swap the bridge for the RealSense driver and the nodes stay the same. One difference:

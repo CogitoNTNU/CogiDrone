@@ -41,6 +41,8 @@ for i in $(seq 1 60); do
 done
 """
 
+WORKSPACE = os.environ.get("COGIDRONE_WORKSPACE", "/workspace")
+
 
 def _px4(context):
     env = {
@@ -95,17 +97,11 @@ def generate_launch_description():
                 parameters=[{"config_file": bridge_config}],
                 output="screen",
             ),
-            Node(
-                package="cogidrone_perception",
-                executable="detector",
-                output="screen",
+            ExecuteProcess(
+                cmd=[os.path.join(WORKSPACE, "build/sim/src/cogidrone")],
+                cwd=WORKSPACE,
                 condition=autonomy,
-            ),
-            Node(
-                package="cogidrone_control",
-                executable="offboard",
                 output="screen",
-                condition=autonomy,
             ),
         ]
     )
