@@ -827,6 +827,10 @@ bool Navigation::dronePositionValid() const {
 // ? otherwise take the closest. Mirrors targeter/target_closest.py.
 // ? No lock: called only from onDetections(), which the executor serializes.
 const vision_msgs::msg::Detection2D* Navigation::selectTarget(const vision_msgs::msg::Detection2DArray& msg) const {
+    // ? Persist across brief dropouts. `person.valid` is false after a single
+    // ? empty frame, but the target is only truly lost after detectionTimeout.
+    const bool HAVE_RECENT_TARGET = person.valid || (m.node->now() - person.timestamp).seconds() <= m.params.detectionTimeout;   
+
     const vision_msgs::msg::Detection2D* closest = nullptr;
     const vision_msgs::msg::Detection2D* current = nullptr;
     float currentIou = 0.0f;
@@ -840,8 +844,8 @@ const vision_msgs::msg::Detection2D* Navigation::selectTarget(const vision_msgs:
             closest = &detection;
         }
 
-        // ? Same person as last frame? Highest overlap wins.
-        if (person.valid) {
+        // ? Same person as last detection? Highest overlap wins.
+        if (HAVE_RECENT_TARGET) {
             const float IOU = cogidrone::iou(toBbox(detection.bbox), lastTargetBox);
             if (IOU >= m.params.targetIouThreshold && IOU > currentIou) {
                 current = &detection;
