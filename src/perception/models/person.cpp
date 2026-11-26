@@ -20,7 +20,8 @@ constexpr std::array<std::string_view, 6> SR_CLASS_NAMES = {
 std::expected<Person, Person::InitError> Person::create() {
     // ! Fallible work FIRST: load the TensorRT plan
     auto yolo = Yolo<OutputLayout::END_TO_END>::create({
-        .enginePath = "models/best.engine",                                         // TODO: [#35] path from a parameter
+        // TODO: [#35] path from a parameter, and maybe not use std::string here
+        .enginePath = std::string("models/best") + std::string(cogidrone::MODEL_EXTENSION), 
         .confidenceThreshold = 0.20f,                                               // ? CONF_THRESHOLD from depth_final.py
         .classNames = classNames()
     });

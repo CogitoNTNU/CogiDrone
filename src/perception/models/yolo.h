@@ -11,8 +11,7 @@
 #include <opencv2/core.hpp>
 
 #include "perception/models/models.h"
-#include "perception/models/trt_engine.h"
-
+#include "perception/models/engine.h"
 
 // TODO: [#42] Address magic numbers/strings
 
@@ -94,7 +93,7 @@ template <OutputLayout Layout>
 class Yolo {
 private:
     struct M {                                                                          // Assembly struct
-        TrtEngine engine;
+        cogidrone::Engine engine;
         int inputWidth;
         int inputHeight;
         float confidenceThreshold;
