@@ -1,0 +1,1204 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
+#pragma once
+
+/*
+ * This file defines SessionOptions Config Keys and format of the Config Values.
+ *
+ * The Naming Convention for a SessionOptions Config Key,
+ * "[Area][.[SubArea1].[SubArea2]...].[Keyname]"
+ * Such as "ep.cuda.use_arena"
+ * The Config Key cannot be empty
+ * The maximum length of the Config Key is 1024
+ *
+ * The string format of a SessionOptions Config Value is defined individually for each Config.
+ * The maximum length of the Config Value is 8192
+ */
+
+// Key for disable PrePacking,
+// If the config value is set to "1" then the prepacking is disabled, otherwise prepacking is enabled (default value)
+static const char* const kOrtSessionOptionsConfigDisablePrepacking = "session.disable_prepacking";
+
+// Log MoE expert-counter updates at INFO severity. This enables counter updates even when expert counting is disabled.
+// At most 1024 updates are logged per Run; further updates emit one WARNING truncation marker but still count.
+// "0": disable (default); "1": enable.
+static const char* const kOrtSessionOptionsConfigEnableMoeExpertStatistics =
+    "session.enable_moe_expert_statistics";
+
+// Persist per-expert usage counters across Run() calls, without changing placement.
+// "0": disable (default); "1": enable. Counting alone does not emit statistics logs.
+// Overlapping Run() calls on the same session are rejected while enabled.
+static const char* const kOrtSessionOptionsConfigEnableMoeExpertCounting =
+    "session.enable_moe_expert_counting";
+// Optional UTF-8 initial counter-state file. Requires expert counting or statistics logging to be enabled.
+static const char* const kOrtSessionOptionsConfigMoeExpertCounterStateFile =
+    "session.moe_expert_counter_state_file";
+// Exponential decay applied to every expert counter after each invocation of its MoE/QMoE node.
+// Must be finite and non-negative, with alpha + beta <= 1. The default is 0.9.
+static const char* const kOrtSessionOptionsConfigMoeExpertCounterAlpha =
+    "session.moe_expert_counter_alpha";
+// Increment applied to each expert selected during an invocation.
+// Must be finite and non-negative, with alpha + beta <= 1. The default is 0.1.
+static const char* const kOrtSessionOptionsConfigMoeExpertCounterBeta =
+    "session.moe_expert_counter_beta";
+
+// Controls weight scaling in the shared-layout CPU QMoE INT3/INT4 kernels only.
+// "0" (default): round each dequantized weight to the activation type before multiplication.
+// "1": accumulate the block dot product in FP32, then apply its scale, without per-weight rounding.
+// Deferred scaling can improve throughput but can change results, particularly under cancellation.
+// Currently does not affect NVFP4/MXFP4, legacy CPU QMoE kernels, or CUDA kernels.
+static const char* const kOrtSessionOptionsCpuQmoeDeferredScale = "ep.cpu.qmoe_deferred_scale";
+
+// A value of "1" means allocators registered in the env will be used. "0" means the allocators created in the session
+// will be used. Use this to override the usage of env allocators on a per session level.
+static const char* const kOrtSessionOptionsConfigUseEnvAllocators = "session.use_env_allocators";
+
+// Set to 'ORT' (case sensitive) to load an ORT format model.
+// If unset, model type will default to ONNX unless inferred from filename ('.ort' == ORT format) or bytes to be ORT
+static const char* const kOrtSessionOptionsConfigLoadModelFormat = "session.load_model_format";
+
+// Set to 'ORT' (case sensitive) to save optimized model in ORT format when SessionOptions.optimized_model_path is set.
+// If unset, format will default to ONNX unless optimized_model_filepath ends in '.ort'.
+static const char* const kOrtSessionOptionsConfigSaveModelFormat = "session.save_model_format";
+
+// If a value is "1", flush-to-zero and denormal-as-zero are applied. The default is "0".
+// When multiple sessions are created, a main thread doesn't override changes from succeeding session options,
+// but threads in session thread pools follow option changes.
+// When ORT runs with OpenMP, the same rule is applied, i.e. the first session option to flush-to-zero and
+// denormal-as-zero is only applied to global OpenMP thread pool, which doesn't support per-session thread pool.
+// Note that an alternative way not using this option at runtime is to train and export a model without denormals
+// and that's recommended because turning this option on may hurt model accuracy.
+static const char* const kOrtSessionOptionsConfigSetDenormalAsZero = "session.set_denormal_as_zero";
+
+// It controls to run quantization model in QDQ (QuantizelinearDeQuantizelinear) format or not.
+// "0": enable. ORT does fusion logic for QDQ format.
+// "1": disable. ORT doesn't do fusion logic for QDQ format.
+// Its default value is "0" unless the DirectML execution provider is registered, in which case it defaults to "1".
+static const char* const kOrtSessionOptionsDisableQuantQDQ = "session.disable_quant_qdq";
+
+// This controls whether to prevent constant folding from folding DequantizeLinear nodes:
+// "0": (default) DequantizeLinear constant folding is determined solely by session.disable_quant_qdq.
+// "1": DequantizeLinear nodes are never individually constant folded.
+// When session.disable_quant_qdq is "0" (default), DequantizeLinear nodes are already protected from
+// constant folding to preserve QDQ node units for downstream QDQ fusion optimizers.
+// When session.disable_quant_qdq is "1", then DequantizeLinear nodes are normally allowed to be
+// constant folded, but setting this option to "1" still preserves DequantizeLinear nodes.
+// This is useful for execution providers like WebNN that disable QDQ fusion, but which
+// still need the original DQ/Q nodes to be preserved for their own quantization handling.
+
+static const char* const kOrtSessionOptionsDisableQDQConstantFolding =
+    "session.disable_qdq_constant_folding";
+
+// It controls whether to enable Double QDQ remover and Identical Children Consolidation
+// "0": not to disable. ORT does remove the middle 2 Nodes from a Q->(QD->Q)->QD pairs
+// "1": disable. ORT doesn't remove the middle 2 Nodes from a Q->(QD->Q)->QD pairs
+// Its default value is "0"
+static const char* const kOrtSessionOptionsDisableDoubleQDQRemover = "session.disable_double_qdq_remover";
+
+// If set to "1", enables the removal of QuantizeLinear/DequantizeLinear node pairs once all QDQ handling has been
+// completed. e.g. If after all QDQ handling has completed and we have -> FloatOp -> Q -> DQ -> FloatOp -> the
+// Q -> DQ could potentially be removed. This will provide a performance benefit by avoiding going from float to
+// 8-bit and back to float, but could impact accuracy. The impact on accuracy will be model specific and depend on
+// other factors like whether the model was created using Quantization Aware Training or Post Training Quantization.
+// As such, it's best to test to determine if enabling this works well for your scenario.
+// The default value is "0"
+// Available since version 1.11.
+static const char* const kOrtSessionOptionsEnableQuantQDQCleanup = "session.enable_quant_qdq_cleanup";
+
+// Enable or disable gelu approximation in graph optimization. "0": disable; "1": enable. The default is "0".
+// GeluApproximation has side effects which may change the inference results. It is disabled by default due to this.
+static const char* const kOrtSessionOptionsEnableGeluApproximation = "optimization.enable_gelu_approximation";
+
+// Enable or disable Cast chain elimination in graph optimization. "0": disable; "1": enable. The default is "0".
+// CastElimination with chain elimination has side effects which may change the inference results. It is disabled by default due to this.
+static const char* const kOrtSessionOptionsEnableCastChainElimination = "optimization.enable_cast_chain_elimination";
+
+// This setting controls whether to enable AheadOfTime function inlining.
+// AOT function inlining examines the graph and attempts to inline as many locally defined functions in the model
+// as possible with the help of enabled execution providers.
+// This can reduce the number of function calls and improve performance because it is done before
+// Level1 optimizers and constant folding. However, under some circumstances, when the EPs are not available,
+// one can disable the AOT inlining, produce an optimized model and postpone AOT until run time.
+// "0": enable; "1": disable.
+// Its default value is "0".
+static const char* const kOrtSessionOptionsDisableAheadOfTimeFunctionInlining = "session.disable_aot_function_inlining";
+
+// Limits cumulative model-local function expansion across AOT and fallback inlining.
+// Values must be positive decimal integers. Defaults are 1,000,000 nodes and 1 GiB of serialized node payload.
+static const char* const kOrtSessionOptionsFunctionExpansionNodeLimit = "session.function_expansion_node_limit";
+static const char* const kOrtSessionOptionsFunctionExpansionByteLimit = "session.function_expansion_byte_limit";
+
+#ifdef ENABLE_TRAINING
+// Specifies a path of the file containing a list of memory optimization configurations.
+// The value should be a string indicating the file path of the config file.
+// The content of the config file is a JSON struct like this:
+// [
+//   "Gelu+Cast+:1:0",
+//   "Dropout+:1:1"
+// ]
+// Taking the example of "Gelu+Cast+:1:0",
+// > "Gelu+Cast+" is the subgraph string, a valid "subgraph string" should be one subgraph representation
+//    output by ORT graph transformations.
+// > "1" is "optimization strategy", valid values: 0 - disabled, 1 - recompute.
+// > "0" is "number of subgraph to apply" which is used to control how many subgraphs to apply optimization,
+//    to avoid "oversaving" the memory.
+static const char* const kOrtSessionOptionsMemoryOptimizerApplyConfig = "optimization.memory_optimizer_config";
+
+// Specifies the config for detecting subgraphs for memory footprint reduction.
+// The value should be a string contains int separated using commas. The default value is "0:0".
+static const char* const kOrtSessionOptionsMemoryOptimizerProbeConfig = "optimization.enable_memory_probe_recompute_config";
+#endif
+
+// This setting if set should contain a comma separated list of optimizers names that should be disabled.
+// Optimizers may take time to execute and affect model loading time. If you feel that a specific optimizer
+// does not provider runtime benefits, but affects your model loading time you may disable it using this config
+// entry. This option is not enabled in ORT_MINIMAL_BUILD build.
+// A list of optimizes is available in onnxruntime/core/optimizer/graph_transformer_utils.cc
+//
+// Default is an empty string which means no optimizers are disabled.
+static const char* const kOrtSessionOptionsDisableSpecifiedOptimizers = "optimization.disable_specified_optimizers";
+
+// Maximum total output size in bytes that the constant folding optimizer is allowed to produce per node.
+// Prevents malicious models from causing excessive memory allocation during optimization.
+// If the estimated or actual output size of a constant-foldable node exceeds this limit, the node will
+// not be constant folded and will instead be executed at runtime.
+//
+// Option values:
+// - A positive integer (as string): Maximum allowed output size in bytes per constant-folded node.
+//   Default is "1073741824" (1 GB).
+// - "0": Disable the size limit (not recommended for untrusted models).
+static const char* const kOrtSessionOptionsConstantFoldingMaxOutputSizeInBytes =
+    "optimization.constant_folding_max_output_size_in_bytes";
+
+// It controls whether to run graph optimizations in loop or not.
+//
+// "0": disable. Graph Optimization Loop is disabled.
+// ```
+// Level 2 --> Level 3 --> InsertCastTransforms --> Level 4
+//   ^                                                 |
+//   |                 "No Loop"                       |
+//   |                                                 |
+//   X                xxxxxxxxxxx                      X
+// ```
+// "1": enable. Graph Optimization Loop is enabled, such that, if optimizations at Level 4 are applied then
+// the loop will check for any other valid optimization that can happen.
+// ```
+// Level 2 --> Level 3 --> InsertCastTransforms --> Level 4
+//   ^                                                 |
+//   |        "Loop only depending on Level 4"         |
+//   |                                                 |
+//   ---------------------------------------------------
+// ```
+// "2": enable. Graph Optimization Loop is enabled, such that, if optimizations at Level 2 or above are applied then
+// The loop will check for any other valid optimization that can happen.
+// ```
+// Level 2 --> Level 3 --> InsertCastTransforms --> Level 4
+//   ^                                                 |
+//   |                    "Loop"                       |
+//   |                                                 |
+//   ---------------------------------------------------
+// ```
+// Default value is set to "1".
+static const char* const kOrtSessionOptionsGraphOptimizationsLoopLevel = "session.graph_optimizations_loop_level";
+
+// Enable or disable using device allocator for allocating initialized tensor memory. "1": enable; "0": disable. The default is "0".
+// Using device allocators means the memory allocation is made using malloc/new.
+static const char* const kOrtSessionOptionsUseDeviceAllocatorForInitializers = "session.use_device_allocator_for_initializers";
+
+// Enable running each node's kernel->PrePack() call (constant-initializer weight pre-packing, done
+// once during session Initialize()) across the intra-op thread pool instead of a single thread.
+// "1": enable; "0": disable. The default is "0", and it only takes effect when the intra-op thread
+// pool has a degree of parallelism greater than one. PrePack() is where the real, potentially large,
+// CPU work (and page-ins for mmap'd external-data tensors) happens for ops like MatMulNBits, so this
+// can noticeably reduce load time for models dominated by such ops. It also only takes effect when
+// cross-session pre-packed-weight caching (OrtApi::AddInitializer /
+// SessionOptions.AddInitializer-based sharing) is NOT in use for this session -- that path is
+// already serialized across sessions and is left untouched. Bookkeeping shared across nodes
+// (the pre-packed-weights container, initializer use counts) is synchronized internally; the
+// per-node PrePack() calls that do the heavy lifting are not, and run concurrently. The feature is
+// also available in Android minimal builds.
+static const char* const kOrtSessionOptionsEnableParallelPrepack = "session.prepack.enable_parallel";
+
+// Configure whether to allow the inter_op/intra_op threads spinning a number of times before blocking
+// "0": thread will block if found no job to run
+// "1": thread will spin a number of times before blocking
+// The default is "0" when ORT is built with "ORT_CLIENT_PACKAGE_BUILD" and "1" otherwise.
+// Thread spinning is disabled by default for client/on-device workloads to reduce cpu utilization and improve power efficiency.
+static const char* const kOrtSessionOptionsConfigAllowInterOpSpinning = "session.inter_op.allow_spinning";
+static const char* const kOrtSessionOptionsConfigAllowIntraOpSpinning = "session.intra_op.allow_spinning";
+
+// Configure the duration in microseconds that threads spin waiting for work before blocking.
+// This setting is subordinate to the allow_spinning flags (session.intra_op.allow_spinning /
+// session.inter_op.allow_spinning). When allow_spinning is "0", spinning is disabled and
+// the spin duration is forced to 0 regardless of this setting.
+// By default (when this option is not set), the thread pool uses an iteration-count-based spin loop
+// whose wall-clock duration varies by CPU architecture and pause instruction latency. This provides
+// the best throughput but may result in high CPU utilization.
+// Setting a positive value switches to calibrated iteration-based spinning that targets
+// the specified duration. The actual spin time is a best-effort approximation based on a
+// one-time measurement of the pause instruction latency; it may vary with CPU frequency
+// changes. Recommended for power-sensitive or client/on-device workloads.
+// Common values: 500-2000 (0.5-2ms).
+// Setting to "0" with spinning enabled effectively disables spinning (equivalent to allow_spinning = false).
+static const char* const kOrtSessionOptionsConfigIntraOpSpinDurationUs = "session.intra_op.spin_duration_us";
+static const char* const kOrtSessionOptionsConfigInterOpSpinDurationUs = "session.inter_op.spin_duration_us";
+
+// Configure the maximum exponential-backoff cap for the thread pool spin loop.
+// When > 1, each idle spin iteration emits a growing number of SpinPause() calls
+// (1, 2, 4, ..., up to this cap), which reduces the density of pause instructions
+// during the spin window and lowers CPU/power usage compared to emitting one
+// SpinPause() per iteration. The total wall-clock spin duration targeted by
+// session.{intra,inter}_op.spin_duration_us is preserved by scaling the iteration
+// count against the backoff cap.
+//   "1" (default) = no backoff, one SpinPause() per iteration (original behavior).
+//   ">= 2"        = enable exponential backoff capped at this value. Typical
+//                   values: 4 (hybrid/E-core friendly) or 8 (desktop/server).
+// Values above 64 are clamped to 64.
+// This setting is subordinate to allow_spinning and spin_duration_us: when
+// spinning is disabled or spin_duration_us forces zero iterations, this value
+// has no effect.
+static const char* const kOrtSessionOptionsConfigIntraOpSpinBackoffMax = "session.intra_op.spin_backoff_max";
+static const char* const kOrtSessionOptionsConfigInterOpSpinBackoffMax = "session.inter_op.spin_backoff_max";
+
+// Key for using model bytes directly for ORT format
+// If a session is created using an input byte array contains the ORT format model data,
+// By default we will copy the model bytes at the time of session creation to ensure the model bytes
+// buffer is valid.
+// Setting this option to "1" will disable copy the model bytes, and use the model bytes directly. The caller
+// has to guarantee that the model bytes are valid until the ORT session using the model bytes is destroyed.
+static const char* const kOrtSessionOptionsConfigUseORTModelBytesDirectly = "session.use_ort_model_bytes_directly";
+
+/// <summary>
+/// Key for using the ORT format model flatbuffer bytes directly for initializers.
+/// This avoids copying the bytes and reduces peak memory usage during model loading and initialization.
+/// Requires `session.use_ort_model_bytes_directly` or `session.use_memory_mapped_ort_model` to be true.
+/// If set, the flatbuffer bytes provided when creating the InferenceSession MUST remain valid for the entire
+/// duration of the InferenceSession.
+/// </summary>
+static const char* const kOrtSessionOptionsConfigUseORTModelBytesForInitializers =
+    "session.use_ort_model_bytes_for_initializers";
+
+/// <summary>
+/// Key for using memory-mapped I/O to load ORT format model files.
+/// When set to "1" and the session is created from a file path, ORT will use memory-mapped I/O
+/// to load the .ort model file instead of reading it into a heap-allocated buffer.
+/// Usage with session.use_ort_model_bytes_for_initializers will ensure Tensors point directly to the mapped bytes,
+/// although the mapping must remain valid and model weights will be immutable.
+/// The model load will fail if the mapping fails; fallbacks should be caller-handled.
+/// </summary>
+static const char* const kOrtSessionOptionsConfigUseMemoryMappedOrtModel = "session.use_memory_mapped_ort_model";
+
+// This should only be specified when exporting an ORT format model for use on a different platform.
+// If the ORT format model will be used on ARM platforms set to "1". For other platforms set to "0"
+// Available since version 1.11.
+static const char* const kOrtSessionOptionsQDQIsInt8Allowed = "session.qdqisint8allowed";
+
+// x64 SSE4.1/AVX2/AVX512(with no VNNI) has overflow problem with quantizied matrix multiplication with U8S8.
+// To avoid this we need to use slower U8U8 matrix multiplication instead. This option, if
+// turned on, use slower U8U8 matrix multiplications. Only effective with AVX2 or AVX512
+// platforms.
+static const char* const kOrtSessionOptionsAvx2PrecisionMode = "session.x64quantprecision";
+
+// Specifies how minimal build graph optimizations are handled in a full build.
+// These optimizations are at the extended level or higher.
+// Possible values and their effects are:
+// "save": Save runtime optimizations when saving an ORT format model.
+// "apply": Only apply optimizations available in a minimal build.
+// ""/<unspecified>: Apply optimizations available in a full build.
+// Available since version 1.11.
+static const char* const kOrtSessionOptionsConfigMinimalBuildOptimizations =
+    "optimization.minimal_build_optimizations";
+
+/// <summary>
+/// Set to "1" to enable replay of saved runtime optimizations from an ORT format model.
+/// Saved runtime optimizations contain graph rewrite instructions and must only be enabled for trusted models.
+/// The default is "0".
+/// </summary>
+static const char* const kOrtSessionOptionsConfigEnableSavedRuntimeOptimizations =
+    "session.enable_saved_runtime_optimizations";
+
+// Note: The options specific to an EP should be specified prior to appending that EP to the session options object in
+// order for them to take effect.
+
+// Specifies a list of stop op types. Nodes of a type in the stop op types and nodes downstream from them will not be
+// run by the NNAPI EP.
+// The value should be a ","-delimited list of op types. For example, "Add,Sub".
+// If not specified, the default set of stop ops is used. To specify an empty stop ops types list and disable stop op
+// exclusion, set the value to "".
+static const char* const kOrtSessionOptionsConfigNnapiEpPartitioningStopOps = "ep.nnapi.partitioning_stop_ops";
+
+// Enabling dynamic block-sizing for multithreading.
+// With a positive value, thread pool will split a task of N iterations to blocks of size starting from:
+// N / (num_of_threads * dynamic_block_base)
+// As execution progresses, the size will decrease according to the diminishing residual of N,
+// meaning the task will be distributed in smaller granularity for better parallelism.
+// For some models, it helps to reduce the variance of E2E inference latency and boost performance.
+// The feature will not function by default, specify any positive integer, e.g. "4", to enable it.
+// Available since version 1.11.
+static const char* const kOrtSessionOptionsConfigDynamicBlockBase = "session.dynamic_block_base";
+
+// This option allows to decrease CPU usage between infrequent
+// requests and forces any TP threads spinning stop immediately when the last of
+// concurrent Run() call returns.
+// Spinning is restarted on the next Run() call.
+// Applies only to internal thread-pools
+static const char* const kOrtSessionOptionsConfigForceSpinningStop = "session.force_spinning_stop";
+
+// "1": all inconsistencies encountered during shape and type inference
+// will result in failures.
+// "0": in some cases warnings will be logged but processing will continue. The default.
+// May be useful to expose bugs in models.
+static const char* const kOrtSessionOptionsConfigStrictShapeTypeInference = "session.strict_shape_type_inference";
+
+// "1": every model using a more recent opset than the latest released one will fail
+// "0": the model may or may not work if onnxruntime cannot find an implementation, this option
+// is used for development purpose.
+static const char* const kOrtSessionOptionsConfigStrictAllowReleasedOpsetsOnly = "session.allow_released_opsets_only";
+
+// The file saves configuration for partitioning node among logic streams
+static const char* const kNodePartitionConfigFile = "session.node_partition_config_file";
+
+// This Option allows setting affinities for intra op threads.
+// Affinity string follows format:
+// logical_processor_id,logical_processor_id;logical_processor_id,logical_processor_id
+// Semicolon isolates configurations among threads, while comma split processors where ith thread expected to attach to.
+// e.g.1,2,3;4,5
+// specifies affinities for two threads, with the 1st thread attach to the 1st, 2nd, and 3rd processor, and 2nd thread to the 4th and 5th.
+// To ease the configuration, an "interval" is also allowed:
+// e.g. 1-8;8-16;17-24
+// orders that the 1st thread runs on first eight processors, 2nd thread runs on next eight processors, and so forth.
+// Note:
+// 1. Once set, the number of thread affinities must equal to intra_op_num_threads - 1, since ort does not set affinity on the main thread which
+//    is started and managed by the calling app;
+// 2. For windows, ort will infer the group id from a logical processor id, for example, assuming there are two groups with each has 64 logical processors,
+//    an id of 64 will be inferred as the last processor of the 1st group, while 65 will be interpreted as the 1st processor of the second group.
+//    Hence 64-65 is an invalid configuration, because a windows thread cannot be attached to processors across group boundary.
+static const char* const kOrtSessionOptionsConfigIntraOpThreadAffinities = "session.intra_op_thread_affinities";
+
+// This option will dump out the model to assist debugging any issues with layout transformation,
+// and is primarily intended for developer usage. It is only relevant if an execution provider that requests
+// NHWC layout is enabled such as NNAPI, XNNPACK or QNN.
+//
+// Default is off. Set to "1" to enable.
+//
+// If modified by layout transformation the model will be dumped after these steps:
+//   1) insertion of the layout transformation Transpose nodes
+//   2) after those are optimized using the transpose optimizer,
+//   3) after the L1 transformers are applied to the updated graph.
+// The model will be saved to filename post_layout_transform_step_<step_number>.onnx.
+static const char* const kDebugLayoutTransformation = "session.debug_layout_transformation";
+
+// Graph nodes that are not supported by the execution providers (EPs) explicitly added to the session are
+// assigned (i.e., "fallback") to the CPU EP by default.
+//
+// This option allows the user to disable the fallback of unsupported graph nodes to the CPU EP.
+// If this option is set to "1", session creation will fail if the execution providers other than the CPU EP cannot
+// fully support all of the nodes in the graph.
+//
+// It is invalid to set this option and explicitly add the CPU EP to the session. In this case, session creation
+// will also fail with an error.
+//
+// Option values:
+// - "0": CPU EP fallback is not disabled. [DEFAULT]
+// - "1": CPU EP fallback is disabled.
+static const char* const kOrtSessionOptionsDisableCPUEPFallback = "session.disable_cpu_ep_fallback";
+
+// Use this config when serializing a large model after optimization to specify an external initializers file
+static const char* const kOrtSessionOptionsOptimizedModelExternalInitializersFileName =
+    "session.optimized_model_external_initializers_file_name";
+
+// Use this config to control the minimum size of the initializer when externalizing it during serialization
+static const char* const kOrtSessionOptionsOptimizedModelExternalInitializersMinSizeInBytes =
+    "session.optimized_model_external_initializers_min_size_in_bytes";
+
+// Specifies the folder path used to resolve a model's external initializer data files.
+// When set, external initializers are loaded from this folder instead of the model's own
+// directory, overriding the model directory. This applies whether the model is loaded from a
+// file path or from a memory buffer/stream. All external data files must be in the same folder.
+// Typical uses include loading models with external data from memory, sharing a weights file
+// across models, and weightless/cache models whose weights live outside the model directory.
+// For EPContext workflows, also set kOrtSessionOptionEpContextFilePath so the EPContext
+// model location remains available for resolving an external EP context binary.
+static const char* const kOrtSessionOptionsModelExternalInitializersFileFolderPath =
+    "session.model_external_initializers_file_folder_path";
+
+// Use CPU buffers supplied through AddExternalInitializers or AddExternalInitializersFromFilesInMemory directly for
+// eligible main-graph initializers.
+// "0": Copy caller-owned CPU buffers during session creation. [DEFAULT]
+// "1": Borrow naturally aligned CPU buffers larger than 127 bytes on little-endian hosts and copy other buffers.
+// The application must keep borrowed buffers unchanged and alive until all sessions using them are released.
+// AddExternalInitializers accepts only non-owning, contiguous tensors containing native-endian values;
+// files contain serialized little-endian values.
+// Device tensors are always copied to owned CPU staging memory before optimization and shape inference.
+static const char* const kOrtSessionOptionsConfigUseExternalInitializerFileBuffersDirectly =
+    "session.use_external_initializer_file_buffers_directly";
+
+// Use this config when saving pre-packed constant initializers to an external data file.
+// This allows you to memory map pre-packed initializers on model load and leave it to
+// to the OS the amount of memory consumed by the pre-packed initializers. Otherwise,
+// pre-packed data resides on the heap.
+//
+// - "0": Default is not save pre-packed initializers to a data file.
+// - "1": Save pre-packed constant initializers to an external data file.
+// Sample usage: sess_options.add_session_config_entry(kOrtSessionOptionsSavePrePackedConstantInitializers,  "1")
+static const char* const kOrtSessionOptionsSavePrePackedConstantInitializers =
+    "session.save_external_prepacked_constant_initializers";
+
+// Use this config when you want to collect memory stats for each node in the graph.
+// The file format is a CSV file with the following columns:
+// The file will be created if it does not exist, and will be overwritten if it does.
+//
+// The content of the file can be used to estimate memory requirements at run time including
+// the temporary allocations. This operation is preferably done on a CPU device, as the model may exceed
+// device memory limits in constrained environments. When enabling this option, it is important to disable
+// memory patterns, as they tend to allocate large blocks to avoid fragmentation and accommodate needs of multiple
+// kernels. Memory patterns may make it difficult to allocate on a device with limited memory.
+//
+// The collected stats then can be used to partition the graph among the devices in a way that only the
+// required memory is allocated on each device.
+//
+// node_name, initializers_memory, dynamic_outputs_sizes, temp_allocations_size
+//
+// - "full path to file": there is not a default for this option. If the file can not be opened for writing, an error will be returned.
+static const char* const kOrtSessionOptionsCollectNodeMemoryStatsToFile = "session.collect_node_memory_stats_to_file";
+
+/// This is a composite CSV setting formatted as "memory limit in kb,file name for collected stats"
+/// "limit > 0": enables Capacity Aware Partitioning for Cuda EP. `limit` is optional and when absent
+/// the provider may attempt to figure out the memory available automatically.
+/// The setting with no pre-recorded stats is expected to look like: "limit > 0,".
+/// In this case, the EP will calculate memory using the initializers referenced by the node.
+///   This enables an ad-hoc and flexible scenarios with no pre-recorded stats, but may be less accurate.
+/// The setting with no limit is expected to look like: ",file name for collected stats"
+/// Finally a setting with both limit and pre-recorded stats absent can contain a single comma: ",".
+///  The EP will attempt to place nodes on device (currently only CUDA is supported) :
+/// this file is expected to be found at the same folder with the model. The file contains
+/// pre-recorded stats collected when running with kOrtSessionOptionsCollectNodeMemoryStatsToFile enforce (see above)
+static const char* const kOrtSessionOptionsResourceCudaPartitioningSettings =
+    "session.resource_cuda_partitioning_settings";
+
+/// Enables the CUDA MatMulNBits fpA_intB path for non-prepacked weights.
+/// "0" or "off" disables it; any other non-empty value enables it.
+/// Overrides the process-wide ORT_FPA_INTB_GEMM environment variable.
+/// Capacity-aware partitioning uses this same resolved value for Level-1 estimation.
+static const char* const kOrtSessionOptionsCudaFpAIntBGemm = "ep.cuda.fpa_intb_gemm";
+
+/// Comma-separated positive M buckets used for initial CUDA MatMulNBits tactic profiling.
+/// Overrides the process-wide ORT_FPA_INTB_PROFILE_M environment variable.
+/// Capacity-aware partitioning uses this same resolved value to estimate profiler scratch.
+static const char* const kOrtSessionOptionsCudaFpAIntBProfileM = "ep.cuda.fpa_intb_profile_m";
+
+/// Opt-in: lets the CUDA MatMulNBits tactic profiler also try a paired-K GEMV kernel (fp16 activations,
+/// 4-bit block_size-32 weights without zero points or bias, SM80-interleaved layout) for M = 5..8. The
+/// profiler keeps it only for shapes where it is faster than the default GEMV and the CUTLASS kernels.
+/// "0", "off", or unset (default) disables it; "force" offers only that tactic for M = 5..8 (for testing and
+/// benchmarking); any other value enables it as an extra candidate.
+/// Overrides the process-wide ORT_FPA_INTB_GEMV_PAIRED_K environment variable. Requires the fpA_intB path.
+/// Experimental: separate FP16 partial sums can overflow before cancellation, producing non-finite
+/// results even when the default GEMV stays finite. Tactic profiling checks speed, not numerical safety.
+static const char* const kOrtSessionOptionsCudaFpAIntBGemvPairedK = "ep.cuda.fpa_intb_gemv_paired_k";
+
+/// Opt in with "1" to wave-aware fp16/int4 M=8 GEMV tiles on sm_12x; "0" or unset keeps the default dispatch.
+static const char* const kOrtSessionOptionsCudaFpAIntBGemvWaveAware = "ep.cuda.fpa_intb_gemv_wave_aware";
+
+/// Declared total KV-length envelope (accumulated past + current tokens) for CUDA
+/// GroupQueryAttention workspace estimation. A positive value enables non-windowed Level-1
+/// estimation using this bound; "0" or unset (default) leaves non-windowed estimation unavailable.
+/// The estimate also covers the allocated past cache capacity if it exceeds this envelope.
+/// Windowed estimation continues to use the cache capacity instead.
+/// A decimal integer in [0, INT32_MAX] is required. Invalid or out-of-ABI values cause
+/// INVALID_ARGUMENT during session initialization. Under capacity-aware partitioning, CUDA
+/// placement is declined when no proven GQA estimate is available; the generic workspace fallback
+/// is not used as a proof bound. This caller-declared envelope is not a runtime-enforced input limit
+/// or a no-OOM guarantee.
+static const char* const kOrtSessionOptionsCudaGqaWorkspaceMaxTotalSequenceLength =
+    "ep.cuda.gqa_workspace_max_total_sequence_length";
+
+/// CUDA DynamicSparseAttention kernel switches. Each is resolved once when the kernel is created, so a change needs a new
+/// session, and overrides the environment variable named below. The 0/1 switches accept only "0" and "1", and the
+/// thresholds a non-negative decimal integer; any other value, including an empty string, fails session initialization.
+/// "1" makes the INT8-cache BF16 prefill run FP16 tensor-core MMA on the gathered K/V tiles instead of dequantizing them
+/// to BF16 (the tensor-core kernel has different numerics; "0" restores the BF16-dequantizing kernel, or the generic
+/// kernels for FP16 queries). Default "1". Overrides ORT_DSA_PREFILL_INT8_TC.
+static const char* const kOrtSessionOptionsCudaDsaPrefillInt8Tc = "ep.cuda.dsa_prefill_int8_tc";
+
+/// "0" routes the BF16 prefill through the generic kernels. Default "1". Overrides ORT_DSA_PREFILL_KERNEL.
+static const char* const kOrtSessionOptionsCudaDsaPrefillKernel = "ep.cuda.dsa_prefill_kernel";
+
+/// "1" makes the INT8-cache BF16 decode (up to 8 query rows) use the split-K tensor-core kernel instead of the
+/// CUDA-core grouped kernel (the tensor-core kernel accumulates in a different order and does not reproduce the
+/// CUDA-core results bit for bit; "0" restores the CUDA-core kernel). Default "1". Overrides ORT_DSA_DECODE_INT8_TC.
+static const char* const kOrtSessionOptionsCudaDsaDecodeInt8Tc = "ep.cuda.dsa_decode_int8_tc";
+
+/// Requested number of 64-candidate tiles each CTA of the split-K tensor-core decode kernel consumes. "0" derives it from
+/// the problem size and the device: the smallest power of two with which all CTAs fit one wave of the CTAs that can be
+/// resident on the device. A positive value is a target: the number of splits is ceil(tiles / value), limited to 32 and
+/// to the split count of the decode workspace, so a small value on a long candidate list is raised and the last split
+/// may hold fewer tiles. Default "0". Overrides ORT_DSA_DECODE_INT8_TC_TILES_PER_SPLIT.
+static const char* const kOrtSessionOptionsCudaDsaDecodeInt8TcTilesPerSplit =
+    "ep.cuda.dsa_decode_int8_tc_tiles_per_split";
+
+/// Reader-only, hardware-neutral kernel dispatch intent shared across operators and EPs.
+/// Valid values are "auto", "latency", "memory", and "safe"; matching is case-sensitive.
+/// Unset or empty values map to "auto". Other values cause INVALID_ARGUMENT during
+/// session initialization.
+/// CUDA GroupQueryAttention Level-1 estimation is the first consumer; sizing does not use it.
+/// No value changes runtime dispatch, workspace estimates, or partitioning, and this option
+/// does not enforce a workload envelope or memory budget or provide a no-OOM guarantee.
+static const char* const kOrtSessionOptionsKernelDispatchPolicy = "session.kernel_dispatch_policy";
+
+/// Maximum number of rows of input A per CUDA MatMulNBits fpA_intB GEMM launch. Values below 8192 are
+/// rounded down to a supported tactic-profiler M bucket. Chunking requires M to exceed this limit
+/// and the 256 MiB estimated A/C row-size gate; ORT_MATMULNBITS_FORCE_CHUNKED=1 bypasses that gate.
+/// "0" or unset (default) disables chunking. Overrides ORT_MATMULNBITS_M_CHUNK_SIZE.
+static const char* const kOrtSessionOptionsCudaMatMulNBitsMChunkSize = "ep.cuda.matmul_nbits_m_chunk_size";
+
+/// CUDA MatMulPacked rounds decoded weights to the activation dtype by default ("0").
+/// "1" permits eligible GEMV kernels to skip that rounding; kernels may still use rounded weights.
+/// GEMM/prefill always rounds weights, including when its scratch buffers use FP32.
+/// Resolved once when the kernel is created. Accepts only "0" and "1"; other values fail session initialization.
+static const char* const kOrtSessionOptionsCudaMatMulPackedAllowUnroundedGemv =
+    "ep.cuda.matmul_packed_allow_unrounded_gemv";
+
+/// Enables per-shape GEMM kernel auto-tuning for CUDA fp16/bf16 MatMul: "1" enables, "0" (default) disables.
+/// When enabled, the first run of each eligible shape times the available kernels (cuBLAS, a small-N
+/// GEMV, and on SM 9.0+ the TMA-based tinygemm2) on the current device and caches the fastest for the
+/// process. Tuning is skipped while a CUDA graph is being captured, so run at least one warm-up inference
+/// before capture.
+/// When disabled, cuBLAS is used. Overrides the ORT_CUDA_GEMM_AUTO_TUNE environment variable;
+/// ORT_ENABLE_SMALL_N_GEMV=1/0, when set, forces the small-N GEMV on/off and bypasses tuning.
+static const char* const kOrtSessionOptionsCudaEnableGemmAutoTune = "ep.cuda.enable_gemm_auto_tune";
+
+/// Controls the intermediate precision of the CUDA GatedDeltaNet chunked prefill kernels when the
+/// input/output tensor type is BFloat16:
+/// - "fp32" (default): preserve 24-bit FP32 state and chunk-update residuals using 3-slice BF16
+///   tensor-core decomposition with an exact FP32 fallback for extreme exponents.
+/// - "fp16": use 1-slice FP16 (10 mantissa bits) for internal chunk MMA tiles when chunk values fit
+///   within the safe FP16 dynamic range, falling back to the FP32-preserving BF16 path otherwise.
+/// - "bf16": use 1-slice native BF16 for all internal chunk MMA tiles.
+/// Overrides the ORT_GDN_BF16_PRECISION environment variable.
+static const char* const kOrtSessionOptionsCudaGatedDeltaNetBf16Precision =
+    "ep.cuda.gated_delta_net_bf16_precision";
+
+/// Range guard of the CUDA GatedDeltaNet per-key-decay (KDA) chunked prefill for float16 input/output. The scan keeps its
+/// recurrent state in FP32 and rounds it to float16 for the tensor-core products. "1" (default) checks every tile for a
+/// state element beyond the float16 range (|x| > 65504) and computes the products of such a tile in exact FP32, so the
+/// result stays finite. "0" skips the check, which makes the KDA prefill up to about 10% faster for a single sequence
+/// (the gain shrinks as the batch grows), but a state element beyond the float16 range then becomes inf and the output
+/// and the final state become NaN/inf. Choose "0" only when the state is known to stay within the float16 range. It has
+/// no effect on BFloat16 input (see ep.cuda.gated_delta_net_bf16_precision). Resolved once when the kernel is created,
+/// so a change needs a new session.
+/// Accepts only "0" and "1"; any other value, including an empty string, fails session initialization.
+/// Overrides the ORT_GDN_FP16_STATE_GUARD environment variable.
+static const char* const kOrtSessionOptionsCudaGatedDeltaNetFp16StateGuard =
+    "ep.cuda.gated_delta_net_fp16_state_guard";
+
+/// CUDA tensor-core kernel switches of MatMulNBits and QMoE. Each is resolved once when the
+/// kernel is created, so a change needs a new session, and overrides the environment variable named below. The
+/// 0/1 switches accept only "0" and "1", and the thresholds a positive decimal integer (or "0" where stated); any other
+/// value, including an empty string, fails session initialization.
+/// "1" uses the scalar GEMV instead of the SM 9.0 tensor-core INT8 GEMV of MatMulNBits. Default "0".
+/// Overrides ORT_DISABLE_FPA_INTB_GEMV_TC.
+static const char* const kOrtSessionOptionsCudaDisableFpAIntBGemvTc = "ep.cuda.disable_fpa_intb_gemv_tc";
+
+/// "1" disables the BF16 tensor-core INT4 decode GEMV of QMoE. Default "0". Overrides ORT_DISABLE_MOE_GEMV_TC.
+static const char* const kOrtSessionOptionsCudaDisableMoeGemvTc = "ep.cuda.disable_moe_gemv_tc";
+
+/// "1" disables the BF16 tensor-core INT3 decode GEMV of QMoE. Default "0". Overrides ORT_DISABLE_QMOE_INT3_TC.
+static const char* const kOrtSessionOptionsCudaDisableQmoeInt3Tc = "ep.cuda.disable_qmoe_int3_tc";
+
+/// Minimum number of routed rows from which QMoE uses the tensor-core INT4 decode GEMV. Default 33.
+/// Overrides ORT_MOE_GEMV_TC_MIN_ROWS.
+static const char* const kOrtSessionOptionsCudaMoeGemvTcMinRows = "ep.cuda.moe_gemv_tc_min_rows";
+
+/// Minimum number of routes from which QMoE uses the tensor-core INT3 decode GEMV. Default 33. Constant INT3 weights
+/// are repacked when the session is created into a layout that runs the tensor-core GEMV from the first route; setting
+/// this threshold above 1 (here or through ORT_QMOE_INT3_TC_MIN_ROUTES) keeps the weights in their raw layout, so that
+/// the threshold holds for every decode launch. Overrides ORT_QMOE_INT3_TC_MIN_ROUTES.
+static const char* const kOrtSessionOptionsCudaQmoeInt3TcMinRoutes = "ep.cuda.qmoe_int3_tc_min_routes";
+
+/// Minimum number of rows M from which the INT8 MatMulNBits (fpA_intB path, no zero points, no bias) dequantizes the
+/// weight once and runs one cuBLAS GEMM instead of the row-chunked CUTLASS mixed-input GEMM. "0" disables. Default 512
+/// on SM 9.0 and 0 (disabled) on other architectures. Overrides ORT_FPA_INTB_DEQUANT_GEMM_MIN_M.
+static const char* const kOrtSessionOptionsCudaFpAIntBDequantGemmMinM = "ep.cuda.fpa_intb_dequant_gemm_min_m";
+
+/// CUDA QMoE INT3 grouped-prefill controls. Resolved once when the kernel is created; session entries override the
+/// corresponding environment variables. Switches accept only "0" or "1"; invalid values fail initialization.
+/// Enable grouped INT3 prefill. Default "0". Overrides ORT_ENABLE_QMOE_INT3_GROUPED_PREFILL.
+static const char* const kOrtSessionOptionsCudaQmoeInt3GroupedPrefill = "ep.cuda.qmoe_int3_grouped_prefill";
+
+/// Enable grouped-prefill Tensor Core compatibility rounding. Default "0".
+/// Overrides ORT_ENABLE_QMOE_INT3_TC_COMPATIBILITY.
+static const char* const kOrtSessionOptionsCudaQmoeInt3TcCompatibility = "ep.cuda.qmoe_int3_tc_compatibility";
+
+/// Enable CUDA PagedAttention XQA decode. Default "1". Overrides ORT_ENABLE_XQA for this operator.
+/// Resolved at kernel creation; accepts only "0" or "1", and invalid values fail session initialization.
+static const char* const kOrtSessionOptionsCudaPagedAttentionEnableXqa = "ep.cuda.paged_attention_enable_xqa";
+
+/// Enable XQA for native FP16/BF16 PagedAttention caches. Default "0"; requires XQA decode enabled.
+/// Overrides ORT_ENABLE_XQA_NATIVE_KV. Resolved at kernel creation; accepts only "0" or "1".
+static const char* const kOrtSessionOptionsCudaPagedAttentionEnableXqaNativeKv =
+    "ep.cuda.paged_attention_enable_xqa_native_kv";
+
+/// <summary>
+/// This is a setting that contains string annotations or annotation prefixes to be matched
+/// against individual nodes metadata entry 'layer_ann' to guide layer assignment during partitioning.
+/// The value is a semicolon separated list of strings or string prefixes per device.
+/// Format: device1(annotation1, annotation2, ...); device2(annotation1, =annotation3, ...);...
+/// Where:
+/// - device1, device2, ... are the recognized device names to be matched against EPs configured in
+///   the given session.
+/// - annotation1, annotation2, ... are annotation prefixes to be matched against node annotations. Any
+///   node annotation that starts with one of these prefixes will be matched.
+/// - =annotation3 indicates an exact match for annotation3. Only node annotations that are exactly
+///   equal to 'annotation3' will be matched.
+/// TODO: add a list of recognized devices here.
+/// </summary>
+static const char* const kOrtSessionOptionsLayerAssignmentSettings = "session.layer_assignment_settings";
+
+/// <summary>
+/// Name-based layer assignment. Uses the same device(pattern1, pattern2, ...); ... grammar
+/// as kOrtSessionOptionsLayerAssignmentSettings but performs SUBSTRING matching against
+/// Node::Name() instead of prefix/exact matching against node metadata annotations.
+/// The '=' prefix (exact match) from the annotation-based grammar is rejected with an error
+/// — all patterns are treated as substrings.
+/// Longest matching pattern wins when multiple patterns match the same node name.
+/// No subgraph inheritance is applied — each node is matched independently by its name.
+///
+/// MUTUALLY EXCLUSIVE with kOrtSessionOptionsLayerAssignmentSettings. Setting both returns
+/// INVALID_ARGUMENT. Use annotation-based matching for models with explicit layer annotations,
+/// or name-based matching for models with structured node names (HuggingFace, PyTorch exports).
+/// </summary>
+static const char* const kOrtSessionOptionsNameBasedLayerAssignment = "session.name_based_layer_assignment";
+
+/// <summary>
+/// Provides input shape overrides for workspace estimation in dynamic-shape models.
+/// When set, the framework propagates these shapes for workspace pre-computation
+/// (Level-1 budget estimation and Level-2 DeclareWorkspaceRequirements).
+///
+/// Format: "input_name:[d0,d1,...];input_name2:[d0,d1,...]"
+/// Example: "input_ids:[8,4096];attention_mask:[8,4096]"
+///
+/// Each input_name must match a model graph input. Dimensions must be positive integers.
+/// Unknown/symbolic dimensions in the model will be replaced by the corresponding override
+/// value and propagated through a separate shape-inference graph for estimation purposes only.
+/// Although an override may describe a maximum input shape, downstream inferred shapes are
+/// estimation hints, not guaranteed upper bounds: operator shape transformations are not
+/// necessarily monotonic. Runtime shapes are not constrained by this setting, and consumers
+/// must retain runtime bounds checks and allocation fallbacks.
+///
+/// When capacity-aware partitioning is enabled, propagated shapes are used to calculate
+/// dynamic output sizes and Level-1 workspace estimates. They therefore directly affect the
+/// hard partitioning budget and may change whether a node is assigned to an EP.
+/// </summary>
+static const char* const kOrtSessionOptionsMaxShapeOverride = "session.max_shape_override";
+
+/// Controls whether a Level-2 workspace declaration larger than the workspace reservation selected during
+/// partitioning, or a nonzero reservation is orphaned by a post-partition graph mutation. The default value is
+/// "0", which logs a warning and retains existing runtime allocation behavior. Nodes without a partition-time
+/// reservation and orphaned zero-byte reservations remain diagnostic only. Set to "1" for strict constrained-memory
+/// validation. Strict verification is not supported when loading an ORT format model because partition-time
+/// workspace reservations are not serialized in the model.
+static const char* const kOrtSessionOptionsStrictWorkspaceVerification =
+    "session.strict_workspace_verification";
+
+// Enable EP context feature to dump the partitioned graph which includes the EP context into Onnx file.
+// The dumped Onnx model with EP context can be used for future inference to avoid the EP graph partitioning/compile overhead.
+// "0": disable. (default)
+// "1": enable.
+static const char* const kOrtSessionOptionEpContextEnable = "ep.context_enable";
+
+// Specify the file path for the ONNX model containing EP context.
+// For EP context generation, defaults to original_file_name_ctx.onnx if not specified.
+// During inference, EPs use this path to resolve an external EP context binary whose
+// relative path is stored in an EPContext node's ep_cache_context attribute.
+// To resolve an external EP context binary, set this option when the model path is
+// unavailable or when kOrtSessionOptionsModelExternalInitializersFileFolderPath overrides
+// it with a different directory. Specifying both paths is recommended for EPContext workflows.
+// A folder is not a valid value.
+static const char* const kOrtSessionOptionEpContextFilePath = "ep.context_file_path";
+
+// Flag to specify whether to dump the EP context into the Onnx model.
+// "0": dump the EP context into separate file, keep the file name in the Onnx model. (default).
+// "1": dump the EP context into the Onnx model.
+static const char* const kOrtSessionOptionEpContextEmbedMode = "ep.context_embed_mode";
+
+// Specify the EPContext node name prefix to make it unique
+// in case user need to merge/connect multiple EPContext nodes in one model
+static const char* const kOrtSessionOptionEpContextNodeNamePrefix = "ep.context_node_name_prefix";
+
+// Share EP related resources across sessions
+static const char* const kOrtSessionOptionShareEpContexts = "ep.share_ep_contexts";
+
+// Stop to share EP related resources across sessions from then on
+static const char* const kOrtSessionOptionStopShareEpContexts = "ep.stop_share_ep_contexts";
+
+// Used only for context model generation.
+// This configuration is used when some nodes are partitioned on the CPU EP and those nodes have external initializers.
+// When generating the EP context model, the new model should not rely on the old external data file used by the source ONNX model.
+// Use this setting when dumping the EP context model with an external initializers file.
+// If specified, all initializers will be placed inside the external data file.
+// Otherwise, all initializers will be embedded inside the generated ONNX file.
+// By default, this option is not set, meaning all initializers will be included within the ONNX file.
+static const char* const kOrtSessionOptionsEpContextModelExternalInitializersFileName =
+    "ep.context_model_external_initializers_file_name";
+
+// Internal-only flag set by OrtCompileAPI::CompileModel() to signal EPs that this session
+// is being used for compilation only and will never be used for inference.
+// EPs can use this to skip GPU deserialization and execution context creation, which would
+// otherwise be wasteful since the session is destroyed immediately after compilation.
+// This is NOT a user-facing option and must not be set directly by application code.
+// "0": normal session (default)
+// "1": compile-only session (set internally by OrtCompileAPI::CompileModel)
+static const char* const kOrtSessionOptionCompileOnly = "session.compile_only";
+
+// Gemm fastmath mode provides fp32 gemm acceleration with bfloat16 based matmul.
+// Option values:
+// - "0": Gemm FastMath mode is not enabled. [DEFAULT]
+// - "1": Gemm FastMath mode is enabled.
+static const char* const kOrtSessionOptionsMlasGemmFastMathArm64Bfloat16 = "mlas.enable_gemm_fastmath_arm64_bfloat16";
+
+// Use LUT (Lookup Table) based GEMM for quantized models when available.
+// Option values:
+// - "0": Do not use LUT based GEMM. [DEFAULT]
+// - "1": Use LUT based GEMM when available.
+static const char* const kOrtSessionOptionsMlasLutGemm = "mlas.use_lut_gemm";
+
+// Force eligible accuracy-level-4 MatMulNBits nodes to use CompFp32 for the entire session.
+// This currently applies to x86/x64 float-input, 4-bit, block-size-32 CPU kernels. Use a dedicated
+// throughput-oriented session when enabling this option so every batch uses the same numerical path.
+// Option values:
+// - "0": Use the compute type selected by accuracy_level for all shapes. [DEFAULT]
+// - "1": Use CompFp32 instead of CompInt8 for eligible accuracy-level-4 nodes.
+static const char* const kOrtSessionOptionsMlasQNBitForceFp32 = "mlas.qnbit.force_fp32";
+
+// Use KleidiAI kernels in MLAS if available.
+// Option values:
+// - "0": Use KleidiAI kernels when available. [DEFAULT]
+// - "1": Disable KleidiAI kernels even if available.
+static const char* const kOrtSessionOptionsMlasDisableKleidiAi = "mlas.disable_kleidiai";
+
+// Power-user tuning option for the Arm® KleidiAI™ SME IGEMM convolution route on Arm64.
+// For 2D convolutions where both SME IGEMM and the MlasGemm SGEMM fallback are valid routes, work is estimated as:
+//  output_h * output_w * input_channels * dilated_kernel_h * dilated_kernel_w * filter_count.
+// Work above this threshold routes through the SGEMM fallback; work at or below it stays on IGEMM.
+// "0" or unset uses the MLAS default heuristic, intended for typical workloads.
+// This option exists for perf experimentation; the default may be retuned in future ORT releases.
+static const char* const kOrtSessionOptionsMlasKleidiAiConvIgemmMaxWork = "mlas.kleidiai.conv_igemm_max_work";
+
+// Power-user tuning option for the MLAS NCHWc pointwise (1x1) convolution algorithm.
+// Controls the maximum number of input channels accumulated per kernel invocation before
+// intermediate results are flushed to the output tensor. Values are rounded up to a multiple
+// of the NCHWc block size. Larger values reduce output read/write round trips for deep-input
+// convolutions at the cost of a larger cache working set.
+// "0" or unset uses the MLAS default (128).
+// This option exists for perf experimentation; the default may be retuned in future releases.
+static const char* const kOrtSessionOptionsMlasNchwcPointwiseConvMaxInputChannelBatch = "mlas.nchwc_pointwise_conv_max_input_channel_batch";
+
+// Selects the NCHWc depthwise convolution kernel on AVX-512 platforms. The sliding window kernel keeps
+// each input column of a kernel row in a register across the kernel columns and handles the padding
+// columns with masks. It supports stride 1, dilation 1 and kernel widths 3, 5 and 7 (other shapes use
+// the assembly kernel). Its results are bitwise identical to the assembly kernel, except that a NaN
+// result may carry a different NaN payload or sign.
+// Option values:
+// - "1": Use the sliding window kernel where it applies. [DEFAULT]
+// - "0": Always use the assembly kernel.
+static const char* const kOrtSessionOptionsMlasNchwcDepthwiseSliding = "mlas.nchwc_depthwise_sliding";
+
+// When converting DQ + MatMul -> MatMulNBits, the accuracy level of the MatMulNBits is controlled by this option.
+// Refer to MatMulNBits op schema for more details.
+// If not provided, default is 4.
+static const char* const kOrtSessionOptionsQDQMatMulNBitsAccuracyLevel = "session.qdq_matmulnbits_accuracy_level";
+
+// Block size used when converting per-tensor or per-axis DQ + MatMul to MatMulNBits.
+// Only applies to DQ nodes without an existing block_size attribute (i.e., per-tensor or per-axis quantization).
+// Positive value: explicit block_size (must be power-of-2 and >= 16, e.g., 16, 32, 64, 128).
+// "0" or not provided: use default block_size of 32.
+// "-1": heuristic - largest power-of-2 <= min(K, 256) that minimizes padding.
+static const char* const kOrtSessionOptionsQDQMatMulNBitsBlockSize = "session.qdq_matmulnbits_block_size";
+
+// Enable the DQ->MatMulNBits fusion graph transformer.
+// "0": disabled (default). "1": enabled.
+// This is typically enabled automatically when the NvTensorRTRTX plugin EP is registered.
+static const char* const kOrtSessionOptionsEnableDQMatMulNBitsFusion = "session.enable_dq_matmulnbits_fusion";
+
+// THIS OPTION IS NOT A REGULAR SESSION OPTION SINCE IT CAN BE MODIFIED AT ANY TIME
+// Meant to be used with SetEpDynamicOptions
+// Specify the type of workload for this session.
+// "Default": OS determines the scheduling priority and processor performance to service this workload. [Default]
+// "Efficient": OS treats this workload is efficiency oriented with low scheduling priority and efficient processor performance.
+static const char* const kOrtEpDynamicOptionsWorkloadType = "ep.dynamic.workload_type";
+
+// Disables model compilation during session initialization.
+//
+// If this option is set to "1", inference session creation will fail with error code ORT_MODEL_REQUIRES_COMPILATION
+// if compilation is required to run the model on any Execution Provider added to the session.
+// Only the following kinds of models are valid when this option is set to "1":
+//   - Pre-compiled models that have EPContext nodes for the compiling Execution Providers in the session.
+//   - Non-compiled models that run only on non-compiling Execution Providers, like CPU EP.
+//
+// See \href https://onnxruntime.ai/docs/execution-providers/EP-Context-Design.html for details about
+// compiled models with EPContext nodes.
+//
+// Option values:
+// - "0": EP compile is not disabled. [DEFAULT]
+// - "1": EP compile is disabled.
+static const char* const kOrtSessionOptionsDisableModelCompile = "session.disable_model_compile";
+
+// Controls behavior when compiled model compatibility is SUPPORTED_PREFER_RECOMPILATION.
+// "0": Allow execution with suboptimal performance. [DEFAULT]
+// "1": Fail session creation to require recompilation for optimal performance.
+// Note: UNSUPPORTED models always fail regardless of this setting.
+static const char* const kOrtSessionOptionsFailOnSuboptimalCompiledModel =
+    "session.fail_on_suboptimal_compiled_model";
+
+// THIS OPTION IS NOT A REGULAR SESSION OPTION SINCE IT CAN BE MODIFIED AT ANY TIME
+// Meant to be used with SetEpDynamicOptions
+// options for HTP performance mode: "burst", "balanced", "default", "high_performance",
+// "high_power_saver", "low_balanced", "extreme_power_saver", "low_power_saver", "power_saver",
+// "sustained_high_performance". Default to "default".
+static const char* const kOrtEpDynamicOptionsQnnHtpPerformanceMode = "ep.dynamic.qnn_htp_performance_mode";
+
+// Enables the session to record information about the subgraphs/nodes assigned to execution providers.
+// When enabled, an application may call Session_GetEpGraphAssignmentInfo() to retrieve the information.
+//
+// Option values:
+// - "0": Recording of EP graph assignment information is disabled. [DEFAULT]
+// - "1": Recording of EP graph assignment information is enabled.
+static const char* const kOrtSessionOptionsRecordEpGraphAssignmentInfo = "session.record_ep_graph_assignment_info";
+
+// An application enables this option to request that EPs create compiled models (i.e., EPContext models) with EPContext
+// nodes that do not store model weights internally. Instead, the weights should be provided by ONNX Runtime as
+// explicit inputs to the EPContext nodes.
+//
+// This option is ignored by an EP if "ep.context_enable" is not set to "1".
+//
+// If the weights are originally stored in an external file, this allows multiple models to share the same
+// external weights file.
+//
+// Option values:
+// - "0": disable. (default)
+// - "1": enable.
+//
+// \deprecated Since version 1.29. Use "ep.enable_weightless_mode" instead, which selects the scope of the
+// initializers (external only, or internal and external) and works in both JIT and AOT flows. If
+// "ep.enable_weightless_mode" is set to OrtWeightlessSupport_NONE ("0"), ORT overrides this option to "0" before
+// creating the EP.
+static const char* const kOrtSessionOptionEpEnableWeightlessEpContextNodes = "ep.enable_weightless_ep_context_nodes";
+
+// Layout of the Value KV-cache tensors that the application binds to the past_value input and
+// present_value output of com.microsoft.GroupQueryAttention. Applies to every GQA node in the
+// model. The Key cache (past_key/present_key) is not affected.
+//
+// Requires onnxruntime_ENABLE_GQA_VALUE_LAYOUT, enabled by default in normal builds and automatically
+// disabled in minimal, extended-minimal, and contrib-disabled builds. When disabled, setting this
+// option to any value fails session initialization with ORT_INVALID_ARGUMENT. Leave it unset to load
+// a model with a preconverted BNHS boundary; disabled builds do not validate or warn about its layout.
+//
+// Option values:
+// - "BNSH": (batch_size, num_heads, sequence_length, head_size). Matches the operator schema. [DEFAULT]
+// - "BNHS": (batch_size, num_heads, head_size, sequence_length).
+//
+// When "BNHS" is selected, ORT keeps the GQA node itself in BNSH and inserts a
+// Transpose(perm=[0,1,3,2]) between the past_value graph input and the node, and another between
+// the node and the present_value graph output. An EP that prefers BNHS is expected to fuse that
+// Transpose -> GroupQueryAttention -> Transpose sequence into a single operation; an EP that does
+// not will execute the transposes, which is correct but costs a full copy of the Value cache in
+// each direction per step. The application may still bind one buffer to both past_value and
+// present_value; what it loses is the GQA kernel's in-place update of that buffer, because the
+// kernel now reads and writes ORT-allocated BNSH intermediates instead.
+// Key buffers may remain aliased. CPU handles each cache's aliasing independently; CUDA stages the
+// aliased cache when only one pair is shared, adding a cache-sized copy and scratch allocation.
+// CUDA sliding-window caches still require both operator cache pairs to be shared, so they cannot
+// use this unfused conversion.
+//
+// Query an EP's preference via the "gqa_preferred_value_layout" OrtEpDevice metadata key
+// (kOrtEpDevice_EpMetadataKey_GqaPreferredValueLayout in onnxruntime_ep_device_ep_metadata_keys.h).
+//
+// Setting "BNSH" explicitly is a claim that the model's Value cache boundary is BNSH, and session
+// initialization fails if the model already carries the BNHS conversion (as one saved from a BNHS
+// session via "session.optimized_model_filepath" does). Leaving the option unset makes no claim: such
+// a model loads unchanged, with a warning, exactly as it did before this option existed.
+//
+// Scope: this option only describes Value caches that the application itself binds, that is, a
+// past_value that is a graph input and a present_value that is a graph output. A Value cache that
+// stays inside the graph keeps the BNSH layout, because the application never sees it; ORT logs a
+// warning naming the node in that case.
+//
+// Requesting "BNHS" fails session initialization when a cache is application visible but cannot be
+// converted, rather than silently leaving it BNSH and letting the application bind buffers in the
+// wrong layout. That happens when:
+// - a past_value graph input is read by more than one node, or a present_value graph output is also
+//   consumed inside the graph (the layout of a shared cache cannot be changed for one reader only);
+// - a node already has the layout applied to only one of past_value / present_value;
+// - the Value cache is 4-bit quantized (two values are packed per byte along head_size);
+// - a Value cache tensor is not rank 4;
+// - a Value cache tensor reaches the boundary through a device copy node, which the conversion cannot
+//   be inserted across;
+// - a GroupQueryAttention node is inside a subgraph (a Loop body or BeamSearch decoder), where the
+//   operator and its boundary are in different graphs and cannot be converted together;
+// - the model is in ORT format, which does not run the graph transform that applies this option.
+//   Note only "BNHS" is refused there; an explicit "BNSH" is still accepted and still checked.
+//
+// This option takes effect at all graph optimization levels, including ORT_DISABLE_ALL, because it
+// changes the layout the session expects at its inputs and outputs rather than optimizing the graph.
+static const char* const kOrtSessionOptionsGqaValueLayout = "session.gqa_value_layout";
+
+// Enable weightless mode for all initializers (internal and external).
+//
+// When enabled, ONNX Runtime requests that the execution provider operate without embedding or copying
+// constant initializers.
+//
+// This option works in both JIT (non-cached) and AOT (EPContext model) flows:
+// - JIT: The EP should set drop_constant_initializers to false in OrtNodeFusionOptions so that ORT
+//   provides the initializer data as inputs to the compiled/fused node. The EP can then access these
+//   initializers at Compute() time via KernelContext_GetInput().
+//   NOTE: Extending the lifetime of initializer data obtained via ValueInfo_GetInitializerValue() during
+//   Compile() so that the EP can cache and reuse data pointers directly is planned but not yet implemented.
+// - AOT: ORT generates EPContext models with weightless EPContext nodes. The EP should use the
+//   "onnx_model_filename" EPContext node attribute or the "ep.context_source_model_path" session option
+//   to locate the source model's initializer data when creating a session from the compiled model.
+//
+// ORT checks that the EP supports weightless mode by calling OrtEpApi::GetWeightlessSupport().
+// If the EP does not support it, ORT returns an error.
+//
+// Option values:
+// - "0": disable. (default)
+// - "1": enable.
+//
+// \deprecated Since version 1.32. Use "ep.enable_weightless_mode" instead, which selects a specific
+// OrtWeightlessSupport mode. If "ep.enable_weightless_mode" is set, ORT overrides this option to match it
+// ("0" for OrtWeightlessSupport_NONE, "1" otherwise) before creating the EP.
+//
+// \since Version 1.29.
+static const char* const kOrtSessionOptionEpEnableWeightless = "ep.enable_weightless";
+
+// Selects the weightless mode to use.
+//
+// When a mode other than OrtWeightlessSupport_NONE is selected, ONNX Runtime requests that the execution provider
+// operate without embedding or copying the constant initializers covered by that mode.
+//
+// Applications can inspect the "weightless_supported_modes" EP metadata entry
+// (kOrtEpDevice_EpMetadataKey_WeightlessSupportedModes), or "weightless_support" if it is not present, of each
+// OrtEpDevice to discover the modes supported by an EP and choose the one that best fits the use case (or none at all).
+//
+// This option works in both JIT (non-cached) and AOT (EPContext model) flows. The EP either keeps the
+// initializers as inputs of the compiled/fused node (drop_constant_initializers = false in OrtNodeFusionOptions)
+// and accesses them at Compute() time via KernelContext_GetInput(), or drops them and loads the initializer data
+// itself. In the AOT flow, when creating a session from the compiled model:
+// - The external initializers file of the compiled model (see "ep.context_model_external_initializers_file_name")
+//   or of the source model must be available, next to the model or in the folder given by
+//   "session.model_external_initializers_file_folder_path".
+// - With OrtWeightlessSupport_ALL, an EP that loads the initializer data itself also needs the source model, e.g. via
+//   the "ep.context_source_model_path" session option. An EP that lets ORT provide the initializers doesn't. Since
+//   the application can't generally tell which approach an EP uses, it should make the source model available.
+//
+// Before creating the EP, ORT:
+// - returns an INVALID_ARGUMENT error if the value is not one of the values below,
+// - returns an error if the selected mode is not supported according to the EP metadata entries above, and
+// - sets the deprecated "ep.enable_weightless" option to "0" for OrtWeightlessSupport_NONE and to "1" otherwise,
+//   and for OrtWeightlessSupport_NONE also sets the deprecated "ep.enable_weightless_ep_context_nodes" option to
+//   "0" if it is set, for EPs built for earlier versions, which only know those options.
+// When compiling, ORT also checks that the EP supports the selected mode by calling OrtEp::GetWeightlessSupport(),
+// and returns an error if it does not.
+//
+// If this option is not set, the deprecated "ep.enable_weightless" option keeps its previous behavior.
+//
+// With OrtWeightlessSupport_ALL, an EP that lets ORT provide the initializers (drop_constant_initializers = false)
+// gets the initializers stored inside the source model copied into the generated EPContext model, unless
+// ModelCompilationOptions_SetOutputModelGetInitializerLocationFunc is used to store them elsewhere (e.g., in a weights
+// file shared by several model variants). ORT logs a warning in that case, since these initializers can't be shared.
+//
+// ORT records the selected mode in the metadata of generated EPContext models under the "weightless_mode" key
+// (kOrtModelMetadata_WeightlessMode), and the external data the models need at runtime under the
+// "external_dependencies" key (kOrtModelMetadata_ExternalDependencies). The option does not need to be set again
+// when creating a session from the compiled model.
+//
+// Equivalent to OrtCompileApi::ModelCompilationOptions_SetWeightlessMode.
+//
+// Option values (exactly one of these strings; other spellings such as "0x2" or an empty value are invalid):
+// - "0": disable (OrtWeightlessSupport_NONE). (default)
+// - "1": weightless mode for external initializers only (OrtWeightlessSupport_EXTERNAL_ONLY).
+// - "2": weightless mode for all initializers, internal and external (OrtWeightlessSupport_ALL).
+//
+// \since Version 1.32.
+static const char* const kOrtSessionOptionEpEnableWeightlessMode = "ep.enable_weightless_mode";
+
+// Specifies the file path to the original (source) ONNX model when creating a session with a weightless
+// EPContext model.
+//
+// This option is only used when "ep.enable_weightless_mode" is set to OrtWeightlessSupport_ALL ("2"), by EPs that
+// load the initializer data themselves. In that mode the EP binary does not contain the original initializer data,
+// so when creating a session from the compiled model such an EP loads the initializer data from the source model.
+// This session option provides the runtime location of the source model, which may differ from the path used at
+// compile time (stored in the EPContext node's "onnx_model_filename" attribute).
+//
+// If not set, the EP falls back to the "onnx_model_filename" attribute in the EPContext node. A relative
+// "onnx_model_filename" is resolved against the directory of the compiled model: the directory of the model path,
+// or of "ep.context_file_path" (kOrtSessionOptionEpContextFilePath) when the compiled model is loaded from memory.
+//
+// ORT logs a warning when creating a session from a model whose "external_dependencies" metadata
+// (kOrtModelMetadata_ExternalDependencies) includes "source_model" if neither this option nor a source model buffer is
+// set. For models without that metadata, ORT does so if the model was compiled with OrtWeightlessSupport_ALL, since the
+// EP may need the source model.
+//
+// If the source model is available as a byte buffer rather than a file path, use
+// OrtApi::SessionOptionsSetWeightlessSourceModelBuffer() instead.
+//
+// \since Version 1.29.
+static const char* const kOrtSessionOptionEpContextSourceModelPath = "ep.context_source_model_path";
+
+// Controls the intra-op thread pool size for a session.
+// Value should be a base-10 int32 string.
+// Equivalent to OrtApi::SetIntraOpNumThreads.
+static const char* const kOrtSessionOptionsConfigIntraOpNumThreads = "session.intra_op_num_threads";
+
+// Controls the inter-op thread pool size for a session.
+// Value should be a base-10 int32 string.
+// Equivalent to OrtApi::SetInterOpNumThreads.
+static const char* const kOrtSessionOptionsConfigInterOpNumThreads = "session.inter_op_num_threads";
+
+// Enable or disable the CPU memory arena for a session.
+// "0": disable; "1": enable.
+// Equivalent to OrtApi::DisableCpuMemArena / OrtApi::EnableCpuMemArena.
+static const char* const kOrtSessionOptionsConfigEnableCpuMemArena = "session.enable_cpu_mem_arena";
+
+// Enable or disable memory pattern optimization for a session.
+// "0": disable; "1": enable.
+// Equivalent to OrtApi::DisableMemPattern / OrtApi::EnableMemPattern.
+static const char* const kOrtSessionOptionsConfigEnableMemPattern = "session.enable_mem_pattern";
+
+// Session log identifier.
+// Value should be a UTF-8 string.
+// Equivalent to OrtApi::SetSessionLogId.
+static const char* const kOrtSessionOptionsConfigLogId = "session.log_id";
+
+// Session log severity level.
+// Value should be a base-10 int32 string (refer to OrtLoggingLevel values).
+// Equivalent to OrtApi::SetSessionLogSeverityLevel.
+static const char* const kOrtSessionOptionsConfigLogSeverityLevel = "session.log_severity_level";
+
+// Session log verbosity level.
+// Value should be a base-10 int32 string.
+// Equivalent to OrtApi::SetSessionLogVerbosityLevel.
+static const char* const kOrtSessionOptionsConfigLogVerbosityLevel = "session.log_verbosity_level";
+
+// Enable or disable profiling for a session.
+// Empty string: disable profiling.
+// Non-empty string: enable profiling and use value as profile file prefix.
+// Equivalent to OrtApi::DisableProfiling / OrtApi::EnableProfiling.
+static const char* const kOrtSessionOptionsConfigEnableProfiling = "session.enable_profiling";
+
+// Graph optimization level for a session.
+// Value should be one of:
+// "disable_all", "enable_basic", "enable_extended", "enable_layout", "enable_all".
+// Equivalent to OrtApi::SetSessionGraphOptimizationLevel.
+static const char* const kOrtSessionOptionsConfigGraphOptimizationLevel = "session.graph_optimization_level";
+
+// File path for saving the optimized model.
+// Value should be a path string.
+// Equivalent to OrtApi::SetOptimizedModelFilePath.
+static const char* const kOrtSessionOptionsConfigOptimizedModelFilePath = "session.optimized_model_filepath";
+
+// Session execution mode.
+// Value should be one of:
+// "sequential", "parallel", "ort_sequential", "ort_parallel".
+// Equivalent to OrtApi::SetSessionExecutionMode.
+static const char* const kOrtSessionOptionsConfigExecutionMode = "session.execution_mode";
+
+// Controls whether to use per-session thread pools.
+// "0": disable per-session threads (use global thread pools).
+// "1": keep per-session threads enabled (default behavior before disable call).
+// Equivalent to OrtApi::DisablePerSessionThreads (one-way via API).
+static const char* const kOrtSessionOptionsConfigUsePerSessionThreads = "session.use_per_session_threads";
+
+// Enable or disable deterministic compute for a session.
+// "0": disable; "1": enable.
+// Equivalent to OrtApi::SetDeterministicCompute.
+static const char* const kOrtSessionOptionsConfigUseDeterministicCompute = "session.use_deterministic_compute";
+
+// Skip device-side input sanitization (block_table clamping, sequence-length monotonicity/bounds
+// clamping, and invalid-sequence output masking) in PagedAttention when the caller guarantees
+// valid block_table, cumulative_seqlens_q, and past_seqlens inputs.
+// Option values:
+// - "0": Sanitize PagedAttention inputs on device. [DEFAULT]
+// - "1": Skip PagedAttention input sanitization.
+static const char* const kOrtSessionOptionsPagedAttentionSkipInputSanitizer =
+    "session.paged_attention.skip_input_sanitizer";
+
+// ---------------------------------------------------------------------------
+// Portable MoE / QMoE Offload v4 Session Configuration Keys
+// ---------------------------------------------------------------------------
+static const char* const kOrtSessionOptionsMoeOffloadMode = "session.moe.offload.mode";
+static const char* const kOrtSessionOptionsMoeOffloadCpuExecution = "session.moe.offload.cpu_execution";
+static const char* const kOrtSessionOptionsMoeOffloadPlacement = "session.moe.offload.placement";
+static const char* const kOrtSessionOptionsMoeOffloadDeviceExpertBytes = "session.moe.offload.device_expert_bytes";
+static const char* const kOrtSessionOptionsMoeOffloadHostExpertBytes = "session.moe.offload.host_expert_bytes";
+static const char* const kOrtSessionOptionsMoeOffloadDeviceWorkingBytes = "session.moe.offload.device_working_bytes";
+static const char* const kOrtSessionOptionsMoeOffloadHostWorkingBytes = "session.moe.offload.host_working_bytes";
+static const char* const kOrtSessionOptionsMoeOffloadPinnedBytes = "session.moe.offload.pinned_bytes";
+static const char* const kOrtSessionOptionsMoeOffloadReserveDeviceBytes = "session.moe.offload.reserve_device_bytes";
+static const char* const kOrtSessionOptionsMoeOffloadBudgetGroup = "session.moe.offload.budget_group";
+// Per-session limit, in bytes, on device memory allocated through the session's CUDA allocators (BFC arena growth,
+// MoE offload buffers, ...). An allocation that would exceed the limit fails.
+// This is not the CUDA EP provider option `gpu_mem_limit`, which only caps the size of the BFC arena.
+// "0" or unset means no limit. Not supported with external CUDA allocators or CUDA memory pools.
+// Honored by both the CUDA EP and the CUDA plugin EP. Must be set before the session is created.
+static const char* const kOrtSessionOptionsMoeOffloadGpuDeviceMemLimit = "session.moe.offload.gpu_device_mem_limit";
+static const char* const kOrtSessionOptionsMoeOffloadAllowFileBacking = "session.moe.offload.allow_file_backing";
+static const char* const kOrtSessionOptionsMoeOffloadCpuThreads = "session.moe.offload.cpu_threads";
+static const char* const kOrtSessionOptionsMoeOffloadAsyncMaxTokens = "session.moe.offload.async_max_tokens";
+static const char* const kOrtSessionOptionsMoeOffloadPrefillWaveExperts = "session.moe.offload.prefill_wave_experts";
+static const char* const kOrtSessionOptionsMoeOffloadSkipZeroColdDoorbell = "session.moe.offload.skip_zero_cold_doorbell";
+static const char* const kOrtSessionOptionsMoeOffloadMinExpertWeight = "session.moe.offload.min_expert_weight";
+// Controls whether tail-expert pruning (`session.moe.offload.min_expert_weight > 0`) during decode skips only CPU-cold
+// experts or all routed tail experts:
+// - "1" (default): retain GPU-resident (`slot >= 0`) tail experts during decode at zero wall-time cost and prune only
+//   CPU-cold (`slot < 0`) tail experts whose routing probability is below `min_expert_weight`.
+// - "0": prune both GPU-resident and CPU-cold tail experts whose routing probability is below `min_expert_weight`.
+// Overrides ORT_QMOE_SKIP_TAIL_COLD_ONLY.
+static const char* const kOrtSessionOptionsMoeOffloadSkipTailColdOnly = "session.moe.offload.skip_tail_cold_only";
+static const char* const kOrtSessionOptionsMoeOffloadTailSubstitutionThreshold = "session.moe.offload.tail_substitution_threshold";
+static const char* const kOrtSessionOptionsMoeOffloadTailSubstitutionMinRank = "session.moe.offload.tail_substitution_min_rank";
+static const char* const kOrtSessionOptionsMoeOffloadPopularityFile = "session.moe.offload.popularity_file";
+static const char* const kOrtSessionOptionsMoeOffloadNodeOverrides = "session.moe.offload.node_overrides";
+static const char* const kOrtSessionOptionsMoeOffloadSourceRoot = "session.moe.offload.source_root";
+static const char* const kOrtSessionOptionsMoeOffloadDerivedCacheDir = "session.moe.offload.derived_cache_dir";
+
+// ---------------------------------------------------------------------------
+// External Data Loader Session Configuration Keys
+// ---------------------------------------------------------------------------
+// Number of CPU reader threads used by the external-data loader when staging external initializers
+// into pinned host memory for device transfer.
+// - "0": Disable the pinned-buffer external-data loader and use the pageable-memory path.
+// - "1": Use pinned staging buffers with synchronous single-threaded reads.
+// - "2".."64": Use that many parallel reader threads.
+// When unset, the default thread count is computed from the host CPU core count (clamped to [2, 8]).
+// Not supported in minimal builds. Honored by both the built-in CUDA EP and plugin EPs (such as the CUDA plugin EP).
+static const char* const kOrtSessionOptionsExternalDataLoaderThreads =
+    "session.external_data_loader.threads";
+
+// Total pinned host staging memory, in bytes, allocated across the two reusable double-buffered
+// staging buffers of the external-data loader (each buffer receives half of this byte count).
+// Must be a decimal integer in [1048576, 4294967296] (1 MiB to 4 GiB) that is a multiple of 8192 (8 KiB).
+// Default is "33554432" (32 MiB total, i.e. two 16 MiB buffers).
+// Not supported in minimal builds. Honored by both the built-in CUDA EP and plugin EPs (such as the CUDA plugin EP).
+static const char* const kOrtSessionOptionsExternalDataLoaderPinnedMemoryBytes =
+    "session.external_data_loader.pinned_memory_bytes";
+
+// Maximum per-transfer chunk size, in bytes, used by parallel reader workers when reading external
+// initializer slices into pinned host memory and issuing asynchronous host-to-device copies.
+// Must be a decimal integer in [4096, 67108864] (4 KiB to 64 MiB) that is a multiple of 4096 (4 KiB).
+// Default is "2097152" (2 MiB).
+// Not supported in minimal builds. Honored by both the built-in CUDA EP and plugin EPs (such as the CUDA plugin EP).
+static const char* const kOrtSessionOptionsExternalDataLoaderChunkBytes =
+    "session.external_data_loader.chunk_bytes";
+
+// Minimum total external initializer bytes on the target device required before session initialization
+// allocates pinned host staging buffers, non-blocking copy streams, and reader threads. Models whose
+// total external initializer size on the device is below this threshold use the pageable-memory path.
+// Must be a non-negative decimal integer in [0, 4294967296].
+// Default is "16777216" (16 MiB).
+// Not supported in minimal builds. Honored by both the built-in CUDA EP and plugin EPs (such as the CUDA plugin EP).
+static const char* const kOrtSessionOptionsExternalDataLoaderMinSizeBytes =
+    "session.external_data_loader.min_size_bytes";
