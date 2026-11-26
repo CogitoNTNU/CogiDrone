@@ -301,7 +301,6 @@ Perception::toDetectionArray(std::span<const Model::Detection> fused) const {
         // ? reference. `detection.results` has exactly one element, so this
         // ? never reallocates and the reference stays valid.
         auto& hypothesis = detection.results.emplace_back();
-        hypothesis.hypothesis.class_id = "person";                                  // ? CONTRACT: always "person"
         hypothesis.hypothesis.score = person.confidence;
 
         // ? Camera-frame position. Navigation converts to world NED via
@@ -310,11 +309,13 @@ Perception::toDetectionArray(std::span<const Model::Detection> fused) const {
         hypothesis.pose.pose.position.y = person.positionCamera.y;
         hypothesis.pose.pose.position.z = person.positionCamera.z;
 
-        // ? The pose class travels in `id`, not `class_id`, so Navigation can
-        // ? use it later without breaking the "person only" contract.
+        // ? `class_id` is the object class. Every class in the person model is a
+        // ? person POSE ("walking", "seated", ...), so that is what belongs here.
+        // ? `id` is RESERVED for a stable track ID and is left empty until
+        // ? Perception assigns one - see the tracking issue.
         const auto CLASS_NAMES = Person::classNames();
         if (person.classId >= 0 && static_cast<std::size_t>(person.classId) < CLASS_NAMES.size()) {
-            detection.id = std::string(CLASS_NAMES[static_cast<std::size_t>(person.classId)]);
+            hypothesis.hypothesis.class_id = std::string(CLASS_NAMES[static_cast<std::size_t>(person.classId)]);
         }
     }
 
