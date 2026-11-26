@@ -98,11 +98,6 @@ def generate_launch_description():
                 parameters=[{"config_file": bridge_config}],
                 output="screen",
             ),
-            # TODO: [#NN] Launch the C++ binary once the `sim` CMake preset exists.
-            #     : The binary needs an ONNX Runtime build, which needs the
-            #     : Dockerfile to install libonnxruntime.so. Until then, run it
-            #     : manually from a second shell:
-            #     :     ./build/sim/src/cogidrone
             ExecuteProcess(
                 cmd=[os.path.join(WORKSPACE, "build/sim/src/cogidrone")],
                 cwd=WORKSPACE,
