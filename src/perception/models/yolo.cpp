@@ -222,8 +222,8 @@ std::expected<Yolo<Layout>, typename Yolo<Layout>::InitError>
 Yolo<Layout>::create(YoloParams<Layout> params) {
     // ! Fallible work FIRST: load the TensorRT plan
     // ? "images" and "output0" are the names ultralytics emits. If the export
-    // ? used different names, TrtEngine::create() logs the ones it found.
-    auto engine = TrtEngine::create(params.enginePath, "images", "output0");
+    // ? used different names, cogidrone::Engine::create() logs the ones it found.
+    auto engine = cogidrone::Engine::create(params.enginePath, "images", "output0");
     if (!engine) return std::unexpected(InitError::ModelLoadFailed);
 
     // ? `.iouThreshold` is omitted here and set below, because it exists only
