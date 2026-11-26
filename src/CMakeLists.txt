@@ -86,6 +86,7 @@ add_executable(cogidrone
     # Perception
     perception/perception.cpp
     perception/perception.h
+    perception/models/engine.h
     perception/models/trt_engine.cpp
     perception/models/trt_engine.h
     perception/models/yolo.cpp
