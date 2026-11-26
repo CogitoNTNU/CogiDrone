@@ -3,10 +3,13 @@
   "configurePresets": [
     {
       "name": "linux-arm64",
-      "displayName": "Linux ARM64 (cross-compile)",
+      "displayName": "Linux ARM64 (cross-compile, TensorRT)",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/linux-arm64",
-      "toolchainFile": "${sourceDir}/cmake/aarch64-linux-gnu.cmake"
+      "toolchainFile": "${sourceDir}/cmake/aarch64-linux-gnu.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
     },
     {
       "name": "jetson-native",
@@ -14,7 +17,18 @@
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/jetson",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release"
+        "CMAKE_BUILD_TYPE": "Release",
+        "COGIDRONE_BACKEND": "TRT"
+      }
+    },
+    {
+      "name": "sim",
+      "displayName": "Sim (native, ONNX Runtime, CPU)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/sim",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "COGIDRONE_BACKEND": "ONNX"
       }
     }
   ]

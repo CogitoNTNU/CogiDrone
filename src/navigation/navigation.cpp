@@ -4,12 +4,35 @@
 #include <string>
 #include <cmath>
 
+#include "controller/px4_topics.h"
 
-// | Logging
+
 namespace {
+// | Logging
 // ? `%.*s` takes the length explicitly - a string_view is not NUL-terminated.
 [[nodiscard]] constexpr int svLen(std::string_view sv) noexcept {
     return static_cast<int>(sv.size());
+}
+
+// * ROS box -> cogidrone::BoundingBox
+// ? `vision_msgs::BoundingBox2D` is centre + size; `cogidrone::Bbox` is
+// ? corners. The conversion lives here, not in math/, so math/ stays free of
+// ? ROS dependencies and remains constexpr-testable.
+[[nodiscard]] cogidrone::BoundingBox toBbox(const vision_msgs::msg::BoundingBox2D& b) noexcept {
+    const double HALF_W = b.size_x / 2.0;
+    const double HALF_H = b.size_y / 2.0;
+    return cogidrone::BoundingBox{
+        static_cast<float>(b.center.position.x - HALF_W),
+        static_cast<float>(b.center.position.y - HALF_H),
+        static_cast<float>(b.center.position.x + HALF_W),
+        static_cast<float>(b.center.position.y + HALF_H)
+    };
+}
+
+// ? Camera-frame forward distance. Perception puts it in the pose's z.
+// ! Caller must have checked `results` is non-empty.
+[[nodiscard]] float distanceOf(const vision_msgs::msg::Detection2D& d) noexcept {
+    return static_cast<float>(d.results.front().pose.pose.position.z);
 }
 } // namespace
 
@@ -30,12 +53,12 @@ std::expected<std::unique_ptr<Navigation>, cogidrone::Error> Navigation::create(
     NavigationParams params;
     params.targetFollowDistance   = node->declare_parameter("target_follow_distance", params.targetFollowDistance);
     params.targetHeight           = node->declare_parameter("target_height", params.targetHeight);
-    params.maxFollowSpeed         = node->declare_parameter("max_follow_speed", params.maxFollowSpeed);
-    params.minFollowDistance      = node->declare_parameter("min_follow_distance", params.minFollowDistance);
     params.maxFollowDistance      = node->declare_parameter("max_follow_distance", params.maxFollowDistance);
     params.detectionTimeout       = node->declare_parameter("detection_timeout", params.detectionTimeout);
     params.minDetectionConfidence = node->declare_parameter("min_detection_confidence", params.minDetectionConfidence);
     params.trackConfirmTime       = node->declare_parameter("track_confirm_time", params.trackConfirmTime);
+    params.targetIouThreshold     = node->declare_parameter("target_iou_threshold", params.targetIouThreshold);
+    params.targetSwitchMargin     = node->declare_parameter("target_switch_margin", params.targetSwitchMargin);
 
     cogidrone::log(LOGGING_LEVEL::INFO, "Navigation parameters initialized successfully"sv);
 
@@ -123,13 +146,16 @@ void Navigation::wire() noexcept {
     // ? Read straight from PX4. `best_effort` is mandatory: PX4 publishes this
     // ? topic as best_effort, and a reliable subscriber would never match.
     // ! No explicit callback group - same invariant as the other callbacks.
-    m.localPositionSubscription = m.node->create_subscription<px4_msgs::msg::VehicleLocalPosition>(
-        "/fmu/out/vehicle_local_position",
-        rclcpp::QoS(10).best_effort(),
-        [this](const px4_msgs::msg::VehicleLocalPosition& msg) {
-            this->onLocalPosition(msg);
-        }
-    );
+    { // Local position subscription
+        using MessageType = px4_msgs::msg::VehicleLocalPosition;
+        m.localPositionSubscription = m.node->create_subscription<MessageType>(
+            cogidrone::px4::versionedTopic<MessageType>("/fmu/out/vehicle_local_position"),
+            rclcpp::QoS(10).best_effort(),
+            [this](const MessageType& msg) {
+                this->onLocalPosition(msg);
+            }
+        );
+    }
 
     // * Publishers
     m.setpointPublisher = m.node->create_publisher<px4_msgs::msg::TrajectorySetpoint>(
@@ -179,22 +205,15 @@ void Navigation::onDetections(const vision_msgs::msg::Detection2DArray& msg) {
     // ? Heartbeat: Perception is alive, regardless of whether a person was found.
     lastHeartbeatTime = m.node->now();
 
-    // * Pick the most confident detection in the array
+    // * Select the target
     // ? CONTRACT: `/perception/detections` carries PERSON detections only.
-    // ? Perception owns the filtering; Navigation takes the highest score and
-    // ? does not inspect `hypothesis.class_id`. This is a deliberate choice over
-    // ? string-matching a class id in the hot loop: the topic name is the
-    // ? contract, and a second class gets a second topic (e.g.
-    // ? `/perception/heads`), not a second branch here.
-    // ! If Perception ever publishes mixed classes on this topic, this loop will
-    // ! follow a head. Change the topic, not this loop.
-    const vision_msgs::msg::Detection2D* best = nullptr;
-    for (const auto& detection : msg.detections) {
-        if (detection.results.empty()) continue;                                        // ? Malformed entry
-        if (!best || detection.results.front().hypothesis.score
-                   > best->results.front().hypothesis.score) {
-            best = &detection;
-        }
+    // ? Perception owns the filtering; Navigation applies mission policy.
+    // ! If Perception ever publishes mixed classes on this topic, this will
+    // ! follow a head. Change the topic, not the selection.
+    const vision_msgs::msg::Detection2D* best = selectTarget(msg);
+
+    if (best) {
+        lastTargetBox = toBbox(best->bbox);
     }
 
     // * Policy A: an empty array means "no person in this frame"
@@ -479,11 +498,15 @@ void Navigation::transitionTo(MissionState next) {
 void Navigation::onEnter(MissionState entered) {
     // ? Edge-triggered outputs: exactly once per transition, never per tick.
     switch (entered) {
+        // ? Both SEARCHING and PERSON_LOST need a fresh sweep origin,
+        // ? otherwise the drone snaps back to a stale heading on entry.
         case MissionState::SEARCHING:
             // TODO: [#23] Rework searchBehavior() to use Representation's map of the environment.
             //     : The current searchBehavior is a simple rotate-in-place. This is a design
             //     : choice, we could also have a mix of: orbit, lawn-mower, and hold+rotate.
-            // ? Start the sweep from wherever the drone already points.
+        case MissionState::PERSON_LOST:                                                 // ? PERSON_LOST sweeps too - see executeBehavior()
+            // TODO: [#48] PERSON_LOST will get its own entry action once it has
+            //     : a dedicated behaviour; the sweep origin is a placeholder.
             searchStartYaw = std::isfinite(dronePosition.heading) ? dronePosition.heading : 0.0f;
             break;
 
@@ -524,6 +547,10 @@ void Navigation::onPerceptionCrashed() {
     // ? not exist yet (see the mission-plan comment in navigation.h). Landing on
     // ? a Perception failure would be a mission abort, and aborting is the
     // ? pilot's call, not a timer's.
+    // ? 
+    // ! This is the ONLY place a PERSON_LOST timeout should target RETURNING.
+    // ! The PERSON_LOST case in executeBehavior() is a different situation -
+    // ! Perception is alive there, so its timeout goes to SEARCHING ([#48]).
     // TODO: [#26] timeout -> RETURNING - blocked on the home-reference decision
 }
 
@@ -577,13 +604,29 @@ void Navigation::executeBehavior() {
             break;
 
         case MissionState::PERSON_LOST:
-            // ? Hold: do NOT publish a new setpoint. FlightController re-streams
-            // ? the last one, so PX4 actively holds the last COMMANDED position.
-            // ? Deliberate over hoverBehavior(), which would hold the CURRENT
-            // ? position: if the person vanished mid-transit, the last commanded
-            // ? point is where the drone was already heading, and completing
-            // ? that transit is a gentler correction than stopping short of it.
-            // ? Both are safe; this one is smoother.
+            // Basic re-acquisition: sweep in place
+            // ? Holding the last commanded point (the previous behaviour) left
+            // ? the camera staring at wherever the person USED to be, so a
+            // ? person who walked out of frame was never seen again. Rotating
+            // ? sweeps the camera and lets the lost -> detected transition fire.
+            // ?
+            // ! THIS IS A PLACEHOLDER, not the intended behaviour. A real
+            // ! re-acquisition would bias the sweep toward the last known
+            // ! position and cover the drone's blind spots, and would consider
+            // ! repositioning for line of sight around obstacles. That needs
+            // ! Representation ([#18]).
+            // !
+            // ! There is also NO TIMEOUT. If the person is genuinely gone, the
+            // ! mission should fall back to SEARCHING after a dwell period
+            // ! (proposed: 10 s). Deliberately not implemented yet.
+            // !
+            // ! Do NOT confuse this with onPerceptionCrashed(), which also
+            // ! enters PERSON_LOST but does NOT publish a setpoint - a dead
+            // ! Perception cannot see a person, so sweeping is pointless and
+            // ! holding is the honest action. That path's timeout goes to
+            // ! RETURNING ([#26]), not SEARCHING.
+            // TODO: [#48] Dedicated PERSON_LOST re-acquisition behaviour + timeout to SEARCHING
+            searchBehavior();
             break;
 
         case MissionState::FOLLOWING:
@@ -713,7 +756,7 @@ void Navigation::publishSetpoint(const cogidrone::Vec3& positionNed, float yaw) 
 
 void Navigation::publishFlightCommand(cogidrone::FlightCommand command) {
     auto msg = std::make_unique<std_msgs::msg::UInt8>();
-    msg->data = static_cast<uint8_t>(command);
+    msg->data = std::to_underlying(command);
     m.flightCommandPublisher->publish(std::move(msg));
 }
 
@@ -747,16 +790,26 @@ bool Navigation::detectionIsValid() const {
     // ! Caller must hold controlMutex if mutex is reinstated - do NOT lock here!
     // ? No lock: caller (onDetections/onWatchdogTick) is serialized by the executor. 
 
+    // ? STRICT: requires a detection in the MOST RECENT frame.
+    // ! `person.valid` is cleared by an empty frame, so a single dropped
+    // ! detection invalidates the target for ACTION. That is deliberate - the
+    // ! mission must not fly toward something it cannot currently see.
+    // ! The loose variant is HAVE_RECENT_TARGET in selectTarget(), which keeps
+    // ! target IDENTITY across a dropout.
     if (!person.valid) return false;
     if (person.confidence < m.params.minDetectionConfidence) return false;
 
-    const double sinceDetection = (m.node->now() - person.timestamp).seconds();
-    if (sinceDetection > m.params.detectionTimeout) return false;
+    // ! Currently unreachable: `person.valid` and `person.timestamp` are
+    // ! assigned together in onDetections(), and this function is only called
+    // ! from that callback. Kept as a guard in case a timer-driven caller is
+    // ! ever added - but routed through the shared predicate so the timeout
+    // ! arithmetic is not reimplemented here.
+    // if (personIsLost()) return false;
 
-    // ? Distance bounds: beyond maxFollowDistance the person is not a follow
-    // ? target, and inside minFollowDistance the standoff point would be behind
-    // ? the drone. Both are "not a valid target", not "lost" - the hysteresis in
-    // ? personIsLost() still governs the state transition.
+    // ? Beyond maxFollowDistance the person is not a follow target. There is no
+    // ? minimum bound: followBehavior()'s standoff geometry already retreats when
+    // ? the drone is too close, because the commanded point is always
+    // ? targetFollowDistance from the person on the DRONE's side.
     if (dronePositionValid()) {
         const float DX = person.position.x - dronePosition.x;
         const float DY = person.position.y - dronePosition.y;
@@ -795,4 +848,66 @@ bool Navigation::dronePositionValid() const {
     // ? position reference (GPS outdoors, VIO later). Without it, `x`/`y`/`z`
     // ? are meaningless and any setpoint built from them is a guess.
     return dronePosition.xy_valid && dronePosition.z_valid;
+}
+
+
+// * Target selection
+// ? Among detections at or above minDetectionConfidence, keep the CURRENT
+// ? target (box IoU >= targetIouThreshold with last frame's box) unless
+// ? another person is CLEARLY closer (< targetSwitchMargin of its distance);
+// ? otherwise take the closest. Mirrors targeter/target_closest.py.
+// ? No lock: called only from onDetections(), which the executor serializes.
+const vision_msgs::msg::Detection2D* Navigation::selectTarget(const vision_msgs::msg::Detection2DArray& msg) const {
+    // ? LOOSE: target IDENTITY survives a brief dropout. person.valid is
+    // ? false after a single empty frame, but lastTargetBox is still the last
+    // ? place we saw them, so it is worth comparing against until the timeout
+    // ? expires. Contrast detectionIsValid(), which is strict.
+    // ?
+    // ! THIS ONLY WORKS WITH A STATIONARY CAMERA. lastTargetBox is in PIXEL
+    // ! coordinates, so any rotation moves the box. At searchYawRate = 0.3 rad/s
+    // ! and 30 Hz, a box shifts ~4.6 px/frame, and IoU drops below
+    // ! targetIouThreshold within ~6 frames (200 ms).
+    // !
+    // ! That is fine today because personIsLost() flips true at exactly the
+    // ! moment the sweep starts, so HAVE_RECENT_TARGET is false for the whole
+    // ! sweep - the IoU comparison is never reached. Persistence is therefore
+    // ! active only during the 2 s hover window in FOLLOWING, where
+    // ! hoverBehavior() holds heading and the camera is stationary.
+    // !
+    // ! If this gate is ever loosened, persistence will silently stop working
+    // ! during PERSON_LOST. Real re-acquisition needs world-frame tracking,
+    // ! which belongs in Perception - see the tracking issue.
+    const bool HAVE_RECENT_TARGET = person.valid || !personIsLost();
+
+    const vision_msgs::msg::Detection2D* closest = nullptr;
+    const vision_msgs::msg::Detection2D* current = nullptr;
+    float currentIou = 0.0f;
+
+    for (const auto& detection : msg.detections) {
+        if (detection.results.empty()) continue;                                        // ? Malformed entry
+        if (detection.results.front().hypothesis.score < m.params.minDetectionConfidence) continue;
+
+        // ? Closest by camera-frame z.
+        if (!closest || distanceOf(detection) < distanceOf(*closest)) {
+            closest = &detection;
+        }
+
+        // ? Same person as last detection? Highest overlap wins.
+        if (HAVE_RECENT_TARGET) {
+            const float IOU = cogidrone::iou(toBbox(detection.bbox), lastTargetBox);
+            if (IOU >= m.params.targetIouThreshold && IOU > currentIou) {
+                current = &detection;
+                currentIou = IOU;
+            }
+        }
+    }
+
+    if (!current) return closest;
+
+    // ? Hysteresis: keep the current target unless another person is CLEARLY
+    // ? closer. Without the margin, two people at similar range would make the
+    // ? drone oscillate between them every frame.
+    const bool CLEARLY_CLOSER = distanceOf(*closest) < distanceOf(*current) * m.params.targetSwitchMargin;
+
+    return CLEARLY_CLOSER ? closest : current;
 }

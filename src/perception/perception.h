@@ -54,7 +54,7 @@ private:
 
         // Subscriptions
         rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr imageSubscription;           // Subscription for camera images
-        rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr cameraInfoSubscription; // Intrinsics, latched
+        rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr cameraInfoSubscription; // Intrinsics, sent with every frame
         
         // Publishers
         // ? CONTRACT: this topic carries PERSON detections only. Navigation takes
@@ -65,11 +65,11 @@ private:
         // ? pipeline produces already has a home:
         // ?   bbox                            -> the pixel box
         // ?   results[0].hypothesis.score     -> confidence
-        // ?   results[0].hypothesis.class_id  -> always "person"
+        // ?   results[0].hypothesis.class_id  -> the pose class ("walking", ...)
         // ?   results[0].pose.pose.position   -> camera-frame XYZ, metres
-        // ?   id                              -> the pose class ("walking", ...)
+        // ?   id                              -> RESERVED for a track ID; empty today
         // ? A custom message becomes worth it only when we need something this
-        // ? cannot express - a track ID, a covariance, or a typed pose enum.
+        // ? cannot express - a covariance, or a typed pose enum.
         rclcpp::Publisher<vision_msgs::msg::Detection2DArray>::SharedPtr targetPublisher;
                 
         // Models

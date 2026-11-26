@@ -58,10 +58,10 @@ TrtEngine::~TrtEngine() {
 // ! but cudaStream_t is only an opaque handle. Default moving would copy the
 // ! stream, causing both objects to destroy the same CUDA resource. The move
 // ! constructor therefore transfers the complete, already-wired state and
-// ! nulls the source stream. The source remains valid for destruction, while
-// ! exactly one TrtEngine owns the stream. Move assignment is deliberately
+// ! then nulls the source stream. The source remains valid for destruction, 
+// ! while the new TrtEngine owns the stream. Move assignment is deliberately
 // ! deleted because engines are created once and initialized into their final
-// ! owners; this class never replaces an existing engine.
+// ! owners; this class never replaces an existing engine, only copy then delete.
 // Move ctor
 TrtEngine::TrtEngine(TrtEngine&& other) noexcept : m(std::move(other.m)) {
     other.m.stream = nullptr;

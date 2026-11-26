@@ -1,0 +1,290 @@
+{
+ "person_walking_00": {
+  "base": "walking",
+  "top": "hivis",
+  "bottom": "black",
+  "skin": 0,
+  "hair": 1,
+  "injured": false
+ },
+ "person_walking_01": {
+  "base": "walking",
+  "top": "red",
+  "bottom": "jeans",
+  "skin": 2,
+  "hair": 0,
+  "injured": false
+ },
+ "person_walking_02": {
+  "base": "walking",
+  "top": "navy",
+  "bottom": "khaki",
+  "skin": 1,
+  "hair": 2,
+  "injured": true
+ },
+ "person_walking_03": {
+  "base": "walking",
+  "top": "forest",
+  "bottom": "green",
+  "skin": 3,
+  "hair": 0,
+  "injured": false
+ },
+ "person_walking_04": {
+  "base": "walking",
+  "top": "black",
+  "bottom": "black",
+  "skin": 0,
+  "hair": 3,
+  "injured": true
+ },
+ "person_walking_05": {
+  "base": "walking",
+  "top": "white",
+  "bottom": "grey",
+  "skin": 4,
+  "hair": 0,
+  "injured": false
+ },
+ "person_walking_06": {
+  "base": "walking",
+  "top": "orange",
+  "bottom": "navy",
+  "skin": 1,
+  "hair": 4,
+  "injured": false
+ },
+ "person_walking_07": {
+  "base": "walking",
+  "top": "brown",
+  "bottom": "khaki",
+  "skin": 2,
+  "hair": 1,
+  "injured": true
+ },
+ "person_walking_08": {
+  "base": "walking",
+  "top": "olive",
+  "bottom": "jeans",
+  "skin": 0,
+  "hair": 2,
+  "injured": false
+ },
+ "person_walking_09": {
+  "base": "walking",
+  "top": "lightblue",
+  "bottom": "grey",
+  "skin": 3,
+  "hair": 0,
+  "injured": false
+ },
+ "person_walking_10": {
+  "base": "walking",
+  "top": "grey",
+  "bottom": "black",
+  "skin": 1,
+  "hair": 3,
+  "injured": false
+ },
+ "person_walking_11": {
+  "base": "walking",
+  "top": "purple",
+  "bottom": "jeans",
+  "skin": 2,
+  "hair": 1,
+  "injured": true
+ },
+ "person_standing_00": {
+  "base": "standing",
+  "top": "hivis",
+  "bottom": "black",
+  "skin": 0,
+  "hair": 1,
+  "injured": false
+ },
+ "person_standing_01": {
+  "base": "standing",
+  "top": "red",
+  "bottom": "jeans",
+  "skin": 2,
+  "hair": 0,
+  "injured": false
+ },
+ "person_standing_02": {
+  "base": "standing",
+  "top": "navy",
+  "bottom": "khaki",
+  "skin": 1,
+  "hair": 2,
+  "injured": true
+ },
+ "person_standing_03": {
+  "base": "standing",
+  "top": "forest",
+  "bottom": "green",
+  "skin": 3,
+  "hair": 0,
+  "injured": false
+ },
+ "person_standing_04": {
+  "base": "standing",
+  "top": "black",
+  "bottom": "black",
+  "skin": 0,
+  "hair": 3,
+  "injured": true
+ },
+ "person_standing_05": {
+  "base": "standing",
+  "top": "white",
+  "bottom": "grey",
+  "skin": 4,
+  "hair": 0,
+  "injured": false
+ },
+ "person_standing_06": {
+  "base": "standing",
+  "top": "orange",
+  "bottom": "navy",
+  "skin": 1,
+  "hair": 4,
+  "injured": false
+ },
+ "person_standing_07": {
+  "base": "standing",
+  "top": "brown",
+  "bottom": "khaki",
+  "skin": 2,
+  "hair": 1,
+  "injured": true
+ },
+ "person_standing_08": {
+  "base": "standing",
+  "top": "olive",
+  "bottom": "jeans",
+  "skin": 0,
+  "hair": 2,
+  "injured": false
+ },
+ "person_standing_09": {
+  "base": "standing",
+  "top": "lightblue",
+  "bottom": "grey",
+  "skin": 3,
+  "hair": 0,
+  "injured": false
+ },
+ "person_standing_10": {
+  "base": "standing",
+  "top": "grey",
+  "bottom": "black",
+  "skin": 1,
+  "hair": 3,
+  "injured": false
+ },
+ "person_standing_11": {
+  "base": "standing",
+  "top": "purple",
+  "bottom": "jeans",
+  "skin": 2,
+  "hair": 1,
+  "injured": true
+ },
+ "person_female_00": {
+  "base": "female",
+  "top": "purple",
+  "bottom": "jeans",
+  "skin": 2,
+  "hair": 1,
+  "injured": true
+ },
+ "person_female_01": {
+  "base": "female",
+  "top": "grey",
+  "bottom": "black",
+  "skin": 1,
+  "hair": 3,
+  "injured": false
+ },
+ "person_female_02": {
+  "base": "female",
+  "top": "lightblue",
+  "bottom": "grey",
+  "skin": 3,
+  "hair": 0,
+  "injured": false
+ },
+ "person_female_03": {
+  "base": "female",
+  "top": "olive",
+  "bottom": "jeans",
+  "skin": 0,
+  "hair": 2,
+  "injured": false
+ },
+ "person_female_04": {
+  "base": "female",
+  "top": "brown",
+  "bottom": "khaki",
+  "skin": 2,
+  "hair": 1,
+  "injured": true
+ },
+ "person_female_05": {
+  "base": "female",
+  "top": "orange",
+  "bottom": "navy",
+  "skin": 1,
+  "hair": 4,
+  "injured": false
+ },
+ "person_female_06": {
+  "base": "female",
+  "top": "white",
+  "bottom": "grey",
+  "skin": 4,
+  "hair": 0,
+  "injured": false
+ },
+ "person_female_07": {
+  "base": "female",
+  "top": "black",
+  "bottom": "black",
+  "skin": 0,
+  "hair": 3,
+  "injured": true
+ },
+ "person_female_08": {
+  "base": "female",
+  "top": "forest",
+  "bottom": "green",
+  "skin": 3,
+  "hair": 0,
+  "injured": false
+ },
+ "person_female_09": {
+  "base": "female",
+  "top": "navy",
+  "bottom": "khaki",
+  "skin": 1,
+  "hair": 2,
+  "injured": true
+ },
+ "person_female_10": {
+  "base": "female",
+  "top": "red",
+  "bottom": "jeans",
+  "skin": 2,
+  "hair": 0,
+  "injured": false
+ },
+ "person_female_11": {
+  "base": "female",
+  "top": "hivis",
+  "bottom": "black",
+  "skin": 0,
+  "hair": 1,
+  "injured": false
+ }
+}
