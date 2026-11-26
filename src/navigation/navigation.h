@@ -38,7 +38,7 @@
 // ? running the state machine twice per frame (once from the timer, once from 
 // ? the callback) for no benefit.
 
-// TODO: [45] Upgrade to full quaternion for camera->world conversion
+// TODO: [#45] Upgrade to full quaternion for camera->world conversion
 // * Frame chain - why Navigation converts, and why yaw-only
 // ? Three frames are in play. Mixing them up is the easiest way to fly the
 // ? drone into something:

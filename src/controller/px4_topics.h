@@ -3,7 +3,7 @@
 #include <string>
 #include <string_view>
 
-// TODO: One caveat we should verify once on hardware: Current we're inferring that the bridge's 
+// TODO: [#52] One caveat we should verify once on hardware: Current we're inferring that the bridge's 
 //     : suffix equals MESSAGE_VERSION, which we need to confirm on the jetson with:
 //     :    ```sh
 //     :    ros2 topic list | grep fmu
@@ -11,7 +11,7 @@
 //     :    ```
 //     : If they match, the template is correct. If they don't, the whole premise is wrong and we revert to literals.
 
-// TODO: Avoid the allocation from std::string by instead using consteval + fixed-size std::array<char, N>. 
+// TODO: [#51] Avoid the allocation from std::string by instead using consteval + fixed-size std::array<char, N>. 
 
 namespace cogidrone::px4 {
 

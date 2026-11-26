@@ -13,7 +13,7 @@ constexpr std::array<std::string_view, 1> HEAD_CLASS_NAMES = { "head" };
 std::expected<Head, Head::InitError> Head::create() {
     // ! Fallible work FIRST: load the TensorRT plan
     auto yolo = Yolo<OutputLayout::ANCHORS>::create({
-        // TODO: [#35] path from a parameter, and maybe not use std::string here
+        // TODO: [#53] path from a parameter, and maybe not use std::string here
         .enginePath = std::string("models/medium") + std::string(cogidrone::MODEL_EXTENSION),
         .classNames = HEAD_CLASS_NAMES
     });

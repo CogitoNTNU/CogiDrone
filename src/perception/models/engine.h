@@ -20,7 +20,7 @@
         using Engine = OnnxEngine;
         inline constexpr std::string_view MODEL_EXTENSION = ".onnx";
     }
-#else
+#elif defined(COGIDRONE_BACKEND_TRT)
     #include "perception/models/trt_engine.h"
     namespace cogidrone {
         using Engine = TrtEngine;
