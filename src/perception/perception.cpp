@@ -83,12 +83,14 @@ void Perception::wire() noexcept {
         }                                                                               // ! would therefore cause a dangling pointer as the `this` adress would be 
     );                                                                                  // ! invalid. Fix: make perception non-movable and owned via a unique_ptr
 
-    // ? Intrinsics are latched: they are published once and never change for a
-    // ? fixed camera configuration. `transient_local` means a late-joining
-    // ? Perception still receives the last one.
+    // ? realsense2_camera and ros_gz_bridge publish CameraInfo with every frame
+    // ? as VOLATILE. A TRANSIENT_LOCAL subscription never matches a VOLATILE
+    // ? publisher (requested <= offered), so it would receive nothing.
+    // ? SENSOR_DATA (best_effort + volatile) matches reliable and best_effort
+    // ? publishers alike.
     m.cameraInfoSubscription = m.node->create_subscription<sensor_msgs::msg::CameraInfo>(
         m.params.cameraInfoTopic,
-        rclcpp::QoS(1).transient_local(),
+        rclcpp::SensorDataQoS(),
         [this](const sensor_msgs::msg::CameraInfo& msg) {
             this->onCameraInfo(msg);
         }
@@ -107,11 +109,18 @@ void Perception::onCameraInfo(const sensor_msgs::msg::CameraInfo& msg) {
     // ? K is row-major 3x3: [fx 0 cx; 0 fy cy; 0 0 1].
     // ? fx and fy are equal for a square-pixel sensor, but read both and use
     // ? fx for horizontal and fy for vertical if they ever diverge.
+    // ?
+    // ! CameraInfo arrives with EVERY frame, so this callback runs at camera
+    // ! rate. Log only the 0 -> usable transition, not per message.
+    const bool INTRINSICS_MISSING_BEFORE_ASSIGNMENT = (focalLength <= 0.0f);
+
     focalLength = static_cast<float>(msg.k[0]);
     principalX  = static_cast<float>(msg.k[2]);
     principalY  = static_cast<float>(msg.k[5]);
 
-    cogidrone::log(LOGGING_LEVEL::INFO, "Camera intrinsics received");
+    if (INTRINSICS_MISSING_BEFORE_ASSIGNMENT && focalLength > 0.0f) {
+        cogidrone::log(LOGGING_LEVEL::INFO, "Camera intrinsics received");
+    }
 }
 
 void Perception::onFrame(const sensor_msgs::msg::Image& msg) {
@@ -193,10 +202,10 @@ void Perception::fuse(const cv::Mat& frame, std::vector<Model::Detection>& out) 
         // * 2. Head on the person crop
         // ? Clamp the crop to the frame: a box can extend past the edge when a
         // ? person is partially out of view.
-        const int X1 = std::max(0, static_cast<int>(person.bbox[0]));
-        const int Y1 = std::max(0, static_cast<int>(person.bbox[1]));
-        const int X2 = std::min(frame.cols, static_cast<int>(person.bbox[2]));
-        const int Y2 = std::min(frame.rows, static_cast<int>(person.bbox[3]));
+        const int X1 = std::max(0, static_cast<int>(person.bbox.x1));
+        const int Y1 = std::max(0, static_cast<int>(person.bbox.y1));
+        const int X2 = std::min(frame.cols, static_cast<int>(person.bbox.x2));
+        const int Y2 = std::min(frame.rows, static_cast<int>(person.bbox.y2));
 
         if (X2 <= X1 || Y2 <= Y1) continue;                                         // ? Degenerate box
 
@@ -219,12 +228,12 @@ void Perception::fuse(const cv::Mat& frame, std::vector<Model::Detection>& out) 
                 }
             );
 
-            const float HEAD_PIXEL_HEIGHT = BEST_HEAD->bbox[3] - BEST_HEAD->bbox[1];
+            const float HEAD_PIXEL_HEIGHT = BEST_HEAD->bbox.height();
             distance = distanceFromPixelHeight(m.params.averageHeadHeight, HEAD_PIXEL_HEIGHT);
         }
 
         if (distance <= 0.0f) {
-            const float BODY_PIXEL_HEIGHT = person.bbox[3] - person.bbox[1];
+            const float BODY_PIXEL_HEIGHT = person.bbox.height();
             distance = distanceFromPixelHeight(m.params.averageHumanHeight, BODY_PIXEL_HEIGHT);
         }
 
@@ -234,8 +243,8 @@ void Perception::fuse(const cv::Mat& frame, std::vector<Model::Detection>& out) 
         // ? The box centre's pixel offset from the principal point, scaled by
         // ? distance / focalLength, gives the lateral offset in metres. This is
         // ? `offset_in_meters()` from depth_head.py.
-        const float CENTER_X = (person.bbox[0] + person.bbox[2]) / 2.0f;
-        const float CENTER_Y = (person.bbox[1] + person.bbox[3]) / 2.0f;
+        const float CENTER_X = (person.bbox.x1 + person.bbox.x2) / 2.0f;
+        const float CENTER_Y = (person.bbox.y1 + person.bbox.y2) / 2.0f;
 
         // ? `emplace_back` with positional arguments, not a designated
         // ? initializer: this constructs the Detection in place, avoiding both
@@ -283,16 +292,15 @@ Perception::toDetectionArray(std::span<const Model::Detection> fused) const {
         auto& detection = out->detections.emplace_back();
 
         // ? bbox is centre + size, not corners.
-        detection.bbox.center.position.x = (person.bbox[0] + person.bbox[2]) / 2.0;
-        detection.bbox.center.position.y = (person.bbox[1] + person.bbox[3]) / 2.0;
-        detection.bbox.size_x = person.bbox[2] - person.bbox[0];
-        detection.bbox.size_y = person.bbox[3] - person.bbox[1];
-
+        detection.bbox.center.position.x = (person.bbox.x1 + person.bbox.x2) / 2.0;
+        detection.bbox.center.position.y = (person.bbox.y1 + person.bbox.y2) / 2.0;
+        detection.bbox.size_x = person.bbox.width();
+        detection.bbox.size_y = person.bbox.height();
+        
         // ? Same reasoning: construct the hypothesis in place, fill through the
         // ? reference. `detection.results` has exactly one element, so this
         // ? never reallocates and the reference stays valid.
         auto& hypothesis = detection.results.emplace_back();
-        hypothesis.hypothesis.class_id = "person";                                  // ? CONTRACT: always "person"
         hypothesis.hypothesis.score = person.confidence;
 
         // ? Camera-frame position. Navigation converts to world NED via
@@ -301,11 +309,13 @@ Perception::toDetectionArray(std::span<const Model::Detection> fused) const {
         hypothesis.pose.pose.position.y = person.positionCamera.y;
         hypothesis.pose.pose.position.z = person.positionCamera.z;
 
-        // ? The pose class travels in `id`, not `class_id`, so Navigation can
-        // ? use it later without breaking the "person only" contract.
+        // ? `class_id` is the object class. Every class in the person model is a
+        // ? person POSE ("walking", "seated", ...), so that is what belongs here.
+        // ? `id` is RESERVED for a stable track ID and is left empty until
+        // ? Perception assigns one - see the tracking issue.
         const auto CLASS_NAMES = Person::classNames();
         if (person.classId >= 0 && static_cast<std::size_t>(person.classId) < CLASS_NAMES.size()) {
-            detection.id = std::string(CLASS_NAMES[static_cast<std::size_t>(person.classId)]);
+            hypothesis.hypothesis.class_id = std::string(CLASS_NAMES[static_cast<std::size_t>(person.classId)]);
         }
     }
 

@@ -15,11 +15,12 @@
 // #include "px4_msgs/msg/vehicle_attitude.hpp"
 #include "vision_msgs/msg/detection2_d_array.hpp"
 
-#include "logging.h"
 #include "controller/flight_commands.h"
-#include "math/vec3.h"
 #include "math/transform.h"
 #include "enum_names.h"
+#include "math/bbox.h"
+#include "math/vec3.h"
+#include "logging.h"
 
 
 // * Design choice - Why we don't have a fixed-rate control loop
@@ -37,7 +38,7 @@
 // ? running the state machine twice per frame (once from the timer, once from 
 // ? the callback) for no benefit.
 
-// TODO: [45] Upgrade to full quaternion for camera->world conversion
+// TODO: [#45] Upgrade to full quaternion for camera->world conversion
 // * Frame chain - why Navigation converts, and why yaw-only
 // ? Three frames are in play. Mixing them up is the easiest way to fly the
 // ? drone into something:
@@ -263,14 +264,17 @@ struct NavigationParams {
     // Following
     float targetFollowDistance      = 4.0f;                                             // meters
     float targetHeight              = 2.5f;                                             // meters above ground
-    float maxFollowSpeed            = 3.0f;                                             // m/s
-    float minFollowDistance         = 2.0f;                                             // safety minimum
     float maxFollowDistance         = 10.0f;                                            // lose tracking beyond this
 
     // Detection
     float detectionTimeout          = 2.0f;                                             // seconds
-    float minDetectionConfidence    = 0.7f;
+    float minDetectionConfidence    = 0.4f;                                             // ? MIN_CONFIDENCE in target_closest.py
     float trackConfirmTime          = 1.0f;                                             // seconds of stable track before committing to FOLLOWING
+
+    // Target selection
+    // ? From targeter/target_closest.py. See [#39].
+    float targetIouThreshold       = 0.3f;                                              // ? box overlap that means "same person"
+    float targetSwitchMargin       = 0.8f;                                              // ? switch only if the new target is <80% as far
 };
 
 
@@ -383,6 +387,13 @@ private:
     // ? the sweep never snaps the drone round to a fixed heading.
     float searchStartYaw = 0.0f;
 
+    // ? Last frame's target box, for target persistence. A detection whose box
+    // ? overlaps this by >= targetIouThreshold is treated as the SAME person,
+    // ? so the drone does not switch targets when someone walks past.
+    // ? `cogidrone::BoundingBox`, not `vision_msgs::msg::BoundingBox2D`: 16 bytes
+    // ? instead of 40, and no ROS type in Navigation's state.
+    cogidrone::BoundingBox lastTargetBox;
+
     // ? The two raw inputs from FlightController. Written by onArmed() /
     // ? onOffboardActive(), read by deriveControlState().
     bool armed = false;
@@ -443,6 +454,17 @@ private:
     [[nodiscard]] bool perceptionIsDead() const;
     [[nodiscard]] bool dronePositionValid() const;                                      // EKF has a usable position reference
 
+    // * Target selection
+    // ? Picks which detection to follow. This is POLICY, not perception:
+    // ? "closest" is a mission decision, and a different mission could pick
+    // ? differently. Perception stays mission-agnostic. See [#39].
+    // ?
+    // ! The IoU persistence here is TRACKING, which arguably belongs in
+    // ! Perception. Splitting it out needs a stable track ID, and
+    // ! `Detection2D.id` is already used for the pose class name. Tracked
+    // ! separately - see the issue on target tracking.
+    [[nodiscard]] const vision_msgs::msg::Detection2D* 
+    selectTarget(const vision_msgs::msg::Detection2DArray& msg) const;
 
     // * Helpers
     // NOTE: 
@@ -462,7 +484,7 @@ private:
     // this monstrocity below :) (Good fucking luck figuring out how the 
     // `cogidrone::NamedEnum` concept + X-macro method works!)     
     // 
-    // Thanks for coming to my TED talk
+    // Thanks for reading!
     //   - Elias Alexander Wiklund Ottersbo
     template <cogidrone::NamedEnum E>
     [[nodiscard]] static constexpr std::string_view toString(E state) noexcept {

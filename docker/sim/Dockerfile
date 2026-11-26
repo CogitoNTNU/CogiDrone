@@ -2,8 +2,9 @@
 #
 # CogiDrone simulation / development image.
 #
-#   target "dev" : ROS 2 Jazzy + px4_msgs + YOLO (ultralytics, CPU).
+#   target "dev" : ROS 2 Jazzy + px4_msgs + OpenCV + ONNX Runtime.
 #                  Builds natively on amd64 and arm64 (Apple Silicon).
+#                  Can build and run the C++ autonomy stack (ONNX backend).
 #   target "sim" : dev + Gazebo Harmonic + PX4 SITL + Micro XRCE-DDS Agent.
 #
 # Versions are pinned here and nowhere else. PX4 and px4_msgs MUST match.
@@ -16,6 +17,8 @@ FROM ros:${ROS_DISTRO}-ros-base AS dev
 ARG ROS_DISTRO
 ARG PX4_MSGS_BRANCH=release/1.17
 ARG YOLO_MODEL=yolo11n.pt
+# ? BuildKit sets this to amd64 or arm64. Declared here so RUN can read it.
+ARG TARGETARCH
 
 ENV DEBIAN_FRONTEND=noninteractive \
     ROS_DISTRO=${ROS_DISTRO} \
@@ -23,6 +26,9 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
+# ? libopencv-dev and pkg-config are here, not in the sim stage, because the
+# ? C++ autonomy stack links opencv_core + opencv_imgproc on EVERY platform.
+# ? unzip is here because the ONNX Runtime block below needs it.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
         cmake \
@@ -30,14 +36,39 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         curl \
         wget \
         nano \
+        unzip \
+        pkg-config \
         python3-pip \
         python3-venv \
         python3-colcon-common-extensions \
         libgl1 \
         libglib2.0-0 \
+        libopencv-dev \
         ros-${ROS_DISTRO}-vision-msgs \
         ros-${ROS_DISTRO}-rosbag2-storage-mcap \
     && rm -rf /var/lib/apt/lists/*
+
+# ONNX Runtime: the CPU inference backend for the sim.
+# ? The NuGet package is the only distribution that ships BOTH the C++ headers
+# ? and the Linux shared library. The pip wheel has no headers, and the GitHub
+# ? release assets are unreachable from some networks.
+# ! TARGETARCH is amd64 or arm64. The dev image builds natively on Apple
+# ! Silicon, so a hardcoded linux-x64 path would break there.
+# ? `unzip -j` junks the archive path, so the library lands at
+# ? /usr/local/lib/libonnxruntime.so - which is what -lonnxruntime and
+# ? ldconfig expect.
+ARG ONNXRUNTIME_VERSION=1.32.0
+RUN case "${TARGETARCH}" in \
+        amd64) ORT_ARCH=x64 ;; \
+        arm64) ORT_ARCH=arm64 ;; \
+        *) echo "ERROR: unsupported TARGETARCH '${TARGETARCH}'" >&2; exit 1 ;; \
+    esac \
+    && curl -L -o /tmp/ort.nupkg \
+         "https://www.nuget.org/api/v2/package/Microsoft.ML.OnnxRuntime/${ONNXRUNTIME_VERSION}" \
+    && unzip -j /tmp/ort.nupkg \
+         "runtimes/linux-${ORT_ARCH}/native/libonnxruntime.so" -d /usr/local/lib/ \
+    && rm /tmp/ort.nupkg \
+    && ldconfig
 
 # Python deps live in a venv that can still see the ROS (apt) packages.
 # It is added to PYTHONPATH so ROS nodes run by /usr/bin/python3 find them.
@@ -62,8 +93,8 @@ RUN mkdir -p /opt/px4_ws/src \
     && MAKEFLAGS=-j4 colcon build --executor sequential --event-handlers console_cohesion- \
     && rm -rf build log
 
-COPY docker/sim/env.sh /opt/cogidrone/env.sh
-COPY docker/sim/entrypoint.sh /opt/cogidrone/entrypoint.sh
+COPY env.sh /opt/cogidrone/env.sh
+COPY entrypoint.sh /opt/cogidrone/entrypoint.sh
 RUN chmod +x /opt/cogidrone/entrypoint.sh \
     && echo "source /opt/cogidrone/env.sh" >> /root/.bashrc
 
@@ -94,7 +125,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends lsb-release gnu
         # PX4 SITL build deps (mirrors Tools/setup/ubuntu.sh --no-nuttx)
         astyle ccache file gdb libssl-dev libxml2-dev libxml2-utils make ninja-build \
         python3-dev python3-setuptools python3-wheel rsync unzip zip \
-        libeigen3-dev libopencv-dev pkg-config protobuf-compiler \
+        libeigen3-dev pkg-config protobuf-compiler \
         libgstreamer-plugins-base1.0-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
         gstreamer1.0-plugins-bad gstreamer1.0-libav \
     && rm -rf /var/lib/apt/lists/*

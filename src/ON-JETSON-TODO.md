@@ -220,7 +220,7 @@ ros2 launch realsense2_camera rs_launch.py \
 # 3. Verify topics exist BEFORE starting cogidrone
 ros2 topic list | grep -E 'fmu|camera'
 ros2 topic hz /camera/camera/color/image_raw
-ros2 topic echo /fmu/out/vehicle_status --once
+ros2 topic echo /fmu/out/vehicle_status_v1 --once
 
 # 4. cogidrone - MUST run from the repo root (model paths are relative)
 cd ~/CogiDrone
@@ -340,7 +340,7 @@ OpenCV is a custom CUDA-enabled build, not Ubuntu's `libopencv-core406t64`.
 ## 8. First-flight checklist
 
 - [ ] `MicroXRCEAgent udp4 -p 8888` running
-- [ ] `ros2 topic list` shows `/fmu/out/vehicle_status`
+- [ ] `ros2 topic list` shows `/fmu/out/vehicle_status_v1`
 - [ ] `ros2 topic hz /camera/camera/color/image_raw` ≈ 30 Hz
 - [ ] `ros2 topic echo /camera/camera/color/camera_info --once` shows non-zero `K`
 - [ ] `models/best.engine` and `models/medium.engine` exist

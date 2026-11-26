@@ -2,6 +2,8 @@
 
 #include <cmath>
 
+#include "controller/px4_topics.h"
+
 
 FlightController::~FlightController() = default;
 
@@ -40,9 +42,26 @@ std::expected<std::unique_ptr<FlightController>, cogidrone::Error> FlightControl
 void FlightController::wire() noexcept {
     // * Publishers
     // PX4 namespace: the bridge exposes uORB topics under /fmu/in/
-    m.offboardModePublisher = m.node->create_publisher<px4_msgs::msg::OffboardControlMode>("/fmu/in/offboard_control_mode", 10);
-    m.setpointPublisher = m.node->create_publisher<px4_msgs::msg::TrajectorySetpoint>("/fmu/in/trajectory_setpoint", 10);
-    m.vehicleCommandPublisher = m.node->create_publisher<px4_msgs::msg::VehicleCommand>("/fmu/in/vehicle_command", 10);
+    m.offboardModePublisher = m.node->create_publisher<px4_msgs::msg::OffboardControlMode>(
+        "/fmu/in/offboard_control_mode",                                                // ? OffboardControlMode doesn't have a `MESSAGE_VERSION` member
+        10
+    );
+
+    { // Trajectory setpoint publisher
+        using MessageType = px4_msgs::msg::TrajectorySetpoint;
+        m.setpointPublisher = m.node->create_publisher<MessageType>(
+            cogidrone::px4::versionedTopic<MessageType>("/fmu/in/trajectory_setpoint"), 
+            10
+        );
+    }
+
+    { // Vehicle command publisher
+        using MessageType = px4_msgs::msg::VehicleCommand;
+        m.vehicleCommandPublisher = m.node->create_publisher<MessageType>(
+            cogidrone::px4::versionedTopic<MessageType>("/fmu/in/vehicle_command"), 
+            10
+        );
+    } 
 
     // Control output to Drone subsystems (intra-process, zero-copy)
     // ? `offboard_active` is the authoritative "who is the pilot" signal. It is
@@ -66,20 +85,27 @@ void FlightController::wire() noexcept {
 
     // * Subscriptions
     // PX4 namespace: the bridge exposes uORB topics under /fmu/out/
-    m.localPositionSubscription = m.node->create_subscription<px4_msgs::msg::VehicleLocalPosition>(
-        "/fmu/out/vehicle_local_position", 
-        rclcpp::QoS(10).best_effort(),
-        [this](const px4_msgs::msg::VehicleLocalPosition& msg) { 
-            this->onLocalPosition(msg); 
-        }
-    );
-    m.statusSubscription = m.node->create_subscription<px4_msgs::msg::VehicleStatus>(
-        "/fmu/out/vehicle_status", 
-        rclcpp::QoS(10).best_effort(),
-        [this](const px4_msgs::msg::VehicleStatus& msg) { 
-            this->onStatus(msg); 
-        }
-    );
+    { // Local position subscription
+        using MessageType = px4_msgs::msg::VehicleLocalPosition;
+        m.localPositionSubscription = m.node->create_subscription<MessageType>(
+            cogidrone::px4::versionedTopic<MessageType>("/fmu/out/vehicle_local_position"),
+            rclcpp::QoS(10).best_effort(),
+            [this](const MessageType& msg) { 
+                this->onLocalPosition(msg); 
+            }
+        );
+    }
+
+    { // Status subscription
+        using MessageType = px4_msgs::msg::VehicleStatus;
+        m.statusSubscription = m.node->create_subscription<MessageType>(
+            cogidrone::px4::versionedTopic<MessageType>("/fmu/out/vehicle_status"), 
+            rclcpp::QoS(10).best_effort(),
+            [this](const MessageType& msg) { 
+                this->onStatus(msg); 
+            }
+        );
+    }
 
     // Control input from Navigation (intra-process, zero-copy)
     m.setpointInputSubscription = m.node->create_subscription<px4_msgs::msg::TrajectorySetpoint>(
