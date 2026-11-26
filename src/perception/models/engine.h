@@ -26,4 +26,6 @@
         using Engine = TrtEngine;
         inline constexpr std::string_view MODEL_EXTENSION = ".engine";
     }
+#else
+    #error "No inference backend selected. Define COGIDRONE_BACKEND_TRT or COGIDRONE_BACKEND_ONNX."
 #endif

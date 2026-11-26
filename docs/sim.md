@@ -103,9 +103,6 @@ cmake --build build/sim
 
 `--preset sim` sets `COGIDRONE_BACKEND=ONNX`, which makes `engine.h` alias `OnnxEngine` instead of `TrtEngine`, and makes `Person::create()` look for `best.onnx` instead of `models/best.engine`.
 
-> [!NOTE]
-> The `sim` preset does not exist yet. Add it to `CMakePresets.json` - see [#49].
-
 ## How it fits together
 
 ```
@@ -135,6 +132,6 @@ The camera topics use the same names as `realsense-ros`, so on the real drone yo
 - **No Gazebo window.** Run `.`sim.sh` up` again. It rewrites `.env` with your display settings. On Linux you may need `xhost +local:`.
 - **Gazebo is very slow.** It renders on the CPU in the container. Use `headless:=true` and view the camera in `rqt_image_view` instead.
 - **No `/fmu/...` topics.** The XRCE agent or PX4 didn't start. Check the launch output. PX4 topics with versioned messages end in `_v1` (e.g. `vehicle_status_v1`).
-- **`sim.launch.py` fails with "No such file: build/sim/src/cogidrone".** The `sim` preset does not exist yet. Run with `autonomy:=false`.
+- **`sim.launch.py` fails with "No such file: build/sim/src/cogidrone".** The binary has not been built. Run `cmake --preset sim && cmake --build build/sim` first, or launch with `autonomy:=false`.
 - **`EngineLoadFailed` on startup.** The model file is missing. TensorRT needs `models/*.engine` (built on the Jetson); ONNX Runtime needs `models/*.onnx` (committed).
 - **Upgrading PX4.** Change `PX4_VERSION` and `PX4_MSGS_BRANCH` together in the Dockerfile. If they don't match, the topics silently stop working.
