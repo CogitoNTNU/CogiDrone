@@ -1,6 +1,5 @@
 #include "navigation.h"
 
-#include <algorithm>
 #include <chrono>
 #include <string>
 #include <cmath>
