@@ -4,7 +4,7 @@
     ros2 launch cogidrone_bringup sim.launch.py headless:=true autonomy:=false
 
 Starts: Micro XRCE-DDS Agent, PX4 SITL (which starts Gazebo), the Gazebo->ROS
-camera bridge and, unless autonomy:=false, the YOLO detector and offboard controller.
+camera bridge and, unless autonomy:=false, the C++ autonomy binary.
 """
 
 import os
@@ -16,8 +16,10 @@ from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
+WORKSPACE = os.environ.get("COGIDRONE_WORKSPACE", "/workspace")
 PX4_DIR = os.environ.get("PX4_DIR", "/opt/PX4-Autopilot")
 PX4_PARAM = os.path.join(PX4_DIR, "build/px4_sitl_default/bin/px4-param")
+
 SET_NO_GCS_REQUIRED = f"""
 ok=0
 for i in $(seq 1 60); do
@@ -29,6 +31,7 @@ for i in $(seq 1 60); do
   fi
 done
 """
+
 # QGroundControl on the host listens on UDP 14550, but PX4's own GCS link only talks
 # to localhost inside the container. Add a link aimed at the host (Docker Desktop).
 QGC_LINK = f"""
@@ -40,8 +43,6 @@ for i in $(seq 1 60); do
     -t "$host" -o 14550 >/dev/null 2>&1 && exit 0
 done
 """
-
-WORKSPACE = os.environ.get("COGIDRONE_WORKSPACE", "/workspace")
 
 
 def _px4(context):
@@ -85,7 +86,7 @@ def generate_launch_description():
                 "headless", default_value="false", description="No Gazebo window"
             ),
             DeclareLaunchArgument(
-                "autonomy", default_value="true", description="Start YOLO + controller"
+                "autonomy", default_value="true", description="Start the C++ autonomy binary"
             ),
             DeclareLaunchArgument("world", default_value="cogidrone"),
             DeclareLaunchArgument("model", default_value="cogidrone_x500"),
@@ -97,6 +98,11 @@ def generate_launch_description():
                 parameters=[{"config_file": bridge_config}],
                 output="screen",
             ),
+            # TODO: [#NN] Launch the C++ binary once the `sim` CMake preset exists.
+            #     : The binary needs an ONNX Runtime build, which needs the
+            #     : Dockerfile to install libonnxruntime.so. Until then, run it
+            #     : manually from a second shell:
+            #     :     ./build/sim/src/cogidrone
             ExecuteProcess(
                 cmd=[os.path.join(WORKSPACE, "build/sim/src/cogidrone")],
                 cwd=WORKSPACE,
