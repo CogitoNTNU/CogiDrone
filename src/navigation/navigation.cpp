@@ -751,7 +751,7 @@ void Navigation::publishSetpoint(const cogidrone::Vec3& positionNed, float yaw) 
 
 void Navigation::publishFlightCommand(cogidrone::FlightCommand command) {
     auto msg = std::make_unique<std_msgs::msg::UInt8>();
-    msg->data = static_cast<uint8_t>(command);
+    msg->data = std::to_underlying(command);
     m.flightCommandPublisher->publish(std::move(msg));
 }
 
