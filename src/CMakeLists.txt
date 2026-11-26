@@ -1,3 +1,16 @@
+# * Inference backend
+# ? One backend per build. They cannot coexist: the sim has no TensorRT,
+# ? and the Jetson has no ONNX Runtime.
+# ! DECLARED HERE, APPLIED AFTER add_executable(). A cache variable is fine at
+# ! the top; target_*() calls are not - the target does not exist yet.
+set(COGIDRONE_BACKEND "TRT" CACHE STRING "Inference backend: TRT or ONNX")
+set_property(CACHE COGIDRONE_BACKEND PROPERTY STRINGS TRT ONNX)
+
+if(NOT COGIDRONE_BACKEND MATCHES "^(TRT|ONNX)$")
+    message(FATAL_ERROR
+        "COGIDRONE_BACKEND must be TRT or ONNX, got '${COGIDRONE_BACKEND}'")
+endif()
+
 # * Dependency roots
 # ? Two build environments, two sources for the SAME dependencies.
 # ?
@@ -8,20 +21,32 @@
 # ?   jetson-native preset -> no toolchain   -> CMAKE_CROSSCOMPILING = FALSE
 # ?                           build.sh on the drone
 # ?                           deps from the system (JetPack)
+# !
+# ! TRT/CUDA paths are only defined for the TRT backend. Referencing an
+# ! undefined variable in target_*() silently expands to nothing, which would
+# ! hide a typo - so the backend branches below are explicit.
 if(CMAKE_CROSSCOMPILING)
-    set(_trt_include_dir    ${CMAKE_SOURCE_DIR}/vendored/tensorrt/include)
-    set(_trt_lib_dir        ${CMAKE_SOURCE_DIR}/vendored/tensorrt/lib)
-    set(_cuda_include_dir   ${CMAKE_SOURCE_DIR}/vendored/cuda/include)
-    set(_cuda_lib_dir       ${CMAKE_SOURCE_DIR}/vendored/cuda/lib)
     set(_opencv_include_dir ${CMAKE_SOURCE_DIR}/vendored/opencv/include)
     set(_opencv_lib_dir     ${CMAKE_SOURCE_DIR}/vendored/opencv/lib)
+    set(_onnx_include_dir   ${CMAKE_SOURCE_DIR}/vendored/onnxruntime/include)
+    set(_onnx_lib_dir       ${CMAKE_SOURCE_DIR}/vendored/onnxruntime/lib)
+    if(COGIDRONE_BACKEND STREQUAL "TRT")
+        set(_trt_include_dir  ${CMAKE_SOURCE_DIR}/vendored/tensorrt/include)
+        set(_trt_lib_dir      ${CMAKE_SOURCE_DIR}/vendored/tensorrt/lib)
+        set(_cuda_include_dir ${CMAKE_SOURCE_DIR}/vendored/cuda/include)
+        set(_cuda_lib_dir     ${CMAKE_SOURCE_DIR}/vendored/cuda/lib)
+    endif()
 else()
-    set(_trt_include_dir    /usr/include/aarch64-linux-gnu)
-    set(_trt_lib_dir        /usr/lib/aarch64-linux-gnu)
-    set(_cuda_include_dir   /usr/local/cuda/include)
-    set(_cuda_lib_dir       /usr/local/cuda/lib64)
     set(_opencv_include_dir /usr/include/opencv4)
     set(_opencv_lib_dir     /usr/lib/aarch64-linux-gnu)
+    set(_onnx_include_dir   /usr/local/include)
+    set(_onnx_lib_dir       /usr/local/lib)
+    if(COGIDRONE_BACKEND STREQUAL "TRT")
+        set(_trt_include_dir  /usr/include/aarch64-linux-gnu)
+        set(_trt_lib_dir      /usr/lib/aarch64-linux-gnu)
+        set(_cuda_include_dir /usr/local/cuda/include)
+        set(_cuda_lib_dir     /usr/local/cuda/lib64)
+    endif()
 endif()
 
 # * Dependency presence
@@ -29,8 +54,15 @@ endif()
 # ? hand include paths to IntelliSense. The compile then fails with
 # ? "NvInfer.h: No such file or directory", naming the same problem.
 # ? Jetson: FATAL, because a missing system path means JetPack is broken.
+set(_required_dirs ${_opencv_include_dir})
+if(COGIDRONE_BACKEND STREQUAL "TRT")
+    list(APPEND _required_dirs ${_trt_include_dir} ${_cuda_include_dir})
+else()
+    list(APPEND _required_dirs ${_onnx_include_dir})
+endif()
+
 set(_missing_dirs "")
-foreach(_dir IN ITEMS ${_trt_include_dir} ${_cuda_include_dir} ${_opencv_include_dir})
+foreach(_dir IN ITEMS ${_required_dirs})
     if(NOT IS_DIRECTORY "${_dir}")
         string(APPEND _missing_dirs "\n    ${_dir}")
     endif()
@@ -48,9 +80,14 @@ if(NOT _missing_dirs STREQUAL "")
     endif()
 endif()
 
-message(STATUS "TensorRT: ${_trt_include_dir} | ${_trt_lib_dir}")
-message(STATUS "CUDA:     ${_cuda_include_dir} | ${_cuda_lib_dir}")
+message(STATUS "Backend:  ${COGIDRONE_BACKEND}")
 message(STATUS "OpenCV:   ${_opencv_include_dir} | ${_opencv_lib_dir}")
+if(COGIDRONE_BACKEND STREQUAL "TRT")
+    message(STATUS "TensorRT: ${_trt_include_dir} | ${_trt_lib_dir}")
+    message(STATUS "CUDA:     ${_cuda_include_dir} | ${_cuda_lib_dir}")
+else()
+    message(STATUS "ONNX RT:  ${_onnx_include_dir} | ${_onnx_lib_dir}")
+endif()
 
 
 # * ROS 2 + px4_msgs
@@ -74,6 +111,9 @@ set(_ros_sys_lib_dir ${CMAKE_SOURCE_DIR}/vendored/ros2/usr/lib/aarch64-linux-gnu
 # ? associate each header with this target's compile flags. A header that is
 # ? in no target gets no include paths, so every #include in it fails when the
 # ? header is opened on its own. That was the yolo.h error.
+# !
+# ! The engine .cpp/.h pair is added by the backend block BELOW, not here:
+# ! compiling both would require both toolchains present at once.
 add_executable(cogidrone
     # Application
     main.cpp
@@ -87,9 +127,7 @@ add_executable(cogidrone
     perception/perception.cpp
     perception/perception.h
     perception/models/engine.h
-    perception/models/trt_engine.cpp
     perception/models/trt_engine.h
-    perception/models/onnx_engine.cpp
     perception/models/onnx_engine.h
     perception/models/yolo.cpp
     perception/models/yolo.h
@@ -122,25 +160,54 @@ add_executable(cogidrone
 )
 
 
+# * Backend selection
+# ? `engine.h` picks the class from COGIDRONE_BACKEND_ONNX, so the definition
+# ? and the source file must agree. Defining one without the other produces a
+# ? link error naming the missing symbol, which is the failure we want.
+if(COGIDRONE_BACKEND STREQUAL "TRT")
+    target_sources(cogidrone PRIVATE
+        perception/models/trt_engine.cpp
+    )
+    target_compile_definitions(cogidrone PRIVATE COGIDRONE_BACKEND_TRT)
+else()
+    target_sources(cogidrone PRIVATE
+        perception/models/onnx_engine.cpp
+    )
+    target_compile_definitions(cogidrone PRIVATE COGIDRONE_BACKEND_ONNX)
+endif()
+
+
 # * Include
+# ? ONNX Runtime's include dir is added UNCONDITIONALLY so IntelliSense can
+# ? resolve onnx_engine.h even when the TRT backend is selected. The header is
+# ? in the source list either way; only the .cpp is backend-specific.
 target_include_directories(cogidrone PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${_ros_include_dirs}
     ${_px4_include_dir}
-    ${_trt_include_dir}
-    ${_cuda_include_dir}
     ${_opencv_include_dir}
+    ${_onnx_include_dir}
 )
+if(COGIDRONE_BACKEND STREQUAL "TRT")
+    target_include_directories(cogidrone PRIVATE
+        ${_trt_include_dir}
+        ${_cuda_include_dir}
+    )
+endif()
 
 
 # * Link
 target_link_directories(cogidrone PRIVATE
     ${_ros_lib_dirs}
     ${_px4_lib_dir}
-    ${_trt_lib_dir}
-    ${_cuda_lib_dir}
     ${_opencv_lib_dir}
 )
+if(COGIDRONE_BACKEND STREQUAL "TRT")
+    target_link_directories(cogidrone PRIVATE ${_trt_lib_dir} ${_cuda_lib_dir})
+else()
+    target_link_directories(cogidrone PRIVATE ${_onnx_lib_dir})
+endif()
+
 target_link_libraries(cogidrone PRIVATE
     rclcpp rcl rmw rmw_fastrtps_cpp rmw_implementation rmw_dds_common
     rmw_fastrtps_shared_cpp rcutils rcpputils
@@ -161,18 +228,28 @@ target_link_libraries(cogidrone PRIVATE
     px4_msgs__rosidl_typesupport_fastrtps_cpp px4_msgs__rosidl_typesupport_fastrtps_c
     px4_msgs__rosidl_typesupport_introspection_cpp px4_msgs__rosidl_typesupport_introspection_c
 
-    nvinfer cudart
     opencv_core opencv_imgproc
 )
+
+if(COGIDRONE_BACKEND STREQUAL "TRT")
+    target_link_libraries(cogidrone PRIVATE nvinfer cudart)
+else()
+    target_link_libraries(cogidrone PRIVATE onnxruntime)
+endif()
 
 # * Runtime library resolution
 # ? The binary links against vendored px4_msgs + ROS 2 libs unconditionally
 # ? (see the link block above). Without an rpath the dynamic linker cannot
 # ? find them at runtime. Embedding the paths makes the binary self-contained:
 # ? no LD_LIBRARY_PATH, works from systemd, launch files, and SSH.
+set(_rpath_dirs "${_px4_lib_dir};${_ros_lib_dirs};${_ros_sys_lib_dir}")
+if(COGIDRONE_BACKEND STREQUAL "ONNX")
+    string(APPEND _rpath_dirs ";${_onnx_lib_dir}")
+endif()
+
 set_target_properties(cogidrone PROPERTIES
-    BUILD_RPATH   "${_px4_lib_dir};${_ros_lib_dirs};${_ros_sys_lib_dir}"
-    INSTALL_RPATH "${_px4_lib_dir};${_ros_lib_dirs};${_ros_sys_lib_dir}"
+    BUILD_RPATH   "${_rpath_dirs}"
+    INSTALL_RPATH "${_rpath_dirs}"
 )
 
 # ? --disable-new-dtags emits DT_RPATH instead of DT_RUNPATH. DT_RUNPATH is
@@ -192,8 +269,6 @@ if(CMAKE_CROSSCOMPILING)
         "-Wl,-rpath-link,${CMAKE_SOURCE_DIR}/vendored/ros2/opt/ros/jazzy/lib"
         "-Wl,-rpath-link,${CMAKE_SOURCE_DIR}/vendored/ros2/usr/lib/aarch64-linux-gnu"
         "-Wl,-rpath-link,${_px4_lib_dir}"
-        "-Wl,-rpath-link,${_trt_lib_dir}"
-        "-Wl,-rpath-link,${_cuda_lib_dir}"
         "-Wl,-rpath-link,${_opencv_lib_dir}"
 
         # ? libnvinfer.so has DT_NEEDED entries for libraries we do not vendor
@@ -201,6 +276,16 @@ if(CMAKE_CROSSCOMPILING)
         # ? on symbols that will resolve at runtime on the Jetson.
         "-Wl,--allow-shlib-undefined"
     )
+    if(COGIDRONE_BACKEND STREQUAL "TRT")
+        target_link_options(cogidrone PRIVATE
+            "-Wl,-rpath-link,${_trt_lib_dir}"
+            "-Wl,-rpath-link,${_cuda_lib_dir}"
+        )
+    else()
+        target_link_options(cogidrone PRIVATE
+            "-Wl,-rpath-link,${_onnx_lib_dir}"
+        )
+    endif()
 endif()
 
 
