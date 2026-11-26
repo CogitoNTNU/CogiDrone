@@ -12,11 +12,11 @@ constexpr std::array<std::string_view, 1> HEAD_CLASS_NAMES = { "head" };
 
 std::expected<Head, Head::InitError> Head::create() {
     // ! Fallible work FIRST: load the TensorRT plan
-    auto yolo = Yolo<OutputLayout::ANCHORS>::create({
+    auto yolo = Yolo<OutputLayout::Anchors>::create({
         .enginePath = "models/medium.engine",                                       // TODO: [#35] path from a parameter
         .classNames = HEAD_CLASS_NAMES
     });
-    
+
     if (!yolo) return std::unexpected(InitError::ModelLoadFailed);
 
     return Head(M{ .yolo = std::move(*yolo) });

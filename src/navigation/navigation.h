@@ -15,11 +15,12 @@
 // #include "px4_msgs/msg/vehicle_attitude.hpp"
 #include "vision_msgs/msg/detection2_d_array.hpp"
 
-#include "logging.h"
 #include "controller/flight_commands.h"
-#include "math/vec3.h"
 #include "math/transform.h"
 #include "enum_names.h"
+#include "math/bbox.h"
+#include "math/vec3.h"
+#include "logging.h"
 
 
 // * Design choice - Why we don't have a fixed-rate control loop
@@ -383,9 +384,12 @@ private:
     // ? the sweep never snaps the drone round to a fixed heading.
     float searchStartYaw = 0.0f;
 
-    // ? Last frame's target box, for ClosestTargeter-style target persistence
-    // ? in onDetections() (same person = box IoU >= 0.3).
-    vision_msgs::msg::BoundingBox2D lastTargetBox;
+    // ? Last frame's target box, for target persistence. A detection whose box
+    // ? overlaps this by >= targetIouThreshold is treated as the SAME person,
+    // ? so the drone does not switch targets when someone walks past.
+    // ? `cogidrone::BoundingBox`, not `vision_msgs::msg::BoundingBox2D`: 16 bytes
+    // ? instead of 40, and no ROS type in Navigation's state.
+    cogidrone::BoundingBox lastTargetBox;
 
     // ? The two raw inputs from FlightController. Written by onArmed() /
     // ? onOffboardActive(), read by deriveControlState().
@@ -447,6 +451,7 @@ private:
     [[nodiscard]] bool perceptionIsDead() const;
     [[nodiscard]] bool dronePositionValid() const;                                      // EKF has a usable position reference
 
+    // * State d
 
     // * Helpers
     // NOTE: 

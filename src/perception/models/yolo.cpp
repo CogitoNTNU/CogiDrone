@@ -55,20 +55,23 @@ struct Letterbox {
 // ? `constexpr`: std::max/std::min are constexpr since C++14, and this is pure
 // ? arithmetic. Marking it constexpr costs nothing and lets a unit test assert
 // ? a known overlap with static_assert.
-[[nodiscard]] constexpr float iou(const std::array<float, 4>& a, const std::array<float, 4>& b) {
-    const float IX1 = std::max(a[0], b[0]);
-    const float IY1 = std::max(a[1], b[1]);
-    const float IX2 = std::min(a[2], b[2]);
-    const float IY2 = std::min(a[3], b[3]);
+// [[nodiscard]] constexpr float iou(const std::array<float, 4>& a, const std::array<float, 4>& b) {
+//     const float IX1 = std::max(a[0], b[0]);
+//     const float IY1 = std::max(a[1], b[1]);
+//     const float IX2 = std::min(a[2], b[2]);
+//     const float IY2 = std::min(a[3], b[3]);
 
-    const float INTER = std::max(0.0f, IX2 - IX1) * std::max(0.0f, IY2 - IY1);
-    const float AREA_A = (a[2] - a[0]) * (a[3] - a[1]);
-    const float AREA_B = (b[2] - b[0]) * (b[3] - b[1]);
-    const float UNION = AREA_A + AREA_B - INTER;
+//     const float INTER = std::max(0.0f, IX2 - IX1) * std::max(0.0f, IY2 - IY1);
+//     const float AREA_A = (a[2] - a[0]) * (a[3] - a[1]);
+//     const float AREA_B = (b[2] - b[0]) * (b[3] - b[1]);
+//     const float UNION = AREA_A + AREA_B - INTER;
 
-    return UNION > 0.0f ? INTER / UNION : 0.0f;
-}
+//     return UNION > 0.0f ? INTER / UNION : 0.0f;
+// }
 
+
+// * Anchors
+namespace Anchors {
 // ? `detections` is sorted in place and left intact so the caller keeps its
 // ? capacity. `out` receives the survivors and is cleared first.
 // ? `suppressed` is caller-owned scratch - see the note on
@@ -121,7 +124,7 @@ void nonMaxSuppression(
         for (std::size_t j = i + 1z; j < detections.size(); ++j) {
             if (suppressed[j])                                      continue;
             if (detections[j].classId != detections[i].classId)     continue;
-            if (iou(detections[i].bbox, detections[j].bbox) > iouThreshold) {
+            if (cogidrone::iou(detections[i].bbox, detections[j].bbox) > iouThreshold) {
                 suppressed[j] = 1u;
             }
         }
@@ -139,9 +142,6 @@ void nonMaxSuppression(
     }
 }
 
-
-// * ANCHORS
-namespace ANCHORS {
 // ? [1, 4 + numClasses, numAnchors], attribute axis SECOND.
 // ? Element (row, anchor) is at row * numAnchors + anchor.
 // ? Many anchors fire per object, so NMS is required.
@@ -183,7 +183,7 @@ void decode(
         const float Y2 = (CY + H / 2.0f - letterbox.padY) / letterbox.scale;
 
         candidates.emplace_back(
-            /* .bbox = */       std::array<float, 4>{
+            /* .bbox = */       cogidrone::BoundingBox{
                                     std::clamp(X1, 0.0f, static_cast<float>(frame.cols)),
                                     std::clamp(Y1, 0.0f, static_cast<float>(frame.rows)),
                                     std::clamp(X2, 0.0f, static_cast<float>(frame.cols)),
@@ -195,12 +195,12 @@ void decode(
     }
 
     // * 4. Suppress
-    nonMaxSuppression(candidates, iouThreshold, out, suppressed);
+    Anchors::nonMaxSuppression(candidates, iouThreshold, out, suppressed);
 }
-} // namespace ANCHORS
+} // namespace Anchors
 
 // * END_TO_END
-namespace E2E {
+namespace EndToEnd {
 // ? [1, maxDetections, 6], attribute axis LAST.
 // ? Each row is a complete detection: x1, y1, x2, y2, score, classId.
 // ? The model already did one-to-one matching, so no NMS runs.
@@ -235,7 +235,7 @@ void decode(
         );
     }
 }
-} // namespace E2E
+} // namespace EndToEnd
 } // namespace
 
 
@@ -334,7 +334,7 @@ void Yolo<Layout>::detect(const cv::Mat& frame, std::vector<Model::Detection>& o
             return;
         }
 
-        E2E::decode(
+        EndToEnd::decode(
             OUTPUT, 
             LETTERBOXED, 
             frame, 
@@ -353,7 +353,7 @@ void Yolo<Layout>::detect(const cv::Mat& frame, std::vector<Model::Detection>& o
         }
 
         m.candidates.clear();
-        ANCHORS::decode(
+        Anchors::decode(
             OUTPUT,
             LETTERBOXED,
             frame,

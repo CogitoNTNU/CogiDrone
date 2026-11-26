@@ -202,10 +202,10 @@ void Perception::fuse(const cv::Mat& frame, std::vector<Model::Detection>& out) 
         // * 2. Head on the person crop
         // ? Clamp the crop to the frame: a box can extend past the edge when a
         // ? person is partially out of view.
-        const int X1 = std::max(0, static_cast<int>(person.bbox[0]));
-        const int Y1 = std::max(0, static_cast<int>(person.bbox[1]));
-        const int X2 = std::min(frame.cols, static_cast<int>(person.bbox[2]));
-        const int Y2 = std::min(frame.rows, static_cast<int>(person.bbox[3]));
+        const int X1 = std::max(0, static_cast<int>(person.bbox.x1));
+        const int Y1 = std::max(0, static_cast<int>(person.bbox.y1));
+        const int X2 = std::min(frame.cols, static_cast<int>(person.bbox.x2));
+        const int Y2 = std::min(frame.rows, static_cast<int>(person.bbox.y2));
 
         if (X2 <= X1 || Y2 <= Y1) continue;                                         // ? Degenerate box
 
@@ -228,12 +228,12 @@ void Perception::fuse(const cv::Mat& frame, std::vector<Model::Detection>& out) 
                 }
             );
 
-            const float HEAD_PIXEL_HEIGHT = BEST_HEAD->bbox[3] - BEST_HEAD->bbox[1];
+            const float HEAD_PIXEL_HEIGHT = BEST_HEAD->bbox.height();
             distance = distanceFromPixelHeight(m.params.averageHeadHeight, HEAD_PIXEL_HEIGHT);
         }
 
         if (distance <= 0.0f) {
-            const float BODY_PIXEL_HEIGHT = person.bbox[3] - person.bbox[1];
+            const float BODY_PIXEL_HEIGHT = person.bbox.height();
             distance = distanceFromPixelHeight(m.params.averageHumanHeight, BODY_PIXEL_HEIGHT);
         }
 
@@ -243,8 +243,8 @@ void Perception::fuse(const cv::Mat& frame, std::vector<Model::Detection>& out) 
         // ? The box centre's pixel offset from the principal point, scaled by
         // ? distance / focalLength, gives the lateral offset in metres. This is
         // ? `offset_in_meters()` from depth_head.py.
-        const float CENTER_X = (person.bbox[0] + person.bbox[2]) / 2.0f;
-        const float CENTER_Y = (person.bbox[1] + person.bbox[3]) / 2.0f;
+        const float CENTER_X = (person.bbox.x1 + person.bbox.x2) / 2.0f;
+        const float CENTER_Y = (person.bbox.y1 + person.bbox.y2) / 2.0f;
 
         // ? `emplace_back` with positional arguments, not a designated
         // ? initializer: this constructs the Detection in place, avoiding both
@@ -292,11 +292,11 @@ Perception::toDetectionArray(std::span<const Model::Detection> fused) const {
         auto& detection = out->detections.emplace_back();
 
         // ? bbox is centre + size, not corners.
-        detection.bbox.center.position.x = (person.bbox[0] + person.bbox[2]) / 2.0;
-        detection.bbox.center.position.y = (person.bbox[1] + person.bbox[3]) / 2.0;
-        detection.bbox.size_x = person.bbox[2] - person.bbox[0];
-        detection.bbox.size_y = person.bbox[3] - person.bbox[1];
-
+        detection.bbox.center.position.x = (person.bbox.x1 + person.bbox.x2) / 2.0;
+        detection.bbox.center.position.y = (person.bbox.y1 + person.bbox.y2) / 2.0;
+        detection.bbox.size_x = person.bbox.width();
+        detection.bbox.size_y = person.bbox.height();
+        
         // ? Same reasoning: construct the hypothesis in place, fill through the
         // ? reference. `detection.results` has exactly one element, so this
         // ? never reallocates and the reference stays valid.

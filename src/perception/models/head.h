@@ -25,7 +25,7 @@
 class Head {
 private:
     struct M {                                                                      // Assembly struct
-        Yolo<OutputLayout::ANCHORS> yolo;
+        Yolo<OutputLayout::Anchors> yolo;
     } m;
 
     explicit Head(M&& m) : m(std::move(m)) {}

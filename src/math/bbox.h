@@ -13,7 +13,7 @@ namespace cogidrone {
 // ! NO ROS TYPES HERE. `math/` stays dependency-free so it remains
 // ! constexpr-testable and usable outside a ROS graph. The conversion from
 // ! `vision_msgs::msg::BoundingBox2D` lives at the ROS boundary instead.
-struct Bbox {
+struct BoundingBox {
     float x1 = 0.0f;
     float y1 = 0.0f;
     float x2 = 0.0f;
@@ -27,7 +27,7 @@ struct Bbox {
 // ? Intersection over union. Returns 0 for disjoint or degenerate boxes.
 // ? `constexpr`: pure arithmetic, so a unit test can assert a known overlap
 // ? with static_assert.
-[[nodiscard]] constexpr float iou(const Bbox& a, const Bbox& b) noexcept {
+[[nodiscard]] constexpr float iou(const BoundingBox& a, const BoundingBox& b) noexcept {
     const float IX = std::max(0.0f, std::min(a.x2, b.x2) - std::max(a.x1, b.x1));
     const float IY = std::max(0.0f, std::min(a.y2, b.y2) - std::max(a.y1, b.y1));
     const float INTERSECTION = IX * IY;

@@ -7,6 +7,7 @@
 
 #include "logging.h"
 #include "math/vec3.h"
+#include "math/bbox.h"
 
 
 // NOTE: Header only library for reused model types and structs
@@ -19,7 +20,7 @@ namespace Model {
 // ? needs the drone's attitude, which is Navigation's concern, not a sensor's.
 // ? See math/transform.h for the conversion.
 struct Detection {
-    std::array<float, 4> bbox{};                                                    // x1, y1, x2, y2 in pixels
+    cogidrone::BoundingBox bbox;                                                    // pixels, corner form
     float confidence = 0.0f;                                                        // [0-1]
     int classId = -1;                                                               // index into the model's class table
     cogidrone::Vec3 positionCamera;                                                 // metres, camera frame
