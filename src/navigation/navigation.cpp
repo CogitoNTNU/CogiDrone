@@ -772,9 +772,6 @@ bool Navigation::detectionIsValid() const {
     if (!person.valid) return false;
     if (person.confidence < m.params.minDetectionConfidence) return false;
 
-    const double sinceDetection = (m.node->now() - person.timestamp).seconds();
-    if (sinceDetection > m.params.detectionTimeout) return false;
-
     // ? Distance bounds: beyond maxFollowDistance the person is not a follow
     // ? target, and inside minFollowDistance the standoff point would be behind
     // ? the drone. Both are "not a valid target", not "lost" - the hysteresis in
