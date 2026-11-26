@@ -837,9 +837,26 @@ bool Navigation::dronePositionValid() const {
 // ? otherwise take the closest. Mirrors targeter/target_closest.py.
 // ? No lock: called only from onDetections(), which the executor serializes.
 const vision_msgs::msg::Detection2D* Navigation::selectTarget(const vision_msgs::msg::Detection2DArray& msg) const {
-    // ? Persist across brief dropouts. `person.valid` is false after a single
-    // ? empty frame, but the target is only truly lost after detectionTimeout.
-    const bool HAVE_RECENT_TARGET = person.valid || (m.node->now() - person.timestamp).seconds() <= m.params.detectionTimeout;   
+    // ? LOOSE: target IDENTITY survives a brief dropout. person.valid is
+    // ? false after a single empty frame, but lastTargetBox is still the last
+    // ? place we saw them, so it is worth comparing against until the timeout
+    // ? expires. Contrast detectionIsValid(), which is strict.
+    // ?
+    // ! THIS ONLY WORKS WITH A STATIONARY CAMERA. lastTargetBox is in PIXEL
+    // ! coordinates, so any rotation moves the box. At searchYawRate = 0.3 rad/s
+    // ! and 30 Hz, a box shifts ~4.6 px/frame, and IoU drops below
+    // ! targetIouThreshold within ~6 frames (200 ms).
+    // !
+    // ! That is fine today because personIsLost() flips true at exactly the
+    // ! moment the sweep starts, so HAVE_RECENT_TARGET is false for the whole
+    // ! sweep - the IoU comparison is never reached. Persistence is therefore
+    // ! active only during the 2 s hover window in FOLLOWING, where
+    // ! hoverBehavior() holds heading and the camera is stationary.
+    // !
+    // ! If this gate is ever loosened, persistence will silently stop working
+    // ! during PERSON_LOST. Real re-acquisition needs world-frame tracking,
+    // ! which belongs in Perception - see the tracking issue.
+    const bool HAVE_RECENT_TARGET = person.valid || !personIsLost();
 
     const vision_msgs::msg::Detection2D* closest = nullptr;
     const vision_msgs::msg::Detection2D* current = nullptr;
