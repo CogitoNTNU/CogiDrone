@@ -272,6 +272,11 @@ struct NavigationParams {
     float detectionTimeout          = 2.0f;                                             // seconds
     float minDetectionConfidence    = 0.4f;                                             // ? MIN_CONFIDENCE in target_closest.py
     float trackConfirmTime          = 1.0f;                                             // seconds of stable track before committing to FOLLOWING
+
+    // Target selection
+    // ? From targeter/target_closest.py. See [#39].
+    float targetIouThreshold       = 0.3f;                                              // ? box overlap that means "same person"
+    float targetSwitchMargin       = 0.8f;                                              // ? switch only if the new target is <80% as far
 };
 
 
@@ -451,7 +456,17 @@ private:
     [[nodiscard]] bool perceptionIsDead() const;
     [[nodiscard]] bool dronePositionValid() const;                                      // EKF has a usable position reference
 
-    // * State d
+    // * Target selection
+    // ? Picks which detection to follow. This is POLICY, not perception:
+    // ? "closest" is a mission decision, and a different mission could pick
+    // ? differently. Perception stays mission-agnostic. See [#39].
+    // ?
+    // ! The IoU persistence here is TRACKING, which arguably belongs in
+    // ! Perception. Splitting it out needs a stable track ID, and
+    // ! `Detection2D.id` is already used for the pose class name. Tracked
+    // ! separately - see the issue on target tracking.
+    [[nodiscard]] const vision_msgs::msg::Detection2D* 
+    selectTarget(const vision_msgs::msg::Detection2DArray& msg) const;
 
     // * Helpers
     // NOTE: 

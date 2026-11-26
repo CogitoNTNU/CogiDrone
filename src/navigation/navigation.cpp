@@ -8,11 +8,32 @@
 #include "controller/px4_topics.h"
 
 
-// | Logging
 namespace {
+// | Logging
 // ? `%.*s` takes the length explicitly - a string_view is not NUL-terminated.
 [[nodiscard]] constexpr int svLen(std::string_view sv) noexcept {
     return static_cast<int>(sv.size());
+}
+
+// * ROS box -> cogidrone::BoundingBox
+// ? `vision_msgs::BoundingBox2D` is centre + size; `cogidrone::Bbox` is
+// ? corners. The conversion lives here, not in math/, so math/ stays free of
+// ? ROS dependencies and remains constexpr-testable.
+[[nodiscard]] cogidrone::BoundingBox toBbox(const vision_msgs::msg::BoundingBox2D& b) noexcept {
+    const double HALF_W = b.size_x / 2.0;
+    const double HALF_H = b.size_y / 2.0;
+    return cogidrone::BoundingBox{
+        static_cast<float>(b.center.position.x - HALF_W),
+        static_cast<float>(b.center.position.y - HALF_H),
+        static_cast<float>(b.center.position.x + HALF_W),
+        static_cast<float>(b.center.position.y + HALF_H)
+    };
+}
+
+// ? Camera-frame forward distance. Perception puts it in the pose's z.
+// ! Caller must have checked `results` is non-empty.
+[[nodiscard]] float distanceOf(const vision_msgs::msg::Detection2D& d) noexcept {
+    return static_cast<float>(d.results.front().pose.pose.position.z);
 }
 } // namespace
 
@@ -39,6 +60,8 @@ std::expected<std::unique_ptr<Navigation>, cogidrone::Error> Navigation::create(
     params.detectionTimeout       = node->declare_parameter("detection_timeout", params.detectionTimeout);
     params.minDetectionConfidence = node->declare_parameter("min_detection_confidence", params.minDetectionConfidence);
     params.trackConfirmTime       = node->declare_parameter("track_confirm_time", params.trackConfirmTime);
+    params.targetIouThreshold     = node->declare_parameter("target_iou_threshold", params.targetIouThreshold);
+    params.targetSwitchMargin     = node->declare_parameter("target_switch_margin", params.targetSwitchMargin);
 
     cogidrone::log(LOGGING_LEVEL::INFO, "Navigation parameters initialized successfully"sv);
 
@@ -185,54 +208,15 @@ void Navigation::onDetections(const vision_msgs::msg::Detection2DArray& msg) {
     // ? Heartbeat: Perception is alive, regardless of whether a person was found.
     lastHeartbeatTime = m.node->now();
 
-    // * Pick the most confident detection in the array
+    // * Select the target
     // ? CONTRACT: `/perception/detections` carries PERSON detections only.
-    // ? Perception owns the filtering; Navigation takes the highest score and
-    // ? does not inspect `hypothesis.class_id`. This is a deliberate choice over
-    // ? string-matching a class id in the hot loop: the topic name is the
-    // ? contract, and a second class gets a second topic (e.g.
-    // ? `/perception/heads`), not a second branch here.
-    // ! If Perception ever publishes mixed classes on this topic, this loop will
-    // ! follow a head. Change the topic, not this loop.
-    // ? Selection follows the Python prototype's ClosestTargeter
-    // ? (targeter/target_closest.py): among detections at or above
-    // ? minDetectionConfidence, keep the CURRENT target (box IoU >= 0.3 with
-    // ? last frame's box) unless another person is clearly closer (< 80 % of
-    // ? its distance); otherwise take the closest. Distance is camera-frame z.
-    constexpr double MIN_IOU_SAME_TARGET = 0.3;
-    constexpr double SWITCH_MARGIN = 0.8;
-    const auto IOU = [](const vision_msgs::msg::BoundingBox2D& a, const vision_msgs::msg::BoundingBox2D& b) {
-        const double IX = std::max(0.0, std::min(a.center.position.x + a.size_x / 2, b.center.position.x + b.size_x / 2)
-                                      - std::max(a.center.position.x - a.size_x / 2, b.center.position.x - b.size_x / 2));
-        const double IY = std::max(0.0, std::min(a.center.position.y + a.size_y / 2, b.center.position.y + b.size_y / 2)
-                                      - std::max(a.center.position.y - a.size_y / 2, b.center.position.y - b.size_y / 2));
-        const double UNION = a.size_x * a.size_y + b.size_x * b.size_y - IX * IY;
-        return UNION > 0.0 ? IX * IY / UNION : 0.0;
-    };
-    const auto DISTANCE = [](const vision_msgs::msg::Detection2D& d) {
-        return d.results.front().pose.pose.position.z;
-    };
+    // ? Perception owns the filtering; Navigation applies mission policy.
+    // ! If Perception ever publishes mixed classes on this topic, this will
+    // ! follow a head. Change the topic, not the selection.
+    const vision_msgs::msg::Detection2D* best = selectTarget(msg);
 
-    const vision_msgs::msg::Detection2D* closest = nullptr;
-    const vision_msgs::msg::Detection2D* current = nullptr;
-    for (const auto& detection : msg.detections) {
-        if (detection.results.empty()) continue;                                        // ? Malformed entry
-        if (detection.results.front().hypothesis.score < m.params.minDetectionConfidence) continue;
-        if (!closest || DISTANCE(detection) < DISTANCE(*closest)) {
-            closest = &detection;
-        }
-        if (person.valid && IOU(detection.bbox, lastTargetBox) >= MIN_IOU_SAME_TARGET
-            && (!current || IOU(detection.bbox, lastTargetBox) > IOU(current->bbox, lastTargetBox))) {
-            current = &detection;
-        }
-    }
-
-    const vision_msgs::msg::Detection2D* best = closest;
-    if (current && !(DISTANCE(*closest) < DISTANCE(*current) * SWITCH_MARGIN)) {
-        best = current;
-    }
     if (best) {
-        lastTargetBox = best->bbox;
+        lastTargetBox = toBbox(best->bbox);
     }
 
     // * Policy A: an empty array means "no person in this frame"
@@ -833,4 +817,45 @@ bool Navigation::dronePositionValid() const {
     // ? position reference (GPS outdoors, VIO later). Without it, `x`/`y`/`z`
     // ? are meaningless and any setpoint built from them is a guess.
     return dronePosition.xy_valid && dronePosition.z_valid;
+}
+
+
+// * Target selection
+// ? Among detections at or above minDetectionConfidence, keep the CURRENT
+// ? target (box IoU >= targetIouThreshold with last frame's box) unless
+// ? another person is CLEARLY closer (< targetSwitchMargin of its distance);
+// ? otherwise take the closest. Mirrors targeter/target_closest.py.
+// ? No lock: called only from onDetections(), which the executor serializes.
+const vision_msgs::msg::Detection2D* Navigation::selectTarget(const vision_msgs::msg::Detection2DArray& msg) const {
+    const vision_msgs::msg::Detection2D* closest = nullptr;
+    const vision_msgs::msg::Detection2D* current = nullptr;
+    float currentIou = 0.0f;
+
+    for (const auto& detection : msg.detections) {
+        if (detection.results.empty()) continue;                                        // ? Malformed entry
+        if (detection.results.front().hypothesis.score < m.params.minDetectionConfidence) continue;
+
+        // ? Closest by camera-frame z.
+        if (!closest || distanceOf(detection) < distanceOf(*closest)) {
+            closest = &detection;
+        }
+
+        // ? Same person as last frame? Highest overlap wins.
+        if (person.valid) {
+            const float IOU = cogidrone::iou(toBbox(detection.bbox), lastTargetBox);
+            if (IOU >= m.params.targetIouThreshold && IOU > currentIou) {
+                current = &detection;
+                currentIou = IOU;
+            }
+        }
+    }
+
+    if (!current) return closest;
+
+    // ? Hysteresis: keep the current target unless another person is CLEARLY
+    // ? closer. Without the margin, two people at similar range would make the
+    // ? drone oscillate between them every frame.
+    const bool CLEARLY_CLOSER = distanceOf(*closest) < distanceOf(*current) * m.params.targetSwitchMargin;
+
+    return CLEARLY_CLOSER ? closest : current;
 }
